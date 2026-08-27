@@ -9,6 +9,8 @@
 // Solidity port is bit-exact.
 // ---------------------------------------------------------------------------
 const PINK='#FF3EB5', WHITE='#FFFFFF';
+// glow shades: luminance falloff toward the black ground (no filters onchain)
+const GLOW_P1='#8A2263', GLOW_P2='#471132', GLOW_W1='#8A8A8A', GLOW_W2='#474747';
 const FORM_NAMES=['BROAD','LEAN','SPIRE','SKEW L','SKEW R','SUNKEN','TOWERING','HOLLOW'];
 const LINE_NAMES=['FINE','MID','HEAVY'];
 const TEAR_NAMES=['CLEAN','TORN','SHREDDED'];
