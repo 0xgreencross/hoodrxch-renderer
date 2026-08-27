@@ -1,188 +1,157 @@
-# HOODRXCH — State → Layer Map (v0.1, for approval)
+# HOODRXCH — STATE → LAYER MAP (v1, SIGNAL WRAITH)
 
-Status: DRAFT awaiting founder/artist approval. Nothing is drawn until this is signed off.
-Precedence: Handoff v1.0.0-draft (mechanics) > Master Prompt v2 (visuals) > this document.
+Renderer version 1 · schema version 1 · canonical mechanics: `HOODRXCH_Dynamic_NFT_Mechanics_Handoff.md`
 
-This is the contract between `RenderStateV1` and the picture. Every state dimension is listed with the layer it drives, its z-order, what overrides it, and what it must never cover. The JS reference renderer and `HOODRXCHRendererV1.sol` both implement exactly this table.
+The renderer is a **pure function of RenderStateV1**. It never reads clocks,
+block numbers or randomness at render time. Same state → byte-identical SVG,
+in the JS reference (`reference-renderer/index.html`) and in `contracts/`.
 
----
+## 1. The visual language
 
-## 1. Canvas and colour law
+Every token is a field of 47 horizontal signal lines on a 100-unit grid
+(×10 px, integer coordinates only). A skull-form heightfield — flat-top
+plateau + crown peak + jaw shelf − nasal dent, all integer centi-unit math —
+displaces the lines upward, so the hooded figure exists only as a
+*disturbance in the signal*. Eyes are the only solid fills.
 
-| Item | Value |
-|---|---|
-| viewBox | `0 0 1000 1000` (banner `0 0 3000 1000`) |
-| Logical grid | 100 units = 1000 px; all base vertices are integers on the 100-grid, scaled ×10, then jittered ±1…2 units from the genesis RNG (see §8) |
-| Colours | `#000000` ground/hood · `#CCFF00` everything lit · `#FF2A2A` only in MARKED, TERMINAL_COFFIN, DIAGNOSTIC |
-| Forbidden SVG | `<script>`, `<filter>`, gradients, `opacity`, patterns, external `href`, fonts/`<text>` |
-| Text | Block glyphs A–Z 0–9 `#` `/` `.` as `<path>` in `<defs>`, placed via `<use>` |
-| Figure height (PLAIN) | 75–80 % of canvas; black ≥ 60 % of canvas on a genesis token |
+Palette (locked): `#000000` ground · `#CCFF00` acid signal · `#FF3EB5` pink
+echo · `#FFFFFF` white (specks, crests, structure). `#FF2A2A` red is
+**reserved**: it may appear only in the MARKED overlay, the TERMINAL coffin
+verdict, and diagnostic renders.
 
-## 2. Z-order (bottom → top)
+Constraints: no `<script>`, no `<filter>`, no gradients, no opacity, no
+external refs. `<defs>/<use>` for the figure group and block glyphs.
+Animation is SMIL only (`flicker`). Text on tokens uses the 5×7 block-glyph
+font; the live figure itself is wordless.
 
-| z | Layer id | Driven by | Notes |
-|--:|---|---|---|
-| 0 | `GROUND` | constant (red border in MARKED / TERMINAL) | full-bleed black rect |
-| 1 | `GHOST` | genesis glitch trait 3, kill tier ≥ REAPER, flicker | green silhouette offset 2–3 u behind |
-| 2 | `HOOD` | genesis traits (silhouette, rim, edge, collar, block mark) | black mass + green rim |
-| 3 | `SKULL` | `deaths` ≥ 1 (tears), COFFINED/TERMINAL (compressed mask) | green, only where exposed |
-| 4 | `DAMAGE` | `deaths`, `savesReceived`, `forcedPurges` | tears, cracks, stitch-scars, tally notches |
-| 5 | `FACE` | genesis traits eyes / mouth / ward sigil | green cut-outs in hood |
-| 6 | `ORNAMENT` | `tierForKills(kills)` | additive kill decoration |
-| 7 | `STATUS` | precedence resolver (§4) — exactly one | crosshair / shield / bars / MARKED kit |
-| 8 | `SEALS` | `sealsRemaining` | three seal glyphs on figure bottom edge |
-| 9 | `BADGES` | kill tier, `latestSeasonBadgeFlags`, `latestAwardSeasonId` | slots A/B/C |
-| 10 | `TERRITORY` | `territoryAchievementCount` | thin top strip, own slot |
-| 11 | `FRAME_HUD` | `displayMode == 1` only | frame, corner marks, stat panel, padlock if `transferLocked` |
-| 12 | `DIAGNOSTIC` | impossible state | replaces all of the above |
+## 2. Z-order
 
-Glitch displacement slices (genesis trait, SAVAGE+, MARKED recolour, flicker) are applied to the composed group z1–z6 via `<clipPath>`+`translate`, never to z7+. Status, seals and badges are never sliced, so critical information is never displaced out of the frame.
+| z | layer | source fields |
+|---|-------|---------------|
+| z0 | black ground | — |
+| z1 | white specks | genesisHash |
+| z2 | pink echo pass | genesis trait `pink`, kill tier ≥ REAPER |
+| z3 | signal field (colour-grouped acid/pink/white) | genesisHash, kills |
+| z4 | eyes + treatments | genesis traits, kill tier escalation |
+| z5 | permanent record: kill notches, purge tallies, save stitches, death scars, mouth marks | kills, forcedPurges, savesReceived, deaths |
+| z6 | ward sigil (top-left) + block mark (bottom-right) + kill-tier halo | wardId, blockId, kills |
+| z6.5 | mosh slices + death slices (displace z1–z6) | genesis trait `mosh`, deaths (damageSeed) |
+| z7 | status overlay (exactly one, see §4) | resolveStatus(state) |
+| z8 | HUD: seal pips (top-right), latest season chips (left), territory ladder (right edge) | sealsRemaining, latestSeason*, territoryAchievementCount |
+| z9 | STATS band (hem) | displayMode = STATS |
+| z10 | flicker scanlines (SMIL) | flicker |
 
-## 3. Dimension → layer table
+COFFINED / TERMINAL_COFFIN replace z1–z7 with the coffin composition (§5).
+Invalid states replace everything with the diagnostic render (§7).
 
-### 3.1 Immutable identity
+## 3. Kill-tier ladder (z3/z4/z6)
 
-| Field | Layer | Effect |
-|---|---|---|
-| `genesisHash`, `tokenId` | RNG seed | `rng = keccak256(abi.encodePacked(genesisHash, uint16 tokenId))`; traits drawn in fixed order (§8) |
-| `wardId` | FACE (brow sigil) + HUD + banner | Ward 1 chevron, Ward 2 three bars, Ward 3 diamond. Fixed, non-random |
-| `blockId` | HOOD (collar block mark, 6 glyph variants) + HUD | `BLOCK 0x` text in STATS |
-| `artIndex` | metadata only | not drawn (identity already fully defined by `genesisHash`) |
+Tier = `tierForKills(kills)`: 1/10/25/50/75/100 →
+FIRST_BLOOD/RISING_THREAT/SAVAGE/EXECUTIONER/DEATH_DEALER/REAPER.
 
-### 3.2 Life state (`lifeState`, enum MaskLifeState)
+Colour roles within the locked palette:
 
-| Value | Figure | Colour | Overrides |
-|---|---|---|---|
-| `ALIVE` (0) | mask | black/green | — |
-| `MARKED` (1) | mask + MARKED kit (red crosshair, red eye drips, red band with `purgeDeadline`, red canvas border, slices recolour red) | adds red | all decoration; badges drawn as outlines only |
-| `COFFINED` (2) | green coffin outline containing compressed mask (silhouette + eyes readable), death number, `markedByTokenId` as killer, broken seals, kill crest on lid | black/green | everything except seals & crest |
-| `TERMINAL_COFFIN` (3) | red coffin, red mask inside, `TERMINAL` glyphs, all seals broken, red border | red | everything. No badges, no animation, no HUD overlays except frame in STATS |
+| tier | figure signal | crest lines | eyes | halo (crest-following corona) |
+|------|---------------|-------------|------|-------------------------------|
+| 0 NONE | acid | — | trait | — |
+| 1 FIRST BLOOD | acid | — | trait | 1 pink arc |
+| 2 RISING THREAT | crest-6 pink | — | ≥ ECHO GLOW | 2 pink arcs |
+| 3 SAVAGE | upper figure pink | 1 white | ≥ ECHO GLOW | 3 pink arcs, outer broken |
+| 4 EXECUTIONER | full figure pink | 2 white | FULL SIGNAL | white arc + radiating ticks |
+| 5 DEATH DEALER | full figure pink, background thinned | 4 white | FULL SIGNAL | + corona ray triangles |
+| 6 REAPER | full figure white + pink echo of 8 crest lines | — | FULL SIGNAL | full white ellipse ring + pink echo ring |
 
-`marked == true` must agree with `lifeState == MARKED`; disagreement is an impossible state.
+Halos are crisp strokes — **no glow layers** (art direction, 2026-08-27).
+Kill notches: 1 pink notch per kill above the left eye, cap 9.
 
-### 3.3 Exposure state (`exposureState`, enum ExposureState) + booleans
+## 4. Status overlays (z7) — precedence
 
-The renderer trusts the booleans `witsecApplies`, `laidLow`, `buyerProtected` for drawing and uses `exposureState` for metadata and consistency checks.
+`resolveStatus`: TERMINAL_COFFIN > COFFINED > MARKED > WITSEC >
+BUYER_PROTECTED > LAY_LOW > HUNTER_SELECTED > ALIVE. Exactly one overlay
+renders. Overlays sit **above** the mosh slices so status stays legible.
 
-| Condition | STATUS layer | Eyes |
-|---|---|---|
-| `witsecApplies` | solid green shield contour around head | thin lines |
-| `buyerProtected` | dashed green shield contour | thin lines |
-| `laidLow` | three horizontal black bars across face | hairline slits |
-| `ON_THE_STREET`, none of the above | nothing | genesis eyes |
+| status | composition |
+|--------|-------------|
+| MARKED | red warrant slash corner-to-corner, red corner brackets, 8 red purge ticks on the crown edge. Only red use on a live token. |
+| WITSEC | the eyes are redacted: white censor bar across both sockets + two white interference bars below |
+| LAY_LOW | gone dark: black blinds close over the figure + small acid down-chevron above the crown |
+| BUYER_PROTECTED | in escrow: thin acid holding frame inset 60 px + acid diamond top-centre |
+| HUNTER_SELECTED | quiet white sight ticks N/S/E/W of the skull |
+| ALIVE | no overlay |
 
-Only one of these three may be true (handoff §14.1, §3: buyer protection consumes no WITSEC, Lay Low is manual). If more than one is true → impossible state.
+## 5. Coffin compositions (COFFINED / TERMINAL_COFFIN)
 
-### 3.4 Combat role
+The signal flatlines. The field renders **undisplaced** (still, torn), and a
+coffin-shaped hexagonal void interrupts it — the wraith is gone; the signal
+refuses to run where the body lies. Structure (outline, nails) is white.
 
-| Field | Layer | Effect |
-|---|---|---|
-| `hunterSelected` | STATUS (lowest precedence) | green crosshair etched on forehead. Hidden when any protection or MARKED/coffin applies |
-| `markedByTokenId`, `markedByWardId` | MARKED band / coffin text | glyphs `BY #0123` |
-| `purgeDeadline` | MARKED band | unix seconds in block glyphs (no countdown — handoff §5) |
+- COFFINED (revivable): white flatline across the canvas with **one residual
+  heartbeat blip**; the eye archetype survives as pink ember glyphs inside
+  the void; seal pips inside the coffin (acid = intact, pink slashed =
+  broken). Exhumation restores the live figure with scars.
+- TERMINAL_COFFIN (permanent): perfectly flat **red** line, two red planks
+  nail the void shut, three red broken seals, no eyes. Field tears heavier.
 
-### 3.5 Permanent progression
+Identity persists in both: ward sigil, block mark, genesis-derived field
+texture, death-scar slices (damageSeed). Kill/season records remain in
+metadata (handoff §2.4).
 
-| Field | Layer | Effect |
-|---|---|---|
-| `kills` → `tierForKills` | ORNAMENT + BADGES slot A + HUD | NONE nothing · FIRST_BLOOD X-stitch one eye + mouth drip · RISING_THREAT X both eyes + spike row · SAVAGE shoulder chain + permanent 2nd slice · EXECUTIONER collar noose + flame-teeth edge · DEATH_DEALER flame crown + both chains · REAPER tall cowl + scythe + ghost duplicate. Strictly additive |
-| `lifetimeKillTier` (provided) | none | **ignored for drawing**; renderer derives from `kills` (handoff §9.3). Mismatch is reported by the fixture harness, not rendered |
-| `deaths` | SKULL + DAMAGE + coffin text | 1: one tear exposing skull patch · 2: second larger tear, cracks, missing teeth · 3: must be TERMINAL |
-| `sealsRemaining` | SEALS | 3/2/1/0 intact glyphs; broken = hollow cracked outline. Must equal `3 - deaths` |
-| `savesReceived` | DAMAGE | one stitch-scar per save across hood, max 5 drawn |
-| `forcedPurges` | DAMAGE | tally notches on collar (or scythe at REAPER), max 10 drawn |
-| `savesGiven`, `currentKillStreak`, `longestKillStreak`, `terminalKills` | HUD (STATS) + metadata | `STREAK` shows `currentKillStreak` |
+## 6. HUD (z8–z9)
 
-Tear placement (jaw vs cheek, left vs right) and scar angles are chosen from a **death seed**. `RenderStateV1` does not carry `coffinSeed` — see open item O-3. Until resolved, the reference renderer derives `damageSeed = keccak256(genesisHash, tokenId, deaths)` and flags it as provisional.
+- **Seal pips** (top-right, live states): 3 pips; acid filled = remaining,
+  pink slashed outline = broken. Coffins carry their pips inside the void.
+- **Season chips** (left, SLOT B/C per handoff §10.6): latest award only.
+  `S<n>` label + white `10` chip when `badgeFlags&1`; + pink `5` chip when
+  `badgeFlags&2`. Never rendered without a valid rank/season (E12).
+- **Territory ladder** (right edge): 1 acid tick per
+  `territoryAchievementCount`, cap 12, climbing from the hem.
+- **STATS band** (`displayMode=STATS`): black hem band, acid rule, two
+  glyph rows — `K/D/KD/STK` and `TIER / W B / S RANK`.
+- **Flicker**: two SMIL scanline sweeps (white 7 s down, pink 11 s up).
 
-### 3.6 Achievements
+## 7. Impossible states → diagnostic render
 
-| Field | Layer | Effect |
-|---|---|---|
-| `latestSeasonBadgeFlags` bit0 `TOP_10` | BADGES slot B | crowned-skull shield, season number inside |
-| `latestSeasonBadgeFlags` bit1 `TOP_5` | BADGES slot C | laurel shield, season number inside. Drawn only if slot B drawn; bit1 without bit0 → impossible state |
-| `latestAwardSeasonId`, `latestSeasonRank` | inside crests / HUD `SEASON` | |
-| `seasonAwardCount` | metadata only | older seasons are not drawn (handoff §10.6) |
-| `territoryAchievementCount > 0` | TERRITORY strip | Ward sigil + count, top edge, never replaces B/C |
+`validate(state)` returns codes; any code ⇒ red-framed diagnostic SVG with
+`INVALID STATE`, the codes, tokenId and stateHash prefix. Codes:
 
-Badge slots in PLAIN: three 8×8 u cells at lower-left of the figure area (x 4–12, y 66–90 approx). STATS: a full left column at 16×16. Badges are green only; in MARKED they reduce to outlines; in coffin states only the kill crest survives (on the lid); in TERMINAL nothing.
+| code | rule |
+|------|------|
+| E01 | TERMINAL with protection/hunter/marked |
+| E02 | COFFINED with protection/hunter/marked |
+| E03 | MARKED with witsec or laidLow |
+| E04 | sealsRemaining 0 but not TERMINAL |
+| E05 | deaths/TERMINAL mismatch (3 deaths ⇔ TERMINAL) |
+| E06 | sealsRemaining + min(deaths,3) ≠ 3 |
+| E07 | TOP_5 flag without TOP_10 |
+| E08 | more than one protection flag |
+| E09 | marked flag ≠ (lifeState==MARKED) |
+| E10 | lifeState/exposureState coffin mismatch |
+| E11 | ward/block/tokenId/schema out of range |
+| E12 | badge flags inconsistent with rank/season |
 
-### 3.7 Temporary context
+## 8. stateHash
 
-| Field | Layer | Effect |
-|---|---|---|
-| `warId`, `campaignId`, `seasonId`, `activeBlockId`, `warPhase` | metadata + HUD | `SEASON` in stat panel; rest metadata only |
-| `transferLocked`, `transferLockUntil` | metadata; padlock glyph in STATS frame | never in PLAIN |
-| `displayMode` (proposed) | FRAME_HUD | 0 PLAIN, 1 STATS |
-| `flicker` (proposed) | SMIL on z1–z6 only | off by default; frame 0 = static composition; never touches z7+ |
+keccak256 over `abi.encode`-style 32-byte words of the material fields, in
+order: schemaVersion, tokenId, artIndex, wardId, blockId, genesisHash,
+seasonId, lifeState, exposureState, sealsRemaining, hunterSelected,
+transferLocked, marked, markedByTokenId, purgeDeadline, witsecApplies,
+laidLow, buyerProtected, kills, deaths, forcedPurges, savesReceived,
+currentKillStreak, latestAwardSeasonId, latestSeasonRank,
+latestSeasonBadgeFlags, territoryAchievementCount, displayMode.
+Non-material fields (warId, campaignId, warPhase, counts…) are excluded.
 
-## 4. Precedence resolver (handoff §14, law)
+## 9. Determinism seeds
 
-```
-if lifeState == TERMINAL_COFFIN        → TERMINAL
-else if lifeState == COFFINED          → COFFINED
-else if lifeState == MARKED || marked  → MARKED
-else if witsecApplies                  → WITSEC
-else if buyerProtected                 → BUYER_PROTECTED
-else if laidLow                        → LAY_LOW
-else if hunterSelected                 → HUNTER_SELECTED
-else                                   → ALIVE
-```
+- `genesisSeed = keccak(genesisHash ‖ uint16(tokenId))` — all genesis traits
+  and the render byte stream (`Rng`: keccak pool, rehash on exhaustion).
+- `damageSeed = keccak(genesisHash ‖ tokenId ‖ deaths ‖ "DMG")` — death
+  scars and death slices; stable per death count, survives exhumation.
+- Banner extension stream: `keccak(genesisSeed ‖ "BNR")`.
 
-Permanent layers (identity, damage, seals, ornament, badges, territory) are drawn alongside the resolved status except where the table in §3.2 says the status suppresses them. Nothing above z7 may cover a red mark, the red band, or the terminal coffin.
+## 10. Banner (3000×1000)
 
-## 5. Impossible states → DIAGNOSTIC layer
-
-Rendered as: black field, red border, red block glyphs `INVALID STATE`, a short reason code, and the 8-hex-byte prefix of `stateHash`. Never guessed.
-
-| Code | Condition |
-|---|---|
-| `E01` | `TERMINAL_COFFIN` with any of `witsecApplies`, `laidLow`, `buyerProtected`, `hunterSelected`, `marked` |
-| `E02` | `COFFINED` with `hunterSelected`, `marked`, or any protection |
-| `E03` | `MARKED` (or `marked`) with `witsecApplies` or `laidLow` |
-| `E04` | `sealsRemaining == 0` and `lifeState != TERMINAL_COFFIN` |
-| `E05` | `deaths >= 3` and `lifeState != TERMINAL_COFFIN`, or `TERMINAL_COFFIN` with `deaths < 3` |
-| `E06` | `sealsRemaining + deaths != 3` |
-| `E07` | `TOP_5` flag set without `TOP_10` |
-| `E08` | more than one of `witsecApplies` / `laidLow` / `buyerProtected` |
-| `E09` | `marked != (lifeState == MARKED)` |
-| `E10` | `exposureState` inconsistent with `lifeState` (`COFFINED`/`TERMINAL` exposure on alive token or vice-versa) |
-| `E11` | `wardId ∉ 1..3`, `blockId ∉ 1..6`, `tokenId ∉ 1..666`, `schemaVersion != 1` |
-| `E12` | `latestSeasonBadgeFlags != 0` with `latestSeasonRank == 0` or `latestAwardSeasonId == 0`; or rank 1–5 without TOP_5 / 6–10 without TOP_10 |
-
-Question for founder: should E06/E12 be hard diagnostics or soft (render, report in harness only)? Default here: **hard**.
-
-## 6. State hash (material fields)
-
-`stateHash = keccak256(abi.encode(schemaVersion, tokenId, artIndex, wardId, blockId, genesisHash, seasonId, lifeState, exposureState, sealsRemaining, hunterSelected, transferLocked, marked, markedByTokenId, purgeDeadline, witsecApplies, laidLow, buyerProtected, kills, deaths, forcedPurges, savesReceived, currentKillStreak, latestAwardSeasonId, latestSeasonRank, latestSeasonBadgeFlags, territoryAchievementCount, displayMode))`
-
-Excluded (do not change the SVG): `warId`, `campaignId`, `activeBlockId`, `warPhase`, `transferLockUntil`, `markedByWardId`, `witsecCredits`, `savesGiven`, `longestKillStreak`, `terminalKills`, `lifetimeKillTier`, `seasonAwardCount`, `deathRecordCount`, `historicalStateCount`, `flicker`. They appear in JSON only; the JSON hash is a separate concern. Open item O-4 asks whether the provider's `stateHash` should use this exact list.
-
-## 7. Display modes
-
-| | PLAIN (0) | STATS (1) |
-|---|---|---|
-| Frame | none | crude-clean frame, corner marks |
-| Text | none (except MARKED deadline, coffin numbers) | `#id`, `WARD 0x`, badge column with tier name + threshold, stat panel KILLS/DEATHS/K/D/SEALS/SEASON/STREAK, bottom `RXCH` / `BLOCK 0x`, padlock if locked |
-| Figure | 75–80 % height | scaled to ~60 % in a right-of-centre cell |
-| Badges | 8×8 | 16×16 column |
-
-K/D per handoff §16.3: `UNTESTED` / `UNDEFEATED` / one-decimal ratio.
-
-## 8. Genesis trait draw order (locked once approved)
-
-1 hood silhouette (8) · 2 eyes (10) · 3 mouth (8) · 4 ward sigil (fixed) · 5 rim (4) · 6 edge (5) · 7 glitch (4, ≤ 1 in 3 tokens non-none) · 8 collar (5) · 9 block mark (fixed by `blockId`, 6). Then jitter stream. Changing the order changes every token, so this is part of the provenance commitment.
-
-## 9. Open items (not resolved silently)
-
-| ID | Item | Proposed default |
-|---|---|---|
-| O-1 | "SEASON CHAMPION 01" in founder reference; handoff defines TOP_10/TOP_5 only | Style TOP_5 crest as the champion-grade laurel; no third badge until `SeasonRegistry` exposes a rank-1 flag |
-| O-2 | `displayMode` and `flicker` absent from `RenderStateV1` | Add `uint8 displayMode` + `bool flicker` to the struct, or read from a `BadgeDisplayRegistry`; default 0/false |
-| O-3 | No death/coffin seed in `RenderStateV1`; coffin composition and tear placement need one | Add `bytes32 latestCoffinSeed` (handoff §15.1) to the provider struct. Reference renderer uses a provisional derived seed until then |
-| O-4 | Which fields the provider's `stateHash` covers | The list in §6 |
-| O-5 | Killer tokenId in coffin text: reuse `markedByTokenId` or add `killedByTokenId`? | Reuse `markedByTokenId` (the executed warrant), but confirm it is retained after execution |
-| O-6 | 100-unit grid + deterministic jitter as frozen provenance (vs 64×64 bitmap in ART-MECH-TBD-010) | Accept 100-unit vector grid; the manifest hashes renderer build + trait draw order instead of bitmaps |
-| O-7 | Coffins keep the kill crest on the lid | Yes |
-| O-8 | Animated SVG in canonical `tokenURI` | No; static default, `flicker` opt-in via display state |
-| O-9 | Hard vs soft diagnostics for E06/E12 | Hard |
+The token's own render (any state, coffins and diagnostics included) sits in
+the left third as a nested `<svg>`; its signal field continues across the
+full width; `HOODRXCH` wordmark + `#id / WARD / BLOCK / TIER` line +
+status line (red for MARKED/TERMINAL) in block glyphs; seal pips and a kill
+tally block on the right edge; acid divider at x=1000.
