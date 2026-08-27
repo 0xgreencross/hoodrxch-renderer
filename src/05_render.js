@@ -66,11 +66,34 @@ function resolveStatus(s){
 // ---------------------------------------------------------------------------
 function diagnosticSVG(s,errs){
   const used=new Set(); let body='';
-  body+=text('INVALID STATE',110,380,16,RED,used);
-  body+=text(errs.join(' '),110,540,10,RED,used);
-  body+=text('#'+String(s.tokenId),110,640,10,RED,used);
-  body+=text(stateHash(s).slice(2,18).toUpperCase(),110,720,8,RED,used);
+  body+=text('INVALID STATE',74,380,11,RED,used);
+  body+=text(errs.join(' '),110,520,10,RED,used);
+  body+=text('#'+String(s.tokenId),110,620,10,RED,used);
+  body+=text(stateHash(s).slice(2,18).toUpperCase(),110,710,8,RED,used);
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+glyphDefs(used)+'</defs><rect width="1000" height="1000" fill="'+BLACK+'"/><rect x="20" y="20" width="960" height="960" fill="none" stroke="'+RED+'" stroke-width="24"/>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// Eye glyphs (shared by the live figure and the coffin compositions).
+// One X arm: quad from centre toward (dx,dy); used to build broken/half arms.
+// ---------------------------------------------------------------------------
+function eyeArm(cx,cy,dx,dy,r,b,fill){ return poly([[cx-b*dy/2|0 || cx, cy+b*dx/2|0 || cy],[cx+(b*dy/2|0),cy-(b*dx/2|0)],[cx+dx*r+(b*dy/2|0),cy+dy*r-(b*dx/2|0)],[cx+dx*r-(b*dy/2|0),cy+dy*r+(b*dx/2|0)]],fill); }
+function eyeGlyph(st,side,cx,cy,r,fill,rng){
+  let e='';
+  const X=(rr,bb)=>xmark(cx,cy,rr,bb,fill,rng);
+  switch(st){
+    case 0: e+=X(r,3); break;
+    case 1: { const arms=[[1,-1],[-1,1],[-1,-1],[1,1]]; const skip=side?0:2;
+      for(let k=0;k<4;k++){ if(k===skip) continue; e+=eyeArm(cx,cy,arms[k][0],arms[k][1],r,3,fill); }
+      e+=eyeArm(cx,cy,arms[skip][0],arms[skip][1],(r>>1),3,fill); break; }
+    case 2: e+=X(r,3); e+=rect(side?cx+2:cx-r-5,cy-1,r+3,2,fill); break;
+    case 3: e+=rect(cx-r-1,cy-1,2*r+2,4,fill); break; // visor (standalone: one blade per eye)
+    case 4: e+=rect(cx-r,cy-((r/2)|0),2*r,3,fill); e+=rect(cx-r+2,cy+2,2*r-2,3,fill); break;
+    case 5: if(side) e+=rect(cx-r,cy-1,2*r,4,fill); else e+=X(r,3); break;
+    case 6: if(!side) e+=X(r,3); break; // right eye = pure void
+    case 7: break;                       // hollow: both void
+    case 8: e+=X(side?(r>>1)+1:r+1,3); break;
+  }
+  return e;
 }
 // ---------------------------------------------------------------------------
 // Genesis figure. Returns {defs, figure, traits, hoodPts}
@@ -151,26 +174,7 @@ function buildGenesis(sState){
   // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
   const rB=t.eyeR;
   const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
-  // one X arm: quad from centre toward (dx,dy); used to build broken/half arms
-  const arm=(cx,cy,dx,dy,r,b,fill)=>poly([[cx-b*dy/2|0 || cx, cy+b*dx/2|0 || cy],[cx+(b*dy/2|0),cy-(b*dx/2|0)],[cx+dx*r+(b*dy/2|0),cy+dy*r-(b*dx/2|0)],[cx+dx*r-(b*dy/2|0),cy+dy*r+(b*dx/2|0)]],fill);
-  const glyph=(st,side,cx,cy,r,fill)=>{
-    let e='';
-    const X=(rr,bb)=>xmark(cx,cy,rr,bb,fill,rng);
-    switch(st){
-      case 0: e+=X(r,3); break;
-      case 1: { const arms=[[1,-1],[-1,1],[-1,-1],[1,1]]; const skip=side?0:2;
-        for(let k=0;k<4;k++){ if(k===skip) continue; e+=arm(cx,cy,arms[k][0],arms[k][1],r,3,fill); }
-        e+=arm(cx,cy,arms[skip][0],arms[skip][1],(r>>1),3,fill); break; }
-      case 2: e+=X(r,3); e+=rect(side?cx+2:cx-r-5,cy-1,r+3,2,fill); break;
-      case 3: break; // continuous visor drawn once, below
-      case 4: e+=rect(cx-r,cy-((r/2)|0),2*r,3,fill); e+=rect(cx-r+2,cy+2,2*r-2,3,fill); break;
-      case 5: if(side) e+=rect(cx-r,cy-1,2*r,4,fill); else e+=X(r,3); break;
-      case 6: if(!side) e+=X(r,3); break; // right eye = pure void
-      case 7: break;                       // hollow: both void
-      case 8: e+=X(side?(r>>1)+1:r+1,3); break;
-    }
-    return e;
-  };
+  const glyph=(st,side,cx,cy,r,fill)=>eyeGlyph(st,side,cx,cy,r,fill,rng);
   const drawEyes=(fill,ox,oy)=>{
     let e='';
     if(t.eyes===3){ // continuous visor: one blade across both sockets
@@ -267,15 +271,180 @@ function buildGenesis(sState){
   if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
     for(let k2=0;k2<sState.deaths;k2++) slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)});
   }
-  return {defs,figure:f,traits:t,slices,rng};
+  // screen-space eye anchors (units) for status overlays
+  const eyeScreen=eyePos.map(([ex,ey2,r])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r]; });
+  return {defs,figure:f,traits:t,slices,rng,eyeScreen};
 }
 function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
+// ---------------------------------------------------------------------------
+// COFFIN COMPOSITIONS (lifeState COFFINED / TERMINAL_COFFIN).
+// The signal flatlines. The field goes still and undisturbed; the wraith is
+// gone — only a coffin-shaped void remains where the signal refuses to run.
+// COFFINED keeps a residual heartbeat blip and pink ember eyes (revivable).
+// TERMINAL is the only other legal use of red: flat red line, red planks,
+// three red broken seals. Identity persists: sigil, block mark, eye archetype.
+// ---------------------------------------------------------------------------
+const COFFIN_PTS=[[43,28],[57,28],[64,42],[58,82],[42,82],[36,42]];
+function inCoffin(x,y,pad){
+  // convex test against the hexagon expanded by `pad` units from its centroid
+  const cx=50,cy=54;
+  for(let i=0;i<6;i++){
+    const a=COFFIN_PTS[i], b=COFFIN_PTS[(i+1)%6];
+    const ax=a[0]+Math.sign(a[0]-cx)*pad, ay=a[1]+Math.sign(a[1]-cy)*pad;
+    const bx=b[0]+Math.sign(b[0]-cx)*pad, by=b[1]+Math.sign(b[1]-cy)*pad;
+    if((bx-ax)*(y-ay)-(by-ay)*(x-ax)<0) return false;
+  }
+  return true;
+}
+function buildCoffinSVG(s){
+  const terminal=s.lifeState===3;
+  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const t=drawTraits(rng);
+  const C=terminal?RED:WHITE;
+  let f='';
+  // the still field: flat lines, torn, silent around the void
+  const sw=[3,4,6][t.lineW];
+  for(let li=0;li<47;li++){
+    const y=4+li*2; let d='',pen=false,px=0,breakLeft=0;
+    for(let xi=0;xi<=33;xi++){
+      const x=xi*3; let gap=false;
+      if(inCoffin(x,y,2)) gap=true;
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else if(rng.int(1000)<(terminal?60:22)){ breakLeft=1+rng.int(5); gap=true; }
+      if(gap){ pen=false; continue; }
+      const X=x*U;
+      if(!pen){ d+='M'+X+' '+(y*U); pen=true; } else d+='h'+(X-px);
+      px=X;
+    }
+    if(d) f+='<path d="'+d+'" fill="none" stroke="'+ACID+'" stroke-width="'+sw+'"/>';
+  }
+  // white specks
+  { let d=''; const n=8+rng.int(10); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // the coffin void outline (structure stays white; red is reserved for the verdict)
+  f+='<path d="'+pathD(jitterPts(COFFIN_PTS,rng,1))+'" fill="none" stroke="'+WHITE+'" stroke-width="6"/>';
+  // nail ticks at the vertices
+  for(const [vx,vy] of COFFIN_PTS) f+=rect(vx-1,vy-1,2,2,WHITE);
+  // eyes: the archetype survives the grave
+  if(!terminal){
+    f+=eyeGlyph(t.eyes,0,46,42,4,PINK,rng);
+    f+=eyeGlyph(t.eyes,1,54,42,4,PINK,rng);
+  }
+  // seal pips inside the coffin
+  for(let i=0;i<3;i++){ const x=43+i*5, y=72;
+    if(i<s.sealsRemaining) f+=rect(x,y,3,3,ACID);
+    else { f+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+(terminal?RED:PINK)+'" stroke-width="3"/>'+xmark(x+1,y+1,2,1,terminal?RED:PINK,rng); }
+  }
+  // terminal: nailed shut — two clean red planks across the void
+  if(terminal){
+    f+=poly([[40,33],[44,32],[60,79],[56,80]],RED);
+    f+=poly([[56,32],[60,33],[44,80],[40,79]],RED);
+  }
+  // the line itself: flat red for terminal; white with one residual blip while seals remain
+  if(terminal) f+='<path d="M0 540h1000" fill="none" stroke="'+RED+'" stroke-width="5"/>';
+  else f+='<path d="M0 540h140l15 -70 15 140 15 -70h815" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
+  // identity marks
+  f+=sigilSVG(s.wardId,8,8,rng,ACID);
+  f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
+  // death scars displace the stillness too
+  const slices=[];
+  { const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,s.deaths||1));
+    for(let k=0;k<Math.max(1,s.deaths);k++) slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); }
+  let defs='<g id="f">'+f+'</g>', body='<rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f"/>';
+  let ci=0; for(const sl of slices){ ++ci; body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  body+=flickerSVG(s);
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+'</defs>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// STATUS OVERLAYS + HUD (z7+). Precedence handled in renderSVG; overlays sit
+// above mosh slices so danger/protection stays legible even when the figure
+// glitches. Red appears ONLY in the MARKED overlay (and TERMINAL/diagnostic).
+// ---------------------------------------------------------------------------
+function markedOverlay(g,rng){
+  const t=g.traits; let o='';
+  // corner brackets
+  const L=9;
+  o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)+'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)+'" fill="none" stroke="'+RED+'" stroke-width="14"/>';
+  // the warrant slash: one red band corner to corner — condemned
+  o+=poly([[0,100],[0,93],[93,0],[100,0],[100,7],[7,100]],RED);
+  // warrant strip: purge countdown ticks along the crown edge
+  for(let i=0;i<8;i++) o+=rect(33+i*4,2,2,3,RED);
+  return o;
+}
+function witsecOverlay(g,rng){
+  // witness protection: the eyes are redacted
+  const [[lx,ly,lr],[rx2,ry2,rr2]]=g.eyeScreen; let o='';
+  const y=Math.min(ly,ry2)-5, x0=lx-lr-4, x1=rx2+rr2+4;
+  o+=rect(x0,y,x1-x0,9,WHITE);
+  o+=rect(x0+3,y+11,((x1-x0)>>1),3,WHITE);
+  o+=rect(x0+((x1-x0)>>1)+6,y+11,((x1-x0)>>2),3,WHITE);
+  return o;
+}
+function layLowOverlay(g,rng){
+  // gone dark: blinds close over the figure
+  const t=g.traits; let o='';
+  const x0=t.cx-t.rw-9, w=2*t.rw+18;
+  for(let y=t.cy-t.rh-4;y<t.cy+24;y+=7) o+=rect(x0,y,w,3,BLACK);
+  o+=poly([[t.cx-4,t.cy-t.rh-9],[t.cx+4,t.cy-t.rh-9],[t.cx,t.cy-t.rh-5]],ACID);
+  return o;
+}
+function buyerOverlay(g,rng){
+  // in escrow: an acid holding frame
+  let o='<rect x="60" y="60" width="880" height="880" fill="none" stroke="'+ACID+'" stroke-width="5"/>';
+  o+=poly([[50,2],[53,5],[50,8],[47,5]],ACID);
+  return o;
+}
+function hunterOverlay(g,rng){
+  // volunteered hunter: quiet white sight ticks
+  const t=g.traits; const hx=t.cx, hy=t.cy-4, rr=t.rw+12; let o='';
+  o+='<path d="M'+(hx*U)+' '+((hy-rr-4)*U)+'v'+(4*U)+'M'+(hx*U)+' '+((hy+rr)*U)+'v'+(4*U)+'M'+((hx-rr-4)*U)+' '+(hy*U)+'h'+(4*U)+'M'+((hx+rr)*U)+' '+(hy*U)+'h'+(4*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
+  return o;
+}
+// seals HUD: three pips top-right — acid intact, pink broken
+function sealHud(s,rng){
+  let o='';
+  for(let i=0;i<3;i++){ const x=85+i*4, y=5;
+    if(i<s.sealsRemaining) o+=rect(x,y,3,3,ACID);
+    else o+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+PINK+'" stroke-width="3"/>'+'<path d="M'+(x*U)+' '+((y+3)*U)+'l30 -30" stroke="'+PINK+'" stroke-width="3" fill="none"/>';
+  }
+  return o;
+}
+// latest season badges: SLOT B (top 10, white) + SLOT C (top 5, pink)
+function seasonChips(s,used){
+  let o=''; if(!(s.latestSeasonBadgeFlags&1)) return o;
+  o+=text('S'+s.latestAwardSeasonId,62,632,4,ACID,used);
+  o+='<rect x="60" y="672" width="104" height="60" fill="none" stroke="'+WHITE+'" stroke-width="4"/>'+text('10',76,682,6,WHITE,used);
+  if(s.latestSeasonBadgeFlags&2) o+='<rect x="60" y="744" width="104" height="60" fill="none" stroke="'+PINK+'" stroke-width="4"/>'+text('5',94,754,6,PINK,used);
+  return o;
+}
+// territory achievements: acid tick ladder up the right edge (cap 12)
+function territoryHud(s){
+  let o=''; const n=Math.min(12,s.territoryAchievementCount);
+  for(let i=0;i<n;i++) o+=rect(95,84-i*3,3,2,ACID);
+  return o;
+}
+// STATS display mode: a data band across the hem
+function statsBand(s,used){
+  const tier=tierForKills(s.kills);
+  let o='<rect x="0" y="880" width="1000" height="120" fill="'+BLACK+'"/><path d="M0 880h1000" stroke="'+ACID+'" stroke-width="3"/>';
+  const l1='K '+s.kills+' / D '+s.deaths+' / KD '+kdText(s)+' / STK '+s.currentKillStreak;
+  let l2=TIER_NAMES[tier]+' / W'+s.wardId+' B'+s.blockId+(s.latestSeasonRank?' / S'+s.latestAwardSeasonId+' RANK '+s.latestSeasonRank:'');
+  o+=text(l1,24,896,5,ACID,used);
+  o+=text(l2,24,946,5,WHITE,used);
+  return o;
+}
+// flicker: SMIL scanline sweep + a pink echo tracer (deterministic, loops)
+function flickerSVG(s){
+  if(!s.flicker) return '';
+  return '<rect x="0" y="-8" width="1000" height="6" fill="'+WHITE+'"><animate attributeName="y" values="-8;1000;-8" dur="7s" repeatCount="indefinite"/></rect>'
+       + '<rect x="0" y="-4" width="1000" height="3" fill="'+PINK+'"><animate attributeName="y" values="1000;-4;1000" dur="11s" repeatCount="indefinite"/></rect>';
+}
 // ---------------------------------------------------------------------------
 // renderSVG — composition per STATE_TO_LAYER_MAP z-order
 // ---------------------------------------------------------------------------
 function renderSVG(s){
   const errs=validate(s); if(errs.length) return diagnosticSVG(s,errs);
   const status=resolveStatus(s);
+  if(status==='TERMINAL'||status==='COFFINED') return buildCoffinSVG(s);
   const g=buildGenesis(s);
   const used=new Set();
   let defs=g.defs, body='';
@@ -288,10 +457,69 @@ function renderSVG(s){
     if(sl.move) body+='<clipPath id="c'+ci+'"><rect x="'+(sl.x*U)+'" y="'+(sl.y*U)+'" width="'+(sl.w*U)+'" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><use href="#f" transform="translate('+(sl.dx*U)+' '+(sl.dy*U)+')"/></g>';
     else if(sl.smear) body+='<clipPath id="c'+ci+'"><rect x="0" y="'+(sl.y*U)+'" width="1000" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f" transform="translate(-500 0) scale(2 1)"/></g>';
     else body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
-  // z7+ : status / seals / badges / territory / HUD — built in later steps
+  // z7: status overlays, precedence MARKED > WITSEC/LAY_LOW/BUYER > HUNTER
+  if(status==='MARKED') body+=markedOverlay(g,g.rng);
+  else if(status==='WITSEC') body+=witsecOverlay(g,g.rng);
+  else if(status==='LAY_LOW') body+=layLowOverlay(g,g.rng);
+  else if(status==='BUYER_PROTECTED') body+=buyerOverlay(g,g.rng);
+  else if(status==='HUNTER_SELECTED') body+=hunterOverlay(g,g.rng);
+  // z8: persistent HUD — seals, latest season badges, territory ladder
+  body+=sealHud(s,g.rng);
+  body+=seasonChips(s,used);
+  body+=territoryHud(s);
+  // z9: STATS display mode band
+  if(s.displayMode===1) body+=statsBand(s,used);
+  // z10: flicker
+  body+=flickerSVG(s);
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+glyphDefs(used)+'</defs>'+body+'</svg>';
 }
-function renderBanner(s){ return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 1000"><rect width="3000" height="1000" fill="#000"/></svg>'; }
+// ---------------------------------------------------------------------------
+// renderBanner — 3000×1000 X-banner. The token's own render (any state) sits
+// at the left; its signal field continues across the full width; the name and
+// campaign line run in block glyphs. Nested <svg> keeps ids self-contained.
+// ---------------------------------------------------------------------------
+function renderBanner(s){
+  const errs=validate(s);
+  const inner=renderSVG(s);
+  const used=new Set();
+  const rng=new Rng(concatBytes(genesisSeed(s.genesisHash,s.tokenId),strBytes('BNR')));
+  const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId)));
+  const sw=[3,4,6][t.lineW];
+  let body='<rect width="3000" height="1000" fill="'+BLACK+'"/>';
+  // the signal continues past the portrait
+  for(let li=0;li<47;li++){
+    const y=(4+li*2)*U; let d='',pen=false,px=1000,breakLeft=0;
+    for(let xi=0;xi<=66;xi++){
+      const X=1000+xi*30; let gap=false;
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else if(rng.int(1000)<30){ breakLeft=1+rng.int(5); gap=true; }
+      // clear a window for the wordmark and campaign lines
+      if(y>290&&y<660&&X>1180&&X<2720) gap=true;
+      if(gap){ pen=false; continue; }
+      if(!pen){ d+='M'+X+' '+y; pen=true; } else d+='h'+(X-px);
+      px=X;
+    }
+    if(d) body+='<path d="'+d+'" fill="none" stroke="'+ACID+'" stroke-width="'+sw+'"/>';
+  }
+  // white specks on the wide field
+  { let d=''; const n=16+rng.int(12); for(let i=0;i<n;i++){ const x=1000+rng.int(2000), y=rng.int(1000); d+='M'+x+' '+y+'h10v10h-10z'; } body+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // wordmark + campaign line
+  const tier=tierForKills(s.kills), status=resolveStatus(s);
+  body+=text('HOODRXCH',1220,330,15,ACID,used);
+  const sub=errs.length?'INVALID STATE':'#'+s.tokenId+' / WARD 0'+s.wardId+' / BLOCK 0'+s.blockId+(tier>0?' / '+TIER_NAMES[tier]:'');
+  body+=text(sub,1224,510,6,errs.length?RED:WHITE,used);
+  if(!errs.length&&status!=='ALIVE') body+=text(status.replace(/_/g,' '),1224,580,6,(status==='MARKED'||status==='TERMINAL')?RED:PINK,used);
+  // right block: seals + kill tally, banner-scaled
+  for(let i=0;i<3;i++){ const x=2800+i*50, y=60;
+    if(i<s.sealsRemaining) body+='<rect x="'+x+'" y="'+y+'" width="34" height="34" fill="'+ACID+'"/>';
+    else body+='<rect x="'+x+'" y="'+y+'" width="34" height="34" fill="none" stroke="'+PINK+'" stroke-width="4"/><path d="M'+x+' '+(y+34)+'l34 -34" stroke="'+PINK+'" stroke-width="4" fill="none"/>';
+  }
+  if(s.kills>0){ const n=Math.min(20,s.kills);
+    for(let i=0;i<n;i++) body+='<rect x="'+(2800+(i%10)*14)+'" y="'+(130+((i/10)|0)*30)+'" width="8" height="20" fill="'+PINK+'"/>'; }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 1000"><defs>'+glyphDefs(used)+'</defs>'+body
+    +'<svg x="0" y="0" width="1000" height="1000" viewBox="0 0 1000 1000">'+inner.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')+'</svg>'
+    +'<path d="M1000 0v1000" stroke="'+ACID+'" stroke-width="3"/></svg>';
+}
 function kdText(s){ if(s.deaths===0) return s.kills===0?'UNTESTED':'UNDEFEATED'; return (Math.floor(s.kills*10/s.deaths)/10).toFixed(1); }
 function renderMetadata(s){
   const svg=renderSVG(s); const tier=tierForKills(s.kills);

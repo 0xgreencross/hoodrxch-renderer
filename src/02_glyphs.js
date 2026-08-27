@@ -46,7 +46,7 @@ Z:['11111','00001','00010','00100','01000','10000','11111'],
 ':':['00000','01100','01100','00000','01100','01100','00000'],
 '-':['00000','00000','00000','11111','00000','00000','00000'],
 };
-const GLYPH_ID = {'#':'gH','/':'gS','.':'gD',':':'gC','-':'gM'};
+const GLYPH_ID = {'#':'gNum','/':'gSla','.':'gDot',':':'gCol','-':'gDsh'};
 function glyphId(ch){ return GLYPH_ID[ch] || ('g'+ch); }
 // bitmap → path (runs per row, unit grid, relative commands)
 function glyphPath(rows){

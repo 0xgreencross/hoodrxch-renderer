@@ -70,6 +70,8 @@ document.querySelectorAll('header button').forEach(b=>b.addEventListener('click'
   if(b.dataset.tab==='gallery'&&!document.getElementById('gal').children.length) drawGallery();
   if(b.dataset.tab==='review'&&!document.getElementById('sheet').children.length) drawReview();
   if(b.dataset.tab==='evo'&&!document.getElementById('evoKills').children.length) drawEvo();
+  if(b.dataset.tab==='fx'&&!document.getElementById('fxGrid').children.length) drawFx();
+  if(b.dataset.tab==='banner') drawBanner();
 }));
 document.getElementById('reviewGo').addEventListener('click',drawReview);
 function drawEvo(){
@@ -78,11 +80,84 @@ function drawEvo(){
     h+='<div class="e">'+svgImg(svg,150)+'<span>'+k+' KILLS · '+TIER_NAMES[tierForKills(k)]+'</span></div>'; }
   document.getElementById('evoKills').innerHTML=h;
   let h2='';
-  const seq=[[0,3,'GENESIS'],[1,2,'EXHUMED · DEATH 1'],[2,1,'EXHUMED · DEATH 2']];
-  for(const [d,seals,label] of seq){ const st=defaultState(id); st.deaths=d; st.sealsRemaining=seals; st.kills=25; const svg=renderSVG(st);
+  const seq=[
+    [{},'GENESIS'],
+    [{lifeState:2,exposureState:5,deaths:1,sealsRemaining:2},'COFFINED · DEATH 1'],
+    [{deaths:1,sealsRemaining:2},'EXHUMED · DEATH 1'],
+    [{lifeState:2,exposureState:5,deaths:2,sealsRemaining:1},'COFFINED · DEATH 2'],
+    [{deaths:2,sealsRemaining:1},'EXHUMED · DEATH 2'],
+    [{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0},'TERMINAL · DEATH 3']];
+  for(const [patch,label] of seq){ const st=Object.assign(defaultState(id),{kills:25},patch); const svg=renderSVG(st);
     h2+='<div class="e">'+svgImg(svg,150)+'<span>'+label+'</span></div>'; }
-  h2+='<div class="e" style="color:var(--red)">COFFINED / TERMINAL — next build step</div>';
   document.getElementById('evoDeaths').innerHTML=h2;
+  let h3='';
+  const stx=[
+    [{marked:true,lifeState:1,markedByTokenId:66,purgeDeadline:1790000000},'MARKED'],
+    [{hunterSelected:true},'HUNTER SELECTED'],
+    [{witsecApplies:true,exposureState:3},'WITSEC'],
+    [{laidLow:true,exposureState:2},'LAY LOW'],
+    [{buyerProtected:true,exposureState:4},'BUYER PROTECTED'],
+    [{displayMode:1,kills:25,deaths:1,sealsRemaining:2,currentKillStreak:4},'STATS MODE']];
+  for(const [patch,label] of stx){ const st=Object.assign(defaultState(id),patch); const svg=renderSVG(st);
+    h3+='<div class="e">'+svgImg(svg,150)+'<span>'+label+'</span></div>'; }
+  const el=document.getElementById('evoStatus'); if(el) el.innerHTML=h3;
+}
+// ---------------------------------------------------------------------------
+// Fixtures FX-001..FX-030 — the canonical review set + differential-test input
+// ---------------------------------------------------------------------------
+const FIXTURES=[
+ ['FX-001','GENESIS BASELINE',1,{}],
+ ['FX-002','FIRST BLOOD',2,{kills:1}],
+ ['FX-003','RISING THREAT',3,{kills:10}],
+ ['FX-004','SAVAGE',4,{kills:25}],
+ ['FX-005','EXECUTIONER',5,{kills:50}],
+ ['FX-006','DEATH DEALER',6,{kills:75}],
+ ['FX-007','REAPER',7,{kills:100}],
+ ['FX-008','HUNTER SELECTED',8,{hunterSelected:true}],
+ ['FX-009','MARKED',9,{lifeState:1,marked:true,markedByTokenId:66,purgeDeadline:1790000000}],
+ ['FX-010','MARKED REAPER',10,{lifeState:1,marked:true,markedByTokenId:13,purgeDeadline:1790000000,kills:100}],
+ ['FX-011','WITSEC',11,{witsecApplies:true,exposureState:3}],
+ ['FX-012','LAY LOW',12,{laidLow:true,exposureState:2}],
+ ['FX-013','BUYER PROTECTED',13,{buyerProtected:true,exposureState:4}],
+ ['FX-014','COFFINED DEATH 1',14,{lifeState:2,exposureState:5,deaths:1,sealsRemaining:2}],
+ ['FX-015','COFFINED DEATH 2',15,{lifeState:2,exposureState:5,deaths:2,sealsRemaining:1,kills:25}],
+ ['FX-016','TERMINAL COFFIN',16,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0}],
+ ['FX-017','TERMINAL REAPER',17,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0,kills:100}],
+ ['FX-018','EXHUMED SCARRED',18,{deaths:2,sealsRemaining:1,kills:30}],
+ ['FX-019','SAVED FIVE TIMES',19,{savesReceived:5,savesGiven:3}],
+ ['FX-020','ENFORCER',20,{forcedPurges:10}],
+ ['FX-021','STREAK SEVEN',21,{currentKillStreak:7,kills:12}],
+ ['FX-022','SEASON TOP 10',22,{latestSeasonBadgeFlags:1,latestSeasonRank:7,latestAwardSeasonId:1}],
+ ['FX-023','SEASON TOP 5',23,{latestSeasonBadgeFlags:3,latestSeasonRank:2,latestAwardSeasonId:2}],
+ ['FX-024','WARLORD',24,{territoryAchievementCount:6,kills:50}],
+ ['FX-025','STATS MODE',25,{displayMode:1,kills:25,deaths:1,sealsRemaining:2,currentKillStreak:3}],
+ ['FX-026','FLICKER',26,{flicker:true,kills:10}],
+ ['FX-027','FULL DECORATION',27,{kills:75,deaths:1,sealsRemaining:2,forcedPurges:6,savesReceived:3,latestSeasonBadgeFlags:3,latestSeasonRank:1,latestAwardSeasonId:1,territoryAchievementCount:4,currentKillStreak:5}],
+ ['FX-028','DIAG SEAL MISMATCH',28,{sealsRemaining:0}],
+ ['FX-029','DIAG DOUBLE SHIELD',29,{witsecApplies:true,laidLow:true,exposureState:3}],
+ ['FX-030','DIAG MARKED TERMINAL',30,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0,marked:true}]];
+function fxState(fx){ return Object.assign(defaultState(fx[2]),fx[3]); }
+function drawFx(){
+  let h=''; let bytes=0;
+  for(const fx of FIXTURES){ const st=fxState(fx); const svg=renderSVG(st); bytes+=svg.length;
+    const errs=validate(st);
+    h+='<div class="f">'+svgImg(svg,190)+'<div>'+fx[0]+' · '+fx[1]+(errs.length?' <span class="warn">'+errs.join(' ')+'</span>':'')+'<br><span style="color:var(--mute)">'+svg.length+' B · '+stateHash(st).slice(0,14)+'</span></div></div>'; }
+  document.getElementById('fxGrid').innerHTML=h;
+  document.getElementById('fxSummary').textContent=FIXTURES.length+' fixtures · '+bytes+' bytes total · mean '+Math.round(bytes/FIXTURES.length)+' B per SVG';
+}
+document.getElementById('exportFx').addEventListener('click',e=>{
+  const out=FIXTURES.map(fx=>{ const st=fxState(fx); return {id:fx[0],name:fx[1],tokenId:fx[2],patch:fx[3],state:st,errors:validate(st),stateHash:stateHash(st),svgBytes:renderSVG(st).length}; });
+  const blob=JSON.stringify({rendererVersion:RENDERER_VERSION,schemaVersion:SCHEMA_VERSION,fixtures:out},null,1);
+  e.target.href='data:application/json;base64,'+btoa(unescape(encodeURIComponent(blob)));
+  e.target.download='fixtures.json';
+});
+function drawBanner(){
+  const states=[S,Object.assign(defaultState(S.tokenId),{kills:100}),Object.assign(defaultState(S.tokenId),{lifeState:1,marked:true,markedByTokenId:66,purgeDeadline:1790000000}),Object.assign(defaultState(S.tokenId),{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0})];
+  const labels=['CURRENT WORKBENCH STATE','REAPER','MARKED','TERMINAL'];
+  let h='';
+  for(let i=0;i<states.length;i++){ const svg=renderBanner(states[i]);
+    h+='<div style="margin-bottom:14px"><div style="color:var(--mute);font-size:10px;margin-bottom:4px">'+labels[i]+' · '+new Blob([svg]).size+' bytes</div><img style="width:100%;max-width:1500px;display:block" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))+'"></div>'; }
+  document.getElementById('bannerOut').innerHTML=h;
 }
 document.getElementById('ver').textContent='renderer v'+RENDERER_VERSION+' · schema v'+SCHEMA_VERSION;
 buildControls(); refresh();
