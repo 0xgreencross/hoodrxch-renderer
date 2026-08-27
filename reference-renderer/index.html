@@ -272,6 +272,8 @@ function xmark(cx,cy,r,b,fill,rng){
 // Solidity port is bit-exact.
 // ---------------------------------------------------------------------------
 const PINK='#FF3EB5', WHITE='#FFFFFF';
+// glow shades: luminance falloff toward the black ground (no filters onchain)
+const GLOW_P1='#8A2263', GLOW_P2='#471132', GLOW_W1='#8A8A8A', GLOW_W2='#474747';
 const FORM_NAMES=['BROAD','LEAN','SPIRE','SKEW L','SKEW R','SUNKEN','TOWERING','HOLLOW'];
 const LINE_NAMES=['FINE','MID','HEAVY'];
 const TEAR_NAMES=['CLEAN','TORN','SHREDDED'];
@@ -618,6 +620,7 @@ function buildGenesis(sState){
         if(h>300){ const vy=baseY*10-Math.round(h/10); if(vy<best) best=vy; } }
       crest.push(best===100000?-1:best); }
     const gcol = tier>=4 ? WHITE : PINK;
+    const gMid = tier>=4 ? GLOW_W1 : GLOW_P1, gDim = tier>=4 ? GLOW_W2 : GLOW_P2;
     const arcPath=(off)=>{ let d='',pen=false;
       for(let xi=0;xi<=33;xi++){ const c=crest[xi];
         if(c<0){ pen=false; continue; }
@@ -626,6 +629,10 @@ function buildGenesis(sState){
         if(!pen){ d+='M'+X+' '+Y; pen=true; } else d+='L'+X+' '+Y; }
       return d; };
     const nArcs = tier===1?1 : tier===2?2 : tier===3?3 : tier>=5?2 : 1;
+    // outward-only glow: dim echo arcs BEYOND the outermost arc (drawn first, behind)
+    const maxOff=5+(nArcs-1)*3;
+    let dg=arcPath(maxOff+6); if(dg) f+='<path d="'+dg+'" fill="none" stroke="'+gDim+'" stroke-width="4"/>';
+    dg=arcPath(maxOff+3); if(dg) f+='<path d="'+dg+'" fill="none" stroke="'+gMid+'" stroke-width="5"/>';
     for(let k=0;k<nArcs;k++){
       let d=arcPath(5+k*3);
       if(tier===3&&k===2){ // outermost arc broken: re-emit with gaps
@@ -644,6 +651,8 @@ function buildGenesis(sState){
     if(tier>=6){ // REAPER: the complete ring, white with a pink echo
       const rcx=t.cx*10, rcy=(t.cy-2)*10;
       const rx=Math.min((t.rw+16)*10,rcx-20,1000-rcx-20), ry=Math.min((t.rh+((t.amp/2)|0)+12)*10,rcy-20);
+      f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+(rx+55)+'" ry="'+(ry+55)+'" fill="none" stroke="'+GLOW_W2+'" stroke-width="4"/>';
+      f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+(rx+28)+'" ry="'+(ry+28)+'" fill="none" stroke="'+GLOW_W1+'" stroke-width="5"/>';
       f+='<ellipse cx="'+(rcx+8)+'" cy="'+(rcy+6)+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+PINK+'" stroke-width="4"/>';
       f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
     }
