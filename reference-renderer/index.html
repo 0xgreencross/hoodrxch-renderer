@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>HOODRXCH — reference renderer</title>
+<style>
+:root{--bg:#0b0b0b;--panel:#141414;--line:#2a2a2a;--fg:#d8d8d8;--acid:#CCFF00;--red:#FF2A2A;--mute:#777}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace}
+header{display:flex;gap:6px;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line);background:#000}
+header h1{font-size:14px;margin:0 16px 0 0;color:var(--acid);letter-spacing:.12em}
+header button{background:#1a1a1a;color:var(--fg);border:1px solid var(--line);padding:5px 10px;cursor:pointer;font:inherit}
+header button.on{background:var(--acid);color:#000;border-color:var(--acid)}
+.tab{display:none;padding:12px}
+.tab.on{display:block}
+#wb.on{display:grid;grid-template-columns:300px 1fr 360px;gap:12px;height:calc(100vh - 60px)}
+.panel{background:var(--panel);border:1px solid var(--line);padding:10px;overflow:auto}
+.panel h2{font-size:11px;letter-spacing:.15em;color:var(--mute);margin:10px 0 6px}
+.row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:3px 0}
+.row label{color:#aaa;flex:1}
+.row input[type=number],.row select,.row input[type=text]{width:130px;background:#000;color:var(--fg);border:1px solid var(--line);padding:3px 5px;font:inherit}
+.row input[type=checkbox]{width:auto}
+.views{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
+.view{display:flex;flex-direction:column;gap:4px;align-items:center}
+.view span{font-size:10px;color:var(--mute)}
+.sq{display:block;image-rendering:auto}
+.black{background:#000}.white{background:#fff}
+.circ{border-radius:50%;overflow:hidden}
+pre{white-space:pre-wrap;word-break:break-all;font-size:10px;color:#9a9a9a;margin:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:4px}
+.grid .cell{display:flex;flex-direction:column;align-items:center;gap:2px;font-size:9px;color:var(--mute)}
+.grid .cell svg{width:64px;height:64px}
+.sheet{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.sheet .tok{display:flex;gap:8px;align-items:flex-end;background:#000;padding:6px;border:1px solid var(--line)}
+.sheet .tok .big{width:256px;height:256px}
+.sheet .tok .mid{width:64px;height:64px}
+.sheet .tok .sm{width:32px;height:32px}
+.sheet .tok .meta{font-size:9px;color:var(--mute);width:130px}
+table{border-collapse:collapse;font-size:11px}
+td,th{border:1px solid var(--line);padding:3px 8px;text-align:left}
+th{color:var(--acid)}
+.bar{display:inline-block;height:8px;background:var(--acid);vertical-align:middle}
+.warn{color:var(--red)}
+.ok{color:var(--acid)}
+.evo{display:flex;gap:8px;flex-wrap:wrap}
+.evo .e{display:flex;flex-direction:column;align-items:center;gap:4px;font-size:10px;color:var(--mute)}
+.evo .e svg{width:150px;height:150px;background:#000}
+.fx{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+.fx .f{background:#000;border:1px solid var(--line);padding:6px;font-size:10px}
+.fx .f svg{width:100%;aspect-ratio:1}
+.bannerwrap svg{width:100%;max-width:1500px;display:block}
+a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;text-decoration:none;margin:6px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>HOODRXCH // RENDERER V1</h1>
+  <button data-tab="wb" class="on">Workbench</button>
+  <button data-tab="review">Review 24</button>
+  <button data-tab="gallery">Gallery 666</button>
+  <button data-tab="evo">Evolution</button>
+  <button data-tab="fx">Fixtures</button>
+  <button data-tab="banner">Banner</button>
+  <span style="margin-left:auto;color:var(--mute)" id="ver"></span>
+</header>
+
+<div id="wb" class="tab on">
+  <div class="panel" id="controls"></div>
+  <div class="panel"><div class="views" id="views"></div></div>
+  <div class="panel"><h2>METADATA JSON</h2><pre id="json"></pre><h2>SVG</h2><div id="size"></div><pre id="svgsrc"></pre></div>
+</div>
+<div id="review" class="tab"><div class="row"><label>Seed set</label><input type="number" id="reviewSeed" value="1" style="width:80px"><button id="reviewGo">Redraw 24</button></div><div class="sheet" id="sheet"></div></div>
+<div id="gallery" class="tab"><div id="rarity"></div><div class="grid" id="gal"></div></div>
+<div id="evo" class="tab"><h2 style="color:var(--mute)">KILLS 0 / 1 / 10 / 25 / 50 / 75 / 100</h2><div class="evo" id="evoKills"></div><h2 style="color:var(--mute)">DEATH 1 → EXHUMED → DEATH 2 → EXHUMED → DEATH 3</h2><div class="evo" id="evoDeaths"></div></div>
+<div id="fx" class="tab"><a class="btn" id="exportFx" href="#">Export fixtures.json</a><div id="fxSummary"></div><div class="fx" id="fxGrid"></div></div>
+<div id="banner" class="tab"><div class="bannerwrap" id="bannerOut"></div></div>
+
+<script>
+'use strict';
+// ============================================================================
+// HOODRXCH reference renderer — single file, vanilla JS, no deps.
+// Mirrors contracts/ one-to-one. Same state → byte-identical SVG.
+// ============================================================================
+const RENDERER_VERSION = 1, SCHEMA_VERSION = 1;
+const BLACK = '#000000', ACID = '#CCFF00', RED = '#FF2A2A';
+// ---------------------------------------------------------------------------
+// keccak256 (Ethereum variant, pad 0x01..0x80). BigInt lanes. Input: Uint8Array.
+// ---------------------------------------------------------------------------
+const KECCAK_RC = [
+  0x0000000000000001n,0x0000000000008082n,0x800000000000808an,0x8000000080008000n,
+  0x000000000000808bn,0x0000000080000001n,0x8000000080008081n,0x8000000000008009n,
+  0x000000000000008an,0x0000000000000088n,0x0000000080008009n,0x000000008000000an,
+  0x000000008000808bn,0x800000000000008bn,0x8000000000008089n,0x8000000000008003n,
+  0x8000000000008002n,0x8000000000000080n,0x000000000000800an,0x800000008000000an,
+  0x8000000080008081n,0x8000000000008080n,0x0000000080000001n,0x8000000080008008n];
+const KECCAK_ROT = [[0,36,3,41,18],[1,44,10,45,2],[62,6,43,15,61],[28,55,25,21,56],[27,20,39,8,14]];
+const M64 = (1n<<64n)-1n;
+function rotl64(x,n){ n=BigInt(n); return n===0n?x:(((x<<n)|(x>>(64n-n)))&M64); }
+function keccakF(A){
+  for(let r=0;r<24;r++){
+    const C=[0n,0n,0n,0n,0n];
+    for(let x=0;x<5;x++) C[x]=A[x]^A[x+5]^A[x+10]^A[x+15]^A[x+20];
+    for(let x=0;x<5;x++){ const D=C[(x+4)%5]^rotl64(C[(x+1)%5],1); for(let y=0;y<25;y+=5) A[x+y]^=D; }
+    const B=new Array(25);
+    for(let x=0;x<5;x++) for(let y=0;y<5;y++) B[y+5*((2*x+3*y)%5)]=rotl64(A[x+5*y],KECCAK_ROT[x][y]);
+    for(let x=0;x<5;x++) for(let y=0;y<5;y++) A[x+5*y]=B[x+5*y]^((~B[(x+1)%5+5*y]&M64)&B[(x+2)%5+5*y]);
+    A[0]^=KECCAK_RC[r];
+  }
+}
+function keccak256(bytes){
+  const rate=136, A=new Array(25).fill(0n);
+  const padded=new Uint8Array(Math.ceil((bytes.length+1)/rate)*rate);
+  padded.set(bytes); padded[bytes.length]^=0x01; padded[padded.length-1]^=0x80;
+  for(let off=0;off<padded.length;off+=rate){
+    for(let i=0;i<17;i++){ let v=0n; for(let b=7;b>=0;b--) v=(v<<8n)|BigInt(padded[off+i*8+b]); A[i]^=v; }
+    keccakF(A);
+  }
+  const out=new Uint8Array(32);
+  for(let i=0;i<4;i++){ let v=A[i]; for(let b=0;b<8;b++){ out[i*8+b]=Number(v&0xffn); v>>=8n; } }
+  return out;
+}
+function hexToBytes(h){ h=h.replace(/^0x/,''); const o=new Uint8Array(h.length/2); for(let i=0;i<o.length;i++) o[i]=parseInt(h.substr(i*2,2),16); return o; }
+function bytesToHex(b){ return '0x'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join(''); }
+function strBytes(s){ return new TextEncoder().encode(s); }
+function concatBytes(...arrs){ let n=0; for(const a of arrs) n+=a.length; const o=new Uint8Array(n); let p=0; for(const a of arrs){ o.set(a,p); p+=a.length; } return o; }
+function u16be(n){ return new Uint8Array([(n>>8)&255,n&255]); }
+function u32be(n){ return new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]); }
+function u8(n){ return new Uint8Array([n&255]); }
+// abi.encode of a uint: 32-byte big-endian
+function word(n){ const o=new Uint8Array(32); let v=BigInt(n); for(let i=31;i>=0;i--){ o[i]=Number(v&0xffn); v>>=8n; } return o; }
+// self-test
+(function(){ const h=bytesToHex(keccak256(new Uint8Array(0))); if(h!=='0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470') throw new Error('keccak self-test failed '+h); })();
+
+// ---------------------------------------------------------------------------
+// Deterministic RNG: stream of bytes from keccak(seed), refilled by keccak(prev).
+// Solidity: same construction (bytes32 pool, counter, rehash).
+// ---------------------------------------------------------------------------
+class Rng{
+  constructor(seedBytes){ this.pool=keccak256(seedBytes); this.i=0; }
+  byte(){ if(this.i===32){ this.pool=keccak256(this.pool); this.i=0; } return this.pool[this.i++]; }
+  // uniform-ish int in [0,n)
+  int(n){ return this.byte()%n; }
+  // jitter in [-2..2] with weight towards small values: bytes 0..255 → {-2,-1,-1,0,0,0,1,1,2}
+  jit(){ const t=[-2,-1,-1,0,0,0,1,1,2]; return t[this.byte()%9]; }
+  // pick from a 3-value stroke set
+  sw(){ return [8,12,16][this.byte()%3]; }
+}
+function genesisSeed(genesisHash,tokenId){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId)); }
+// Provisional damage seed (open item O-3): keccak(genesisHash, tokenId, deaths)
+function damageSeed(genesisHash,tokenId,deaths){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId),u8(deaths),strBytes('DMG')); }
+// Demo genesisHash for the workbench when the provider isn't wired: keccak("HOODRXCH_GENESIS_V1", tokenId)
+function demoGenesisHash(tokenId){ return bytesToHex(keccak256(concatBytes(strBytes('HOODRXCH_GENESIS_V1'),word(tokenId)))); }
+// ---------------------------------------------------------------------------
+// Block glyph set: 5x7 cells, A–Z 0–9 # / . and space. Each glyph becomes one
+// <path> in <defs> (only glyphs actually used are emitted). Unit grid; placed
+// with <use transform="translate(x y) scale(s)">.
+// ---------------------------------------------------------------------------
+const GLYPHS = {
+A:['01110','10001','10001','11111','10001','10001','10001'],
+B:['11110','10001','10001','11110','10001','10001','11110'],
+C:['01111','10000','10000','10000','10000','10000','01111'],
+D:['11110','10001','10001','10001','10001','10001','11110'],
+E:['11111','10000','10000','11110','10000','10000','11111'],
+F:['11111','10000','10000','11110','10000','10000','10000'],
+G:['01111','10000','10000','10111','10001','10001','01111'],
+H:['10001','10001','10001','11111','10001','10001','10001'],
+I:['11111','00100','00100','00100','00100','00100','11111'],
+J:['00111','00001','00001','00001','00001','10001','01110'],
+K:['10001','10010','10100','11000','10100','10010','10001'],
+L:['10000','10000','10000','10000','10000','10000','11111'],
+M:['10001','11011','10101','10101','10001','10001','10001'],
+N:['10001','11001','10101','10011','10001','10001','10001'],
+O:['01110','10001','10001','10001','10001','10001','01110'],
+P:['11110','10001','10001','11110','10000','10000','10000'],
+Q:['01110','10001','10001','10001','10101','10010','01101'],
+R:['11110','10001','10001','11110','10100','10010','10001'],
+S:['01111','10000','10000','01110','00001','00001','11110'],
+T:['11111','00100','00100','00100','00100','00100','00100'],
+U:['10001','10001','10001','10001','10001','10001','01110'],
+V:['10001','10001','10001','10001','10001','01010','00100'],
+W:['10001','10001','10001','10101','10101','11011','10001'],
+X:['10001','10001','01010','00100','01010','10001','10001'],
+Y:['10001','10001','01010','00100','00100','00100','00100'],
+Z:['11111','00001','00010','00100','01000','10000','11111'],
+'0':['01110','10001','10011','10101','11001','10001','01110'],
+'1':['00100','01100','00100','00100','00100','00100','01110'],
+'2':['01110','10001','00001','00110','01000','10000','11111'],
+'3':['11110','00001','00001','01110','00001','00001','11110'],
+'4':['00010','00110','01010','10010','11111','00010','00010'],
+'5':['11111','10000','10000','11110','00001','00001','11110'],
+'6':['01110','10000','10000','11110','10001','10001','01110'],
+'7':['11111','00001','00010','00100','01000','01000','01000'],
+'8':['01110','10001','10001','01110','10001','10001','01110'],
+'9':['01110','10001','10001','01111','00001','00001','01110'],
+'#':['01010','01010','11111','01010','11111','01010','01010'],
+'/':['00001','00010','00010','00100','01000','01000','10000'],
+'.':['00000','00000','00000','00000','00000','01100','01100'],
+':':['00000','01100','01100','00000','01100','01100','00000'],
+'-':['00000','00000','00000','11111','00000','00000','00000'],
+};
+const GLYPH_ID = {'#':'gH','/':'gS','.':'gD',':':'gC','-':'gM'};
+function glyphId(ch){ return GLYPH_ID[ch] || ('g'+ch); }
+// bitmap → path (runs per row, unit grid, relative commands)
+function glyphPath(rows){
+  let d='';
+  for(let y=0;y<7;y++){ const r=rows[y]; let x=0;
+    while(x<5){ if(r[x]==='1'){ let w=1; while(x+w<5&&r[x+w]==='1') w++; d+='M'+x+' '+y+'h'+w+'v1h-'+w+'z'; x+=w; } else x++; }
+  }
+  return d;
+}
+// Text placement. Returns {svg, used:Set}. size = pixels per cell. Advance 6 cells.
+function text(str, x, y, size, fill, used){
+  let s='';
+  for(let i=0;i<str.length;i++){ const ch=str[i]; if(ch===' ') continue; if(!GLYPHS[ch]) continue;
+    used.add(ch);
+    s+='<use href="#'+glyphId(ch)+'" transform="translate('+(x+i*6*size)+' '+y+') scale('+size+')" fill="'+fill+'"/>';
+  }
+  return s;
+}
+function textWidth(str,size){ return (str.length*6-1)*size; }
+function glyphDefs(used){ let s=''; for(const ch of used) s+='<path id="'+glyphId(ch)+'" d="'+glyphPath(GLYPHS[ch])+'"/>'; return s; }
+// ---------------------------------------------------------------------------
+// Geometry primitives. Logical 100-unit grid → ×10 px. Integer output only.
+// (Glitch.sol / SVGBuilder.sol equivalents.)
+// ---------------------------------------------------------------------------
+const U = 10; // px per unit
+function jitterPts(pts, rng, amp){ // amp 1 or 2 units
+  const o=[]; for(const p of pts){ let jx=rng.jit(), jy=rng.jit(); if(amp===1){ jx=Math.max(-1,Math.min(1,jx)); jy=Math.max(-1,Math.min(1,jy)); } o.push([p[0]+jx,p[1]+jy]); } return o;
+}
+function offsetPts(pts,dx,dy){ return pts.map(p=>[p[0]+dx,p[1]+dy]); }
+function mirrorPts(pts,cx){ return pts.map(p=>[2*cx-p[0],p[1]]); }
+// closed polygon path, relative integer commands, px
+function pathD(pts){
+  let d='M'+(pts[0][0]*U)+' '+(pts[0][1]*U);
+  for(let i=1;i<pts.length;i++){ const dx=(pts[i][0]-pts[i-1][0])*U, dy=(pts[i][1]-pts[i-1][1])*U;
+    if(dy===0) d+='h'+dx; else if(dx===0) d+='v'+dy; else d+='l'+dx+' '+dy; }
+  return d+'z';
+}
+function poly(pts,fill,extra){ return '<path d="'+pathD(pts)+'" fill="'+fill+'"'+(extra||'')+'/>'; }
+function rect(x,y,w,h,fill){ return '<rect x="'+x*U+'" y="'+y*U+'" width="'+w*U+'" height="'+h*U+'" fill="'+fill+'"/>'; }
+// crude-clean stroked polyline: each segment gets a width from the 3-value set;
+// segments are grouped by width into ≤3 paths. closed=true joins last→first.
+function strokeLine(pts,rng,color,closed,scale){
+  const groups={}; const n=closed?pts.length:pts.length-1;
+  for(let i=0;i<n;i++){ const a=pts[i], b=pts[(i+1)%pts.length]; const w=rng.sw()*(scale||1);
+    (groups[w]=groups[w]||[]).push('M'+(a[0]*U)+' '+(a[1]*U)+'l'+((b[0]-a[0])*U)+' '+((b[1]-a[1])*U)); }
+  let s=''; for(const w of Object.keys(groups).sort((a,b)=>a-b)) s+='<path d="'+groups[w].join('')+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-linecap="square"/>';
+  return s;
+}
+function thickLine(pts,color,w){ let d=''; for(let i=0;i<pts.length-1;i++){ const a=pts[i],b=pts[i+1]; d+='M'+(a[0]*U)+' '+(a[1]*U)+'l'+((b[0]-a[0])*U)+' '+((b[1]-a[1])*U); } return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-linecap="square"/>'; }
+// solid drip: a tapered polygon hanging from (x,y) of length len (units)
+function drip(x,y,len,w,fill,rng){ const pts=[[x-w,y],[x+w,y],[x+w,y+len-2],[x,y+len],[x-w,y+len-2]]; return poly(jitterPts(pts,rng,1),fill); }
+// displacement slice of group #id: band [y,y+h) shifted dx units. idx numbers the clipPath.
+function slice(id,idx,y,h,dx,groundFill){
+  return '<clipPath id="c'+idx+'"><rect x="0" y="'+(y*U)+'" width="1000" height="'+(h*U)+'"/></clipPath>'
+       + '<g clip-path="url(#c'+idx+')"><rect width="1000" height="1000" fill="'+groundFill+'"/><use href="#'+id+'" transform="translate('+(dx*U)+' 0)"/></g>';
+}
+// X mark centred at (cx,cy), half-size r, bar width b (units)
+function xmark(cx,cy,r,b,fill,rng){
+  const a=[[cx-r,cy-r+b],[cx-r+b,cy-r],[cx+r,cy+r-b],[cx+r-b,cy+r]];
+  const c=[[cx+r-b,cy-r],[cx+r,cy-r+b],[cx-r+b,cy+r],[cx-r,cy+r-b]];
+  return poly(jitterPts(a,rng,1),fill)+poly(jitterPts(c,rng,1),fill);
+}
+// ---------------------------------------------------------------------------
+// Genesis (MaskGeometry.sol). Round 10 — SIGNAL WRAITH.
+// A completely different construction: no blocks, no checkers, no cartoon
+// shapes. The whole image is a field of horizontal signal lines; a skull-form
+// heightfield displaces them upward, so the figure exists only as a
+// disturbance in the signal — a shroud draped over the scan. Eye sockets dent
+// the field and burn as the only solid fills. Lines tear, spike and
+// double-expose in pink. All integer fixed-point math (centi-units) so the
+// Solidity port is bit-exact.
+// ---------------------------------------------------------------------------
+const PINK='#FF3EB5', WHITE='#FFFFFF';
+const FORM_NAMES=['BROAD','LEAN','SPIRE','SKEW L','SKEW R','SUNKEN','TOWERING','HOLLOW'];
+const LINE_NAMES=['FINE','MID','HEAVY'];
+const TEAR_NAMES=['CLEAN','TORN','SHREDDED'];
+const SPIKE_NAMES=['NONE','FEW','STORM'];
+const EYE_NAMES=['X','BROKEN X','SMEARED X','VISOR','SPLIT VISOR','X + SLIT','X + VOID','HOLLOW','DOUBLE X'];
+const TREAT_NAMES=['RAW','ECHO GLOW','CHROMATIC','RIPPLE','FULL SIGNAL'];
+const MOUTH_NAMES=['NONE','GASH','GRIN','SEWN'];
+const PINKAMT_NAMES=['NONE','ECHO','BLEED'];
+const MOSH_NAMES=['NONE','SHIFTS','HEAVY'];
+const WARD_NAMES=['','CHEVRON','THREE BARS','DIAMOND'];
+
+// traits: continuous anatomy parameters + named buckets
+function drawTraits(rng){
+  const t={};
+  // skull mass
+  t.cx = 44+rng.int(13);              // face centre x
+  t.cy = 50+rng.int(9);               // face centre y
+  t.rw = 24+rng.int(15);              // dome radius x
+  t.rh = 28+rng.int(13);              // dome radius y
+  t.amp = 18+rng.int(10);              // dome amplitude (units of lift)
+  t.peak = rng.int(17)-8;             // crown peak skew
+  t.pamp = 5+rng.int(6);              // peak amplitude
+  t.jawY = t.cy+22+rng.int(8);        // mass fades below this
+  // sockets (asymmetric)
+  t.sLdx=-(8+rng.int(6)); t.sLdy=-(4+rng.int(6)); t.sLr=7+rng.int(4); t.sLd=13+rng.int(9);
+  t.sRdx=  7+rng.int(6);  t.sRdy=-(3+rng.int(7)); t.sRr=6+rng.int(5); t.sRd=13+rng.int(9);
+  t.nas = 4+rng.int(4);               // nasal dent
+  // line field
+  t.lineW=rng.int(3);                 // 0 fine 1 mid 2 heavy
+  const te=rng.int(100); t.tear = te<35?0 : te<78?1 : 2;
+  const sp=rng.int(100); t.spike = sp<30?0 : sp<80?1 : 2;
+  const ey=rng.int(100);
+  t.eyes = ey<26?0 : ey<38?1 : ey<46?2 : ey<62?3 : ey<70?4 : ey<82?5 : ey<90?6 : ey<96?7 : 8;
+  t.eyeR = 6+rng.int(3);
+  const tr=rng.int(100); t.treat = tr<15?0 : tr<40?1 : tr<60?2 : tr<75?3 : 4;
+  const mo=rng.int(100); t.mouth = mo<22?0 : 1+((mo-22)%3);
+  const p=rng.int(100); t.pink = p<30?0 : p<78?1 : 2;
+  const g=rng.int(100); t.mosh = g<38?0 : g<78?1 : 2;
+  // named form bucket (for rarity/metadata only)
+  t.form = t.rw>=33 ? 0 : (t.rw<=27 ? 1 : (t.pamp>=12 ? 2 : (t.peak<=-4 ? 3 : (t.peak>=4 ? 4 : (t.amp<=15 ? 5 : (t.rh>=36 ? 6 : 7))))));
+  return t;
+}
+// heightfield in centi-units. x,y in units. Integer math only.
+// bump: A * ((1e4-d2)/1e4)^2 * 100  where d2 = (dx*100/rw)^2+(dy*100/rh)^2
+function bump100(x,y,cx,cy,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((y-cy)*100)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q=10000-d2;                          // 0..1e4
+  return Math.trunc(A*q*q/1000000);          // ≤ A*100
+}
+// flat-top head mass: full amplitude plateau, steep linear falloff at the edge
+function bumpFlat100(x,y,cx,cy,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((y-cy)*100)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q = d2<4200 ? 10000 : Math.trunc((10000-d2)*10000/5800);
+  return Math.trunc(A*q/100);
+}
+function heightAt(t,noiseCols,x,y,noSock){
+  let b=bumpFlat100(x,y,t.cx,t.cy,t.rw,t.rh,t.amp);
+  b+=bump100(x,y,t.cx+t.peak,t.cy-t.rh+6,14,16,t.pamp);
+  b+=bumpFlat100(x,y,t.cx+((t.peak/2)|0),t.cy+18,t.rw+5,14,(t.amp>>1));
+  b-=bump100(x,y,t.cx+((t.peak/3)|0),t.cy+7,4,6,t.nas);
+  if(y>t.jawY){ const f=Math.max(0,1400-(y-t.jawY)*100); b=Math.trunc(b*f/1400); }
+  if(b<-400) b=-400;
+  const col=Math.max(0,Math.min(50,(x>>1)));
+  return b+noiseCols[col];
+}
+// inside-socket test (for line gaps at the eyes)
+function inSocket(t,x,y,which){
+  const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
+  const nx=Math.trunc(((x-(t.cx+dx))*100)/(r+1)), ny=Math.trunc(((y-(t.cy+dy))*100)/Math.max(2,r-1));
+  return nx*nx+ny*ny<10000;
+}
+function sigilSVG(ward,cx,cy,rng,fill){
+  const J=(pts)=>offsetPts(pts,cx,cy); let s='';
+  if(ward===1) s+=poly(J([[-3,1],[0,-3],[3,1],[3,3],[0,-1],[-3,3]]),fill);
+  else if(ward===2){ for(let y=-3;y<=3;y+=3) s+=poly(J([[-3,y-1],[3,y-1],[3,y],[-3,y]]),fill); }
+  else s+=poly(J([[0,-3],[3,0],[0,3],[-3,0]]),fill);
+  return s;
+}
+function blockMarkSVG(block,cx,cy,rng,fill){
+  switch(block){
+    case 1: return rect(cx-1,cy-1,2,2,fill);
+    case 2: return rect(cx-3,cy-1,6,2,fill);
+    case 3: return rect(cx-3,cy-1,2,2,fill)+rect(cx+1,cy-1,2,2,fill);
+    case 4: return poly(offsetPts([[-2,2],[0,-3],[2,2]],cx,cy),fill);
+    case 5: return poly(offsetPts([[-2,-2],[2,-2],[2,2],[-2,2]],cx,cy),fill);
+    case 6: return xmark(cx,cy,2,1,fill,rng);
+  }
+  return '';
+}
+
+// --- KILL-TIER GLYPHS: one unmistakable silhouette per tier ---
+// T1 slash blade · T2 twin chevrons · T3 trident · T4 axe diamond · T5 crown · T6 scythe
+function tierGlyphPolys(tier){
+  switch(tier){
+    case 1: return [[[-1,-8],[3,-8],[1,8],[-3,8]]];
+    case 2: return [[[-7,-1],[0,-7],[7,-1],[7,3],[0,-3],[-7,3]],[[-7,7],[0,1],[7,7],[7,11],[0,5],[-7,11]]];
+    case 3: return [[[-7,-8],[-5,-8],[-4,2],[-8,2]],[[-1,-10],[1,-10],[2,2],[-2,2]],[[5,-8],[7,-8],[8,2],[4,2]],[[-9,2],[9,2],[9,5],[-9,5]]];
+    case 4: return [[[0,-10],[6,-3],[3,9],[-3,9],[-6,-3]],[[-1,-5],[1,-5],[1,4],[-1,4]]];
+    case 5: return [[[-9,5],[-9,0],[-6,-7],[-3,0],[0,-9],[3,0],[6,-7],[9,0],[9,5]],[[-9,7],[9,7],[9,10],[-9,10]]];
+    case 6: return [[[-8,-6],[-2,-10],[5,-9],[9,-4],[7,-3],[3,-6],[-2,-6],[-6,-3],[-7,1]],[[-3,-4],[1,-4],[-3,10],[-7,10]]];
+  }
+  return [];
+}
+// draw a tier glyph at (cx,cy), unit scale k/10 (k=10 → 1:1), solid fill
+function tierGlyphSVG(tier,cx,cy,k,fill){
+  let s2=''; for(const pts of tierGlyphPolys(tier)) s2+=poly(pts.map(p=>[cx+Math.round(p[0]*k/10),cy+Math.round(p[1]*k/10)]),fill);
+  return s2;
+}
+// the tier-4 diamond carries a black slit; handle via draw order (second poly is the slit)
+// ---------------------------------------------------------------------------
+// RenderStateV1 (handoff §13.2) + displayMode/flicker (open item O-2)
+// ---------------------------------------------------------------------------
+const LIFE=['ALIVE','MARKED','COFFINED','TERMINAL_COFFIN'];
+const EXPO=['NOT_APPLICABLE','ON_THE_STREET','LAY_LOW','WITSEC','BUYER_PROTECTED','COFFINED','TERMINAL'];
+const TIER_NAMES=['NONE','FIRST BLOOD','RISING THREAT','SAVAGE','EXECUTIONER','DEATH DEALER','REAPER'];
+const TIER_MIN=[0,1,10,25,50,75,100];
+const PHASES=['REGISTRATION','SELECTION','RESCUE','EXECUTION','FINALISATION','ARMISTICE'];
+function tierForKills(k){ if(k>=100)return 6; if(k>=75)return 5; if(k>=50)return 4; if(k>=25)return 3; if(k>=10)return 2; if(k>=1)return 1; return 0; }
+function defaultState(tokenId){
+  tokenId=tokenId||1;
+  const wardId=((tokenId-1)%3)+1, blockId=(Math.floor((tokenId-1)/3)%6)+1; // demo assignment only; WardRegistry is canonical
+  return {schemaVersion:1,tokenId,artIndex:tokenId,wardId,blockId,genesisHash:demoGenesisHash(tokenId),
+    warId:1,campaignId:1,seasonId:1,activeBlockId:1,warPhase:0,
+    lifeState:0,exposureState:1,sealsRemaining:3,hunterSelected:false,transferLocked:false,transferLockUntil:0,
+    marked:false,markedByTokenId:0,markedByWardId:0,purgeDeadline:0,
+    witsecCredits:0,witsecApplies:false,laidLow:false,buyerProtected:false,
+    kills:0,deaths:0,forcedPurges:0,savesGiven:0,savesReceived:0,currentKillStreak:0,longestKillStreak:0,terminalKills:0,
+    lifetimeKillTier:0,latestAwardSeasonId:0,latestSeasonRank:0,latestSeasonBadgeFlags:0,seasonAwardCount:0,territoryAchievementCount:0,
+    deathRecordCount:0,historicalStateCount:1,
+    displayMode:0,flicker:false};
+}
+// Impossible states (STATE_TO_LAYER_MAP §5). Returns array of codes.
+function validate(s){
+  const e=[]; const prot=(s.witsecApplies?1:0)+(s.laidLow?1:0)+(s.buyerProtected?1:0);
+  const T=s.lifeState===3, C=s.lifeState===2, M=s.lifeState===1||s.marked;
+  if(T&&(prot>0||s.hunterSelected||s.marked)) e.push('E01');
+  if(C&&(prot>0||s.hunterSelected||s.marked)) e.push('E02');
+  if(M&&(s.witsecApplies||s.laidLow)) e.push('E03');
+  if(s.sealsRemaining===0&&!T) e.push('E04');
+  if((s.deaths>=3&&!T)||(T&&s.deaths<3)) e.push('E05');
+  if(s.sealsRemaining+Math.min(s.deaths,3)!==3) e.push('E06');
+  if((s.latestSeasonBadgeFlags&2)&&!(s.latestSeasonBadgeFlags&1)) e.push('E07');
+  if(prot>1) e.push('E08');
+  if(s.marked!==(s.lifeState===1)) e.push('E09');
+  const exC=s.exposureState===5, exT=s.exposureState===6;
+  if((exT&&!T)||(T&&!exT)||(exC&&!C)||(C&&!exC)) e.push('E10');
+  if(s.wardId<1||s.wardId>3||s.blockId<1||s.blockId>6||s.tokenId<1||s.tokenId>666||s.schemaVersion!==1) e.push('E11');
+  if(s.latestSeasonBadgeFlags!==0&&(s.latestSeasonRank===0||s.latestAwardSeasonId===0)) e.push('E12');
+  if(s.latestSeasonRank>=1&&s.latestSeasonRank<=5&&s.latestSeasonBadgeFlags!==3) e.push('E12');
+  if(s.latestSeasonRank>=6&&s.latestSeasonRank<=10&&s.latestSeasonBadgeFlags!==1) e.push('E12');
+  return [...new Set(e)];
+}
+// stateHash over material fields (map §6) — abi.encode, every field a 32-byte word.
+function stateHash(s){
+  const f=[s.schemaVersion,s.tokenId,s.artIndex,s.wardId,s.blockId];
+  let b=concatBytes(...f.map(word), hexToBytes(s.genesisHash));
+  const rest=[s.seasonId,s.lifeState,s.exposureState,s.sealsRemaining,s.hunterSelected?1:0,s.transferLocked?1:0,s.marked?1:0,s.markedByTokenId,s.purgeDeadline,
+    s.witsecApplies?1:0,s.laidLow?1:0,s.buyerProtected?1:0,s.kills,s.deaths,s.forcedPurges,s.savesReceived,s.currentKillStreak,
+    s.latestAwardSeasonId,s.latestSeasonRank,s.latestSeasonBadgeFlags,s.territoryAchievementCount,s.displayMode];
+  b=concatBytes(b,...rest.map(word));
+  return bytesToHex(keccak256(b));
+}
+function resolveStatus(s){
+  if(s.lifeState===3) return 'TERMINAL';
+  if(s.lifeState===2) return 'COFFINED';
+  if(s.lifeState===1||s.marked) return 'MARKED';
+  if(s.witsecApplies) return 'WITSEC';
+  if(s.buyerProtected) return 'BUYER_PROTECTED';
+  if(s.laidLow) return 'LAY_LOW';
+  if(s.hunterSelected) return 'HUNTER_SELECTED';
+  return 'ALIVE';
+}
+// ---------------------------------------------------------------------------
+// Diagnostic SVG
+// ---------------------------------------------------------------------------
+function diagnosticSVG(s,errs){
+  const used=new Set(); let body='';
+  body+=text('INVALID STATE',110,380,16,RED,used);
+  body+=text(errs.join(' '),110,540,10,RED,used);
+  body+=text('#'+String(s.tokenId),110,640,10,RED,used);
+  body+=text(stateHash(s).slice(2,18).toUpperCase(),110,720,8,RED,used);
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+glyphDefs(used)+'</defs><rect width="1000" height="1000" fill="'+BLACK+'"/><rect x="20" y="20" width="960" height="960" fill="none" stroke="'+RED+'" stroke-width="24"/>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// Genesis figure. Returns {defs, figure, traits, hoodPts}
+// ---------------------------------------------------------------------------
+function buildGenesis(sState){
+  const s=sState;
+  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const t=drawTraits(rng);
+  // column noise: a smooth random walk shared by every line (organic wobble)
+  const noiseCols=[]; { let n=0; for(let c=0;c<=50;c++){ n+=(rng.int(3)-1)*12; if(n>150)n=150; if(n<-150)n=-150; noiseCols.push(n); } }
+  // spike map: line index -> [xIndex, amplitude px]
+  const spikes={}; { const nS=[0,1+rng.int(2),3+rng.int(3)][t.spike];
+    for(let i=0;i<nS;i++){ const li=rng.int(47); (spikes[li]=spikes[li]||[]).push([rng.int(34),(25+rng.int(25))*(rng.int(3)?1:-1)]); } }
+  const mw=9+rng.int(5), mouthY=t.cy+13+rng.int(3);
+  const STEP=3;
+  // build every line path (displaced, torn, spiked)
+  const linesD=[];
+  for(let li=0;li<47;li++){
+    const baseY=4+li*2; let d=''; let pen=false; let px=0,py=0; let breakLeft=0; let maxH=0;
+    for(let xi=0;xi<=33;xi++){
+      const x=xi*STEP;
+      const h=heightAt(t,noiseCols,x,baseY);
+      if(h>maxH) maxH=h;
+      let ypx=baseY*10-Math.round(h/10);
+      if(spikes[li]) for(const [sx,amp] of spikes[li]) if(sx===xi) ypx+=amp;
+      // gaps: eye sockets, mouth, tears
+      let gap=false;
+      { const yv=baseY-Math.round(heightAt(t,noiseCols,x,baseY,true)/100); if(inSocket(t,x,yv,0)||inSocket(t,x,yv,1)) gap=true; }
+      if(t.mouth>0 && baseY>=mouthY-1 && baseY<=mouthY+4 && Math.abs(x-t.cx)<mw) gap=true;
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else { const inFig=h>300; const p0=[3,12,26][t.tear]+(inFig?[3,10,16][t.tear]:0);
+        if(rng.int(1000)<p0){ breakLeft=1+rng.int(5); gap=true; } }
+      if(gap){ pen=false; continue; }
+      const X=x*10;
+      if(!pen){ d+='M'+X+' '+ypx; pen=true; }
+      else { const dy=ypx-py; d+= dy===0 ? 'h'+(X-px) : 'l'+(X-px)+' '+dy; }
+      px=X; py=ypx;
+    }
+    linesD.push({d,maxH,baseY});
+  }
+  const sw=[3,4,6][t.lineW];
+  let defs='';
+  let f='';
+  // white specks, faint
+  { let d=''; const n=12+rng.int(16); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // --- KILL-TIER COLOUR LADDER (handoff §9.3): the figure's own signal
+  // changes colour as kills accumulate. acid → pink → white, role-shifted.
+  const tier=tierForKills(sState.kills);
+  const figLines=linesD.filter(L=>L.d&&L.maxH>800).sort((a,b)=>a.baseY-b.baseY);
+  const isFig=new Set(figLines);
+  const crestN = tier>=5?4 : tier>=4?2 : tier>=3?1 : 0;
+  const crest=new Set(figLines.slice(0,crestN));
+  const pinkFigAll = tier>=4, pinkFigUpper = tier===3, pinkCrest6 = tier===2;
+  const crest6=new Set(figLines.slice(0,6));
+  const whiteFig = tier>=6;
+  // pink echo pass: genesis trait, plus forced echo of figure lines at tier>=6
+  { let e=''; const dx=(2+rng.int(3))*U, dy=(1+rng.int(2))*U;
+    if(t.pink>0){ const k=t.pink===2?4+rng.int(3):2+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(47); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; } }
+    if(tier>=6) for(const L of figLines.slice(0,8)) e+='<path d="'+L.d+'"/>';
+    if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+dx+' '+dy+')">'+e+'</g>'; }
+  // the signal field, grouped by colour role
+  { let gA='',gP='',gW='';
+    for(const L of linesD){ if(!L.d) continue;
+      let col='A';
+      if(isFig.has(L)){
+        if(whiteFig) col='W';
+        else if(pinkFigAll) col='P';
+        else if(pinkFigUpper && L.baseY<t.cy) col='P';
+        else if(pinkCrest6 && crest6.has(L)) col='P';
+        if(!whiteFig && crest.has(L)) col='W';
+      }
+      if(col==='A') gA+='<path d="'+L.d+'"/>'; else if(col==='P') gP+='<path d="'+L.d+'"/>'; else gW+='<path d="'+L.d+'"/>';
+    }
+    const bgw = tier>=5? Math.max(2,sw-1) : sw;
+    if(gA) f+='<g fill="none" stroke="'+ACID+'" stroke-width="'+bgw+'">'+gA+'</g>';
+    if(gP) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'">'+gP+'</g>';
+    if(gW) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'">'+gW+'</g>'; }
+  // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
+  const rB=t.eyeR;
+  const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
+  // one X arm: quad from centre toward (dx,dy); used to build broken/half arms
+  const arm=(cx,cy,dx,dy,r,b,fill)=>poly([[cx-b*dy/2|0 || cx, cy+b*dx/2|0 || cy],[cx+(b*dy/2|0),cy-(b*dx/2|0)],[cx+dx*r+(b*dy/2|0),cy+dy*r-(b*dx/2|0)],[cx+dx*r-(b*dy/2|0),cy+dy*r+(b*dx/2|0)]],fill);
+  const glyph=(st,side,cx,cy,r,fill)=>{
+    let e='';
+    const X=(rr,bb)=>xmark(cx,cy,rr,bb,fill,rng);
+    switch(st){
+      case 0: e+=X(r,3); break;
+      case 1: { const arms=[[1,-1],[-1,1],[-1,-1],[1,1]]; const skip=side?0:2;
+        for(let k=0;k<4;k++){ if(k===skip) continue; e+=arm(cx,cy,arms[k][0],arms[k][1],r,3,fill); }
+        e+=arm(cx,cy,arms[skip][0],arms[skip][1],(r>>1),3,fill); break; }
+      case 2: e+=X(r,3); e+=rect(side?cx+2:cx-r-5,cy-1,r+3,2,fill); break;
+      case 3: break; // continuous visor drawn once, below
+      case 4: e+=rect(cx-r,cy-((r/2)|0),2*r,3,fill); e+=rect(cx-r+2,cy+2,2*r-2,3,fill); break;
+      case 5: if(side) e+=rect(cx-r,cy-1,2*r,4,fill); else e+=X(r,3); break;
+      case 6: if(!side) e+=X(r,3); break; // right eye = pure void
+      case 7: break;                       // hollow: both void
+      case 8: e+=X(side?(r>>1)+1:r+1,3); break;
+    }
+    return e;
+  };
+  const drawEyes=(fill,ox,oy)=>{
+    let e='';
+    if(t.eyes===3){ // continuous visor: one blade across both sockets
+      const [lx,ly,lr]=eyePos[0], [rx2,ry2,rr2]=eyePos[1];
+      const dispL=Math.round(heightAt(t,noiseCols,lx,ly,true)/100);
+      const vy=ly-((dispL/3)|0)+2;
+      e+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
+      return e; }
+    for(const [ex,ey2,r,side] of eyePos){
+      const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100);
+      e+=glyph(t.eyes,side,ex+ox,ey2-((disp/3)|0)+2+oy,r,fill);
+    }
+    return e;
+  };
+  // treatments (trait, escalated by kill tier: 10+ at least ECHO GLOW, 50+ FULL SIGNAL)
+  { const base=t.treat; t.treat = tier>=4 ? 4 : (tier>=2 ? Math.max(1,base) : base); }
+  if(t.treat===1||t.treat===4){ f+=drawEyes(PINK,3,2); f+=drawEyes(ACID,-2,-2); }
+  else if(t.treat===2||(t.mosh>0&&t.treat===0)) f+=drawEyes(PINK,2,2);
+  if(t.treat===3||t.treat===4){ // ripple rings: the field reacting to the stare
+    for(const [ex,ey2,r,side] of eyePos){
+      if(t.eyes===6&&side) continue; if(t.eyes===7) continue;
+      const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); const cyp=ey2-((disp/3)|0)+2;
+      for(let k=1;k<=(t.treat===4?1:2);k++){ const rr=r+3+k*4;
+        const oct=[[ex-rr,cyp],[ex-(rr*7/10|0),cyp-(rr*7/10|0)],[ex,cyp-rr],[ex+(rr*7/10|0),cyp-(rr*7/10|0)],[ex+rr,cyp],[ex+(rr*7/10|0),cyp+(rr*7/10|0)],[ex,cyp+rr],[ex-(rr*7/10|0),cyp+(rr*7/10|0)]];
+        f+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="3"/>'; } } }
+  f+=drawEyes(ACID,0,0);
+  // hunter marks: kill notches above the left eye (1 per kill, capped at 9)
+  if(sState.kills>0){ const n=Math.min(9,sState.kills); const [lx,ly]=eyePos[0];
+    const disp=Math.round(heightAt(t,noiseCols,lx,ly,true)/100); const ny2=ly-((disp/3)|0)-t.eyeR-5;
+    for(let i=0;i<n;i++) f+=rect(lx-t.eyeR+i*3,ny2,2,3,PINK); }
+  // forced-purge tallies: white ticks along the hem
+  if(sState.forcedPurges>0){ const n=Math.min(10,sState.forcedPurges);
+    for(let i=0;i<n;i++) f+=rect(8+i*4,95,2,3,WHITE); }
+  // survival stitches: pink x per purged warrant survived (max 5), low left
+  if(sState.savesReceived>0){ const n=Math.min(5,sState.savesReceived);
+    for(let i=0;i<n;i++) f+=xmark(8+i*6,88,2,1,PINK,rng); }
+  // death damage: permanent scar bands + exposed bone lines (survives exhumation)
+  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
+    for(let k2=0;k2<sState.deaths;k2++){
+      const sy2=t.cy-14+drng.int(26);
+      f+='<path d="M'+((t.cx-t.rw+2)*U)+' '+(sy2*U)+'l'+((t.rw-4+drng.int(8))*U)+' '+((drng.int(5)-2)*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
+    } }
+  // mouth details on the gap
+  if(t.mouth===2){ for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=4){ const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=rect(x,mouthY-((disp/3)|0)+2,2,5,ACID); } }
+  else if(t.mouth===3){ for(let i=-1;i<=1;i++){ const x=t.cx+i*6; const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=xmark(x,mouthY-((disp/3)|0)+3,2,1,ACID,rng); } }
+  else if(t.mouth===1&&t.pink>0){ const disp=Math.round(heightAt(t,noiseCols,t.cx,mouthY,true)/100); f+=rect(t.cx-mw+2,mouthY-((disp/3)|0)+3,mw,1,PINK); }
+  // ward sigil above the crown; block mark at the hem
+  f+=sigilSVG(s.wardId,8,8,rng,ACID);
+  f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
+  // mosh: slice shifts
+  // --- KILL-TIER HALO: a corona over the crest, one signature per tier ---
+  // T1 single arc · T2 double · T3 triple broken · T4 arc + ticks · T5 corona rays · T6 full ring
+  if(tier>0){
+    // crest profile: topmost visual point of the figure per column (px)
+    const crest=[];
+    for(let xi=0;xi<=33;xi++){ const x=xi*STEP; let best=100000;
+      for(let li=0;li<47;li++){ const baseY=4+li*2; const h=heightAt(t,noiseCols,x,baseY);
+        if(h>300){ const vy=baseY*10-Math.round(h/10); if(vy<best) best=vy; } }
+      crest.push(best===100000?-1:best); }
+    const gcol = tier>=4 ? WHITE : PINK;
+    const arcPath=(off)=>{ let d='',pen=false;
+      for(let xi=0;xi<=33;xi++){ const c=crest[xi];
+        if(c<0){ pen=false; continue; }
+        const X=xi*STEP*10, Y=c-off*10;
+        if(Y<20){ pen=false; continue; }
+        if(!pen){ d+='M'+X+' '+Y; pen=true; } else d+='L'+X+' '+Y; }
+      return d; };
+    const nArcs = tier===1?1 : tier===2?2 : tier===3?3 : tier>=5?2 : 1;
+    for(let k=0;k<nArcs;k++){
+      let d=arcPath(5+k*3);
+      if(tier===3&&k===2){ // outermost arc broken: re-emit with gaps
+        d=''; let pen=false; for(let xi=0;xi<=33;xi++){ const c=crest[xi];
+          if(c<0||xi%5===0){ pen=false; continue; } const X=xi*STEP*10, Y=c-110;
+          if(Y<20){ pen=false; continue; }
+          if(!pen){ d+='M'+X+' '+Y; pen=true; } else d+='L'+X+' '+Y; } }
+      if(d) f+='<path d="'+d+'" fill="none" stroke="'+gcol+'" stroke-width="'+(tier>=4?5:4)+'"/>';
+    }
+    if(tier>=4){ // radiating ticks along the arc
+      for(let xi=1;xi<33;xi+=3){ const c=crest[xi]; if(c<0) continue; const X=xi*STEP*10, Y=c-50;
+        if(Y>60) f+='<path d="M'+X+' '+(Y-10)+'V'+Math.max(20,Y-10-(tier>=5?50:30))+'" stroke="'+gcol+'" stroke-width="4" fill="none"/>'; } }
+    if(tier>=5){ // corona rays: triangles between the ticks
+      for(let xi=2;xi<33;xi+=4){ const c=crest[xi]; if(c<0) continue; const X=xi*STEP, Y=Math.round(c/10)-9;
+        if(Y>7) f+=poly([[X-1,Y],[X+1,Y],[X,Math.max(3,Y-4)]],PINK); } }
+    if(tier>=6){ // REAPER: the complete ring, white with a pink echo
+      const rcx=t.cx*10, rcy=(t.cy-2)*10;
+      const rx=Math.min((t.rw+16)*10,rcx-20,1000-rcx-20), ry=Math.min((t.rh+((t.amp/2)|0)+12)*10,rcy-20);
+      f+='<ellipse cx="'+(rcx+8)+'" cy="'+(rcy+6)+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+PINK+'" stroke-width="4"/>';
+      f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
+    }
+  }
+  const slices=[];
+  if(t.mosh>0){ const n=t.mosh===2?4+rng.int(2):2+rng.int(2);
+    for(let i=0;i<n;i++) slices.push({y:6+rng.int(84),h:2+rng.int(5),dx:(2+rng.int(7))*(rng.int(2)?1:-1)}); }
+  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
+    for(let k2=0;k2<sState.deaths;k2++) slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)});
+  }
+  return {defs,figure:f,traits:t,slices,rng};
+}
+function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
+// ---------------------------------------------------------------------------
+// renderSVG — composition per STATE_TO_LAYER_MAP z-order
+// ---------------------------------------------------------------------------
+function renderSVG(s){
+  const errs=validate(s); if(errs.length) return diagnosticSVG(s,errs);
+  const status=resolveStatus(s);
+  const g=buildGenesis(s);
+  const used=new Set();
+  let defs=g.defs, body='';
+  // z0 ground
+  body+='<rect width="1000" height="1000" fill="'+BLACK+'"/>';
+  // figure group (z1–z6)
+  defs+='<g id="f">'+g.figure+'</g>';
+  body+='<use href="#f"/>';
+  let ci=0; for(const sl of g.slices){ ++ci;
+    if(sl.move) body+='<clipPath id="c'+ci+'"><rect x="'+(sl.x*U)+'" y="'+(sl.y*U)+'" width="'+(sl.w*U)+'" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><use href="#f" transform="translate('+(sl.dx*U)+' '+(sl.dy*U)+')"/></g>';
+    else if(sl.smear) body+='<clipPath id="c'+ci+'"><rect x="0" y="'+(sl.y*U)+'" width="1000" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f" transform="translate(-500 0) scale(2 1)"/></g>';
+    else body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // z7+ : status / seals / badges / territory / HUD — built in later steps
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+glyphDefs(used)+'</defs>'+body+'</svg>';
+}
+function renderBanner(s){ return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 1000"><rect width="3000" height="1000" fill="#000"/></svg>'; }
+function kdText(s){ if(s.deaths===0) return s.kills===0?'UNTESTED':'UNDEFEATED'; return (Math.floor(s.kills*10/s.deaths)/10).toFixed(1); }
+function renderMetadata(s){
+  const svg=renderSVG(s); const tier=tierForKills(s.kills);
+  const a=(t,v)=>({trait_type:t,value:v});
+  const attrs=[a('Token ID',s.tokenId),a('Ward','WARD 0'+s.wardId),a('Block','BLOCK 0'+s.blockId),a('Art Index',s.artIndex),
+    a('Life State',LIFE[s.lifeState]),a('Exposure State',EXPO[s.exposureState]),a('Seals Remaining',s.sealsRemaining),
+    a('Kills',s.kills),a('Deaths',s.deaths),a('K/D',kdText(s)),a('Forced Purges',s.forcedPurges),a('Saves Given',s.savesGiven),a('Saves Received',s.savesReceived),
+    a('Current Kill Streak',s.currentKillStreak),a('Longest Kill Streak',s.longestKillStreak),a('Terminal Kills',s.terminalKills),
+    a('Lifetime Kill Tier',TIER_NAMES[tier]),a('Latest Season',s.latestAwardSeasonId),a('Latest Season Rank',s.latestSeasonRank),
+    a('Season Top 10',(s.latestSeasonBadgeFlags&1)?'YES':'NO'),a('Season Top 5',(s.latestSeasonBadgeFlags&2)?'YES':'NO'),a('Season Award Count',s.seasonAwardCount),
+    a('Territory Achievements',s.territoryAchievementCount),a('Current War',s.warId),a('Current Campaign',s.campaignId),a('Current Season',s.seasonId),a('War Phase',PHASES[s.warPhase]||String(s.warPhase)),
+    a('WITSEC Credits',s.witsecCredits),a('WITSEC Applies',s.witsecApplies?'YES':'NO'),a('Lay Low',s.laidLow?'YES':'NO'),a('Buyer Protected',s.buyerProtected?'YES':'NO'),a('Hunter Selected',s.hunterSelected?'YES':'NO'),
+    a('Marked By Token ID',s.markedByTokenId),a('Purge Deadline',s.purgeDeadline),a('Transfer Locked',s.transferLocked?'YES':'NO'),a('Transfer Lock Expiry',s.transferLockUntil),
+    a('Historical State Count',s.historicalStateCount),a('Display Mode',s.displayMode?'STATS':'PLAIN'),a('Canonical Game State',LIFE[s.lifeState]),
+    a('Renderer Version',RENDERER_VERSION),a('Render-State Schema Version',SCHEMA_VERSION),a('State Hash',stateHash(s))];
+  const tn=traitNames(s); for(const k in tn) attrs.push(a('Genesis '+k[0].toUpperCase()+k.slice(1),tn[k]));
+  return JSON.stringify({name:'HOODRXCH #'+s.tokenId,description:'A persistent onchain HOODRXCH mask. Fully generative, fully onchain.',image:'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg))),attributes:attrs});
+}
+// ---------------------------------------------------------------------------
+// Workbench UI
+// ---------------------------------------------------------------------------
+const FIELDS=[
+ ['tokenId','n',1,666],['wardId','n',1,3],['blockId','n',1,6],['genesisHash','t'],
+ ['lifeState','s',LIFE],['exposureState','s',EXPO],['sealsRemaining','n',0,3],['kills','n',0,65535],['deaths','n',0,3],
+ ['marked','b'],['markedByTokenId','n',0,666],['purgeDeadline','n',0,4294967295],['hunterSelected','b'],['witsecApplies','b'],['laidLow','b'],['buyerProtected','b'],
+ ['savesReceived','n',0,65535],['forcedPurges','n',0,65535],['currentKillStreak','n',0,65535],
+ ['latestAwardSeasonId','n',0,9999],['latestSeasonRank','n',0,666],['latestSeasonBadgeFlags','n',0,3],['territoryAchievementCount','n',0,9999],
+ ['transferLocked','b'],['displayMode','s',['PLAIN','STATS']],['flicker','b']];
+let S=defaultState(1);
+function buildControls(){
+  const c=document.getElementById('controls'); let h='<h2>STATE</h2>';
+  for(const f of FIELDS){ const [k,ty]=f; let inp='';
+    if(ty==='n') inp='<input type="number" data-k="'+k+'" min="'+f[2]+'" max="'+f[3]+'" value="'+S[k]+'">';
+    else if(ty==='t') inp='<input type="text" data-k="'+k+'" value="'+S[k]+'">';
+    else if(ty==='b') inp='<input type="checkbox" data-k="'+k+'"'+(S[k]?' checked':'')+'>';
+    else inp='<select data-k="'+k+'">'+f[2].map((n,i)=>'<option value="'+i+'"'+(S[k]===i?' selected':'')+'>'+n+'</option>').join('')+'</select>';
+    h+='<div class="row"><label>'+k+'</label>'+inp+'</div>'; }
+  h+='<h2>PRESETS</h2><div class="row"><button data-p="random">Random token</button><button data-p="reset">Reset</button><button data-p="regen">Regen hash</button></div>';
+  h+='<h2>TRAITS</h2><pre id="traits"></pre>';
+  c.innerHTML=h;
+  c.addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k) return; const f=FIELDS.find(x=>x[0]===k);
+    if(f[1]==='b') S[k]=e.target.checked; else if(f[1]==='t') S[k]=e.target.value; else S[k]=Number(e.target.value);
+    if(k==='tokenId') S.genesisHash=demoGenesisHash(S.tokenId);
+    refresh(); });
+  c.addEventListener('click',e=>{ const p=e.target.dataset.p; if(!p) return;
+    if(p==='random'){ S=defaultState(1+Math.floor(Math.random()*666)); }
+    if(p==='reset'){ S=defaultState(S.tokenId); }
+    if(p==='regen'){ S.genesisHash=bytesToHex(keccak256(concatBytes(hexToBytes(S.genesisHash),u8(1)))); }
+    syncControls(); refresh(); });
+}
+function syncControls(){ for(const f of FIELDS){ const el=document.querySelector('[data-k="'+f[0]+'"]'); if(!el) continue; if(f[1]==='b') el.checked=!!S[f[0]]; else el.value=S[f[0]]; } }
+// previews use <img data:> so that <defs> ids never collide between inline SVGs
+function svgImg(svg,px){ return '<img class="sq" width="'+px+'" height="'+px+'" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))+'">'; }
+function svgTag(svg,px,cls){ return '<div class="'+(cls||'')+'" style="width:'+px+'px;height:'+px+'px">'+svgImg(svg,px)+'</div>'; }
+function refresh(){
+  const svg=renderSVG(S); const v=document.getElementById('views'); let h='';
+  for(const bg of ['black','white']){ for(const px of [512,128,64,32]) h+='<div class="view '+bg+'">'+svgTag(svg,px)+'<span>'+px+'</span></div>';
+    h+='<div class="view '+bg+'">'+svgTag(svg,256,'circ')+'<span>PFP</span></div>'; }
+  v.innerHTML=h;
+  const json=renderMetadata(S);
+  document.getElementById('json').textContent=JSON.stringify(JSON.parse(json),(k,val)=>k==='image'?val.slice(0,60)+'…':val,1);
+  document.getElementById('size').innerHTML='SVG '+new Blob([svg]).size+' bytes · JSON '+new Blob([json]).size+' bytes · status '+resolveStatus(S)+' · tier '+TIER_NAMES[tierForKills(S.kills)]+' · hash '+stateHash(S).slice(0,18);
+  document.getElementById('svgsrc').textContent=svg;
+  const errs=validate(S); document.getElementById('traits').textContent=(errs.length?'DIAGNOSTIC '+errs.join(' ')+'\n':'')+JSON.stringify(errs.length?{}:traitNames(S),null,1);
+}
+// Review sheet: 24 tokens at 256/64/32
+function drawReview(){
+  const seed=Number(document.getElementById('reviewSeed').value)||1; const sh=document.getElementById('sheet'); let h='';
+  const r=new Rng(concatBytes(strBytes('REVIEW'),word(seed)));
+  for(let i=0;i<24;i++){ const id=1+(r.byte()*256+r.byte())%666; const st=defaultState(id); const svg=renderSVG(st); const tn=traitNames(st);
+    h+='<div class="tok">'+svgTag(svg,256,'big')+svgTag(svg,64,'mid')+svgTag(svg,32,'sm')+'<div class="meta">#'+id+' W'+st.wardId+' B'+st.blockId+'<br>'+Object.values(tn).join('<br>')+'</div></div>'; }
+  sh.innerHTML=h;
+}
+// Gallery 666 + rarity
+function drawGallery(){
+  const gal=document.getElementById('gal'); const counts={form:{},lines:{},tear:{},spikes:{},eyes:{},treatment:{},mouth:{},pink:{},mosh:{},sigil:{}}; let h='';
+  for(let id=1;id<=666;id++){ const st=defaultState(id); const svg=renderSVG(st); const tn=traitNames(st);
+    for(const k in tn) counts[k][tn[k]]=(counts[k][tn[k]]||0)+1;
+    h+='<div class="cell">'+svgImg(svg,64)+'<span>#'+id+'</span></div>'; }
+  gal.innerHTML=h;
+  let t='<h2 style="color:var(--mute)">RARITY (666 GENESIS, demo genesisHash)</h2><table><tr><th>Trait</th><th>Value</th><th>Count</th><th>%</th><th></th></tr>';
+  for(const k in counts){ const ent=Object.entries(counts[k]).sort((a,b)=>b[1]-a[1]); for(const [n,c] of ent) t+='<tr><td>'+k+'</td><td>'+n+'</td><td>'+c+'</td><td>'+(c/6.66).toFixed(1)+'</td><td><span class="bar" style="width:'+(c/2)+'px"></span></td></tr>'; }
+  document.getElementById('rarity').innerHTML=t+'</table>';
+}
+document.querySelectorAll('header button').forEach(b=>b.addEventListener('click',()=>{
+  document.querySelectorAll('header button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id===b.dataset.tab));
+  if(b.dataset.tab==='gallery'&&!document.getElementById('gal').children.length) drawGallery();
+  if(b.dataset.tab==='review'&&!document.getElementById('sheet').children.length) drawReview();
+  if(b.dataset.tab==='evo'&&!document.getElementById('evoKills').children.length) drawEvo();
+}));
+document.getElementById('reviewGo').addEventListener('click',drawReview);
+function drawEvo(){
+  const id=225; let h='';
+  for(const k of [0,1,10,25,50,75,100]){ const st=defaultState(id); st.kills=k; const svg=renderSVG(st);
+    h+='<div class="e">'+svgImg(svg,150)+'<span>'+k+' KILLS · '+TIER_NAMES[tierForKills(k)]+'</span></div>'; }
+  document.getElementById('evoKills').innerHTML=h;
+  let h2='';
+  const seq=[[0,3,'GENESIS'],[1,2,'EXHUMED · DEATH 1'],[2,1,'EXHUMED · DEATH 2']];
+  for(const [d,seals,label] of seq){ const st=defaultState(id); st.deaths=d; st.sealsRemaining=seals; st.kills=25; const svg=renderSVG(st);
+    h2+='<div class="e">'+svgImg(svg,150)+'<span>'+label+'</span></div>'; }
+  h2+='<div class="e" style="color:var(--red)">COFFINED / TERMINAL — next build step</div>';
+  document.getElementById('evoDeaths').innerHTML=h2;
+}
+document.getElementById('ver').textContent='renderer v'+RENDERER_VERSION+' · schema v'+SCHEMA_VERSION;
+buildControls(); refresh();
+</script>
+</body>
+</html>
