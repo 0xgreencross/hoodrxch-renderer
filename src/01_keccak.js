@@ -55,6 +55,8 @@ class Rng{
   byte(){ if(this.i===32){ this.pool=keccak256(this.pool); this.i=0; } return this.pool[this.i++]; }
   // uniform-ish int in [0,n)
   int(n){ return this.byte()%n; }
+  // per-mille roll [0,1000) from two bytes (for the rarity weight tables)
+  r1000(){ return (this.byte()*256+this.byte())%1000; }
   // jitter in [-2..2] with weight towards small values: bytes 0..255 → {-2,-1,-1,0,0,0,1,1,2}
   jit(){ const t=[-2,-1,-1,0,0,0,1,1,2]; return t[this.byte()%9]; }
   // pick from a 3-value stroke set

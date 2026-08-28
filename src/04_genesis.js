@@ -7,48 +7,107 @@
 // the field and burn as the only solid fills. Lines tear, spike and
 // double-expose in pink. All integer fixed-point math (centi-units) so the
 // Solidity port is bit-exact.
+//
+// TRAIT ENGINE V2 — 110 values across 9 traits, six rarity tiers:
+// COMMON > UNCOMMON > RARE > ULTRA RARE > LEGENDARY > EPIC (rarest, ~5‰).
+// Every value is drawn from a per-mille weight table with a two-byte roll.
 // ---------------------------------------------------------------------------
 const PINK='#FF3EB5', WHITE='#FFFFFF';
-const FORM_NAMES=['BROAD','LEAN','SPIRE','SKEW L','SKEW R','SUNKEN','TOWERING','HOLLOW'];
-const LINE_NAMES=['FINE','MID','HEAVY'];
-const TEAR_NAMES=['CLEAN','TORN','SHREDDED'];
-const SPIKE_NAMES=['NONE','FEW','STORM'];
-const EYE_NAMES=['X','BROKEN X','SMEARED X','VISOR','SPLIT VISOR','X + SLIT','X + VOID','HOLLOW','DOUBLE X'];
-const TREAT_NAMES=['RAW','ECHO GLOW','CHROMATIC','RIPPLE','FULL SIGNAL'];
-const MOUTH_NAMES=['NONE','GASH','GRIN','SEWN'];
-const PINKAMT_NAMES=['NONE','ECHO','BLEED'];
-const MOSH_NAMES=['NONE','SHIFTS','HEAVY'];
+
+// tier names for the rarity UI/docs (index into TIER_OF tables below)
+const RARITY_NAMES=['COMMON','UNCOMMON','RARE','ULTRA RARE','LEGENDARY','EPIC'];
+
+const FORM_NAMES=['BROAD','LEAN','SKEW L','SKEW R','HOLLOW','TOWERING','SPIRE','SUNKEN',
+ 'TWIN PEAK','HORNED','TILTED','CRATER','COLOSSUS','NEEDLE','WRAITH TALL','PHANTOM'];
+const FORM_W=[195,185,95,95,90,80,55,55,30,30,28,25,12,12,8,5];
+const FORM_TIER=[0,0,0,0,0,0,1,1,2,2,2,2,3,3,4,5];
+
+const LINE_NAMES=['FINE','MID','HEAVY','DENSE','SPARSE','DASHED','DUAL WEIGHT','BARCODE','NO SIGNAL'];
+const LINE_W=[240,260,210,90,90,55,35,15,5];
+const LINE_TIER=[0,0,0,1,1,2,3,4,5];
+
+const TEAR_NAMES=['CLEAN','TORN','SHREDDED','RIPPED EDGE','MOTH EATEN','SPLIT FIELD','VAPOR','CENSORED'];
+const TEAR_W=[330,330,150,90,50,30,15,5];
+const TEAR_TIER=[0,0,1,1,2,3,4,5];
+
+const SPIKE_NAMES=['NONE','FEW','STORM','NEEDLES','SEISMIC','PULSE TRAIN','LIGHTNING','EARTHQUAKE','FLATLINE SCAR'];
+const SPIKE_W=[300,330,130,90,50,45,35,15,5];
+const SPIKE_TIER=[0,0,1,1,2,2,3,4,5];
+
+const EYE_NAMES=['X','BROKEN X','SMEARED X','VISOR','SPLIT VISOR','X + SLIT','X + VOID','HOLLOW','DOUBLE X',
+ 'SLIT','GLITCH BAR','PIXEL STORM','CROSSHAIR','TRIPLE SLIT','VOID RING','NAILED X','BINARY',
+ 'TARGET','SPIRAL','WEEPING X','SPLIT PAIR','BURNING X','STAR','DEAD LIGHT','ALL SEEING'];
+const EYE_W=[155,100,55,100,45,95,45,40,30,50,45,40,30,28,27,25,25,12,12,12,9,5,5,5,5];
+const EYE_TIER=[0,0,1,0,1,0,1,1,2,1,1,1,2,2,2,2,2,3,3,3,3,4,4,4,5];
+
+const TREAT_NAMES=['RAW','ECHO GLOW','CHROMATIC','RIPPLE','FULL SIGNAL',
+ 'STATIC','CROSS FLARE','HALO EYES','SMEAR TRAIL','INVERTED','PRISM','GOD RAYS'];
+const TREAT_W=[190,240,190,90,120,60,35,25,25,12,8,5];
+const TREAT_TIER=[0,0,0,1,0,1,2,3,3,4,4,5];
+
+const MOUTH_NAMES=['NONE','GASH','GRIN','SEWN','WIRE','STITCHED GRIN','DOUBLE GASH','SIDE SMIRK',
+ 'ZIPPER','SNARL','DRIP','SCREAM','FANGS','HOWL','MUZZLE','GLITCH MOUTH'];
+const MOUTH_W=[200,165,160,128,60,55,50,45,32,30,28,14,13,8,7,5];
+const MOUTH_TIER=[0,0,0,0,1,1,1,1,2,2,2,3,3,4,4,5];
+
+const PINKAMT_NAMES=['NONE','ECHO','BLEED','FLOOD','WHITE ECHO','INVERSION','TRICHROME','HEARTBEAT'];
+const PINK_W=[320,350,150,80,50,30,15,5];
+const PINK_TIER=[0,0,1,2,2,3,4,5];
+
+const MOSH_NAMES=['NONE','SHIFTS','HEAVY','TEARDROP','CORRUPTED','SPLIT','MELTDOWN'];
+const MOSH_W=[360,330,160,80,50,15,5];
+const MOSH_TIER=[0,0,1,2,3,4,5];
+
 const WARD_NAMES=['','CHEVRON','THREE BARS','DIAMOND'];
 
-// traits: continuous anatomy parameters + named buckets
+// weighted pick: two-byte per-mille roll against a cumulative table
+function pick(rng,W){
+  let r=rng.r1000(); for(let i=0;i<W.length;i++){ r-=W[i]; if(r<0) return i; }
+  return W.length-1;
+}
+
+// traits: form-driven anatomy + weighted buckets
 function drawTraits(rng){
   const t={};
-  // skull mass
-  t.cx = 44+rng.int(13);              // face centre x
-  t.cy = 50+rng.int(9);               // face centre y
-  t.rw = 24+rng.int(15);              // dome radius x
-  t.rh = 28+rng.int(13);              // dome radius y
-  t.amp = 18+rng.int(10);              // dome amplitude (units of lift)
-  t.peak = rng.int(17)-8;             // crown peak skew
-  t.pamp = 5+rng.int(6);              // peak amplitude
-  t.jawY = t.cy+22+rng.int(8);        // mass fades below this
+  t.form=pick(rng,FORM_W);
+  // anatomy per form (ranges keep continuous variety inside each silhouette)
+  t.cx=44+rng.int(13); t.cy=50+rng.int(9);
+  t.rw=25+rng.int(9); t.rh=29+rng.int(11); t.amp=19+rng.int(7);
+  t.peak=rng.int(9)-4; t.pamp=6+rng.int(4);
+  t.x2mode=0; t.x2amp=0; t.x2dx=0;
+  switch(t.form){
+    case 0: t.rw=30+rng.int(9); t.amp=20+rng.int(7); break;                    // BROAD
+    case 1: t.rw=22+rng.int(5); t.rh=30+rng.int(11); break;                    // LEAN
+    case 2: t.peak=-(8+rng.int(7)); t.rw=25+rng.int(9); break;                 // SKEW L
+    case 3: t.peak=8+rng.int(7); t.rw=25+rng.int(9); break;                    // SKEW R
+    case 4: t.amp=14+rng.int(4); t.rw=27+rng.int(8); break;                    // HOLLOW
+    case 5: t.rh=38+rng.int(7); t.rw=24+rng.int(7); t.amp=20+rng.int(7); break;// TOWERING
+    case 6: t.rw=20+rng.int(5); t.pamp=12+rng.int(5); t.rh=34+rng.int(9); break;// SPIRE
+    case 7: t.amp=12+rng.int(4); t.cy=55+rng.int(4); t.rh=26+rng.int(7); break;// SUNKEN
+    case 8: t.x2mode=1; t.x2amp=8+rng.int(5); t.x2dx=10+rng.int(5); break;     // TWIN PEAK
+    case 9: t.x2mode=2; t.x2amp=10+rng.int(5); break;                          // HORNED
+    case 10: t.peak=(12+rng.int(5))*(rng.int(2)?1:-1); t.cx=rng.int(2)?38+rng.int(5):52+rng.int(5); break; // TILTED
+    case 11: t.x2mode=3; t.x2amp=8+rng.int(5); break;                          // CRATER
+    case 12: t.rw=36+rng.int(5); t.amp=26+rng.int(5); t.rh=34+rng.int(7); break;// COLOSSUS
+    case 13: t.rw=18+rng.int(4); t.pamp=14+rng.int(5); t.rh=38+rng.int(7); t.amp=16+rng.int(5); break; // NEEDLE
+    case 14: t.cy=44+rng.int(3); t.rh=40+rng.int(5); break;                    // WRAITH TALL
+    case 15: t.amp=10+rng.int(4); break;                                       // PHANTOM
+  }
+  t.jawY=t.cy+22+rng.int(8);
   // sockets (asymmetric)
   t.sLdx=-(8+rng.int(6)); t.sLdy=-(4+rng.int(6)); t.sLr=7+rng.int(4); t.sLd=13+rng.int(9);
   t.sRdx=  7+rng.int(6);  t.sRdy=-(3+rng.int(7)); t.sRr=6+rng.int(5); t.sRd=13+rng.int(9);
-  t.nas = 4+rng.int(4);               // nasal dent
-  // line field
-  t.lineW=rng.int(3);                 // 0 fine 1 mid 2 heavy
-  const te=rng.int(100); t.tear = te<35?0 : te<78?1 : 2;
-  const sp=rng.int(100); t.spike = sp<30?0 : sp<80?1 : 2;
-  const ey=rng.int(100);
-  t.eyes = ey<26?0 : ey<38?1 : ey<46?2 : ey<62?3 : ey<70?4 : ey<82?5 : ey<90?6 : ey<96?7 : 8;
-  t.eyeR = 6+rng.int(3);
-  const tr=rng.int(100); t.treat = tr<15?0 : tr<40?1 : tr<60?2 : tr<75?3 : 4;
-  const mo=rng.int(100); t.mouth = mo<22?0 : 1+((mo-22)%3);
-  const p=rng.int(100); t.pink = p<30?0 : p<78?1 : 2;
-  const g=rng.int(100); t.mosh = g<38?0 : g<78?1 : 2;
-  // named form bucket (for rarity/metadata only)
-  t.form = t.rw>=33 ? 0 : (t.rw<=27 ? 1 : (t.pamp>=12 ? 2 : (t.peak<=-4 ? 3 : (t.peak>=4 ? 4 : (t.amp<=15 ? 5 : (t.rh>=36 ? 6 : 7))))));
+  t.nas = 4+rng.int(4);
+  // field + surface buckets
+  t.lineW=pick(rng,LINE_W);
+  t.tear=pick(rng,TEAR_W);
+  t.spike=pick(rng,SPIKE_W);
+  t.eyes=pick(rng,EYE_W);
+  t.eyeR=6+rng.int(3);
+  t.treat=pick(rng,TREAT_W);
+  t.mouth=pick(rng,MOUTH_W);
+  t.pink=pick(rng,PINK_W);
+  t.mosh=pick(rng,MOSH_W);
   return t;
 }
 // heightfield in centi-units. x,y in units. Integer math only.
@@ -73,6 +132,10 @@ function heightAt(t,noiseCols,x,y,noSock){
   b+=bump100(x,y,t.cx+t.peak,t.cy-t.rh+6,14,16,t.pamp);
   b+=bumpFlat100(x,y,t.cx+((t.peak/2)|0),t.cy+18,t.rw+5,14,(t.amp>>1));
   b-=bump100(x,y,t.cx+((t.peak/3)|0),t.cy+7,4,6,t.nas);
+  // form modifiers: twin peak / horns / crater
+  if(t.x2mode===1){ b+=bump100(x,y,t.cx-t.x2dx,t.cy-t.rh+7,10,14,t.x2amp); b+=bump100(x,y,t.cx+t.x2dx,t.cy-t.rh+7,10,14,t.x2amp); }
+  else if(t.x2mode===2){ b+=bump100(x,y,t.cx-t.rw+4,t.cy-t.rh+10,5,12,t.x2amp); b+=bump100(x,y,t.cx+t.rw-4,t.cy-t.rh+10,5,12,t.x2amp); }
+  else if(t.x2mode===3){ b-=bump100(x,y,t.cx+((t.peak/2)|0),t.cy-t.rh+8,9,10,t.x2amp); }
   if(y>t.jawY){ const f=Math.max(0,1400-(y-t.jawY)*100); b=Math.trunc(b*f/1400); }
   if(b<-400) b=-400;
   const col=Math.max(0,Math.min(50,(x>>1)));
@@ -102,23 +165,3 @@ function blockMarkSVG(block,cx,cy,rng,fill){
   }
   return '';
 }
-
-// --- KILL-TIER GLYPHS: one unmistakable silhouette per tier ---
-// T1 slash blade · T2 twin chevrons · T3 trident · T4 axe diamond · T5 crown · T6 scythe
-function tierGlyphPolys(tier){
-  switch(tier){
-    case 1: return [[[-1,-8],[3,-8],[1,8],[-3,8]]];
-    case 2: return [[[-7,-1],[0,-7],[7,-1],[7,3],[0,-3],[-7,3]],[[-7,7],[0,1],[7,7],[7,11],[0,5],[-7,11]]];
-    case 3: return [[[-7,-8],[-5,-8],[-4,2],[-8,2]],[[-1,-10],[1,-10],[2,2],[-2,2]],[[5,-8],[7,-8],[8,2],[4,2]],[[-9,2],[9,2],[9,5],[-9,5]]];
-    case 4: return [[[0,-10],[6,-3],[3,9],[-3,9],[-6,-3]],[[-1,-5],[1,-5],[1,4],[-1,4]]];
-    case 5: return [[[-9,5],[-9,0],[-6,-7],[-3,0],[0,-9],[3,0],[6,-7],[9,0],[9,5]],[[-9,7],[9,7],[9,10],[-9,10]]];
-    case 6: return [[[-8,-6],[-2,-10],[5,-9],[9,-4],[7,-3],[3,-6],[-2,-6],[-6,-3],[-7,1]],[[-3,-4],[1,-4],[-3,10],[-7,10]]];
-  }
-  return [];
-}
-// draw a tier glyph at (cx,cy), unit scale k/10 (k=10 → 1:1), solid fill
-function tierGlyphSVG(tier,cx,cy,k,fill){
-  let s2=''; for(const pts of tierGlyphPolys(tier)) s2+=poly(pts.map(p=>[cx+Math.round(p[0]*k/10),cy+Math.round(p[1]*k/10)]),fill);
-  return s2;
-}
-// the tier-4 diamond carries a black slit; handle via draw order (second poly is the slit)

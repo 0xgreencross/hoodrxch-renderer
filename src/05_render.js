@@ -77,6 +77,16 @@ function diagnosticSVG(s,errs){
 // One X arm: quad from centre toward (dx,dy); used to build broken/half arms.
 // ---------------------------------------------------------------------------
 function eyeArm(cx,cy,dx,dy,r,b,fill){ return poly([[cx-b*dy/2|0 || cx, cy+b*dx/2|0 || cy],[cx+(b*dy/2|0),cy-(b*dx/2|0)],[cx+dx*r+(b*dy/2|0),cy+dy*r-(b*dx/2|0)],[cx+dx*r-(b*dy/2|0),cy+dy*r+(b*dx/2|0)]],fill); }
+// octagon ring (stroke) centred at cx,cy — shared by eyes/treatments/mouths
+function octRing(cx,cy,r,w,color){
+  const q=(r*7/10)|0;
+  const pts=[[cx-r,cy],[cx-q,cy-q],[cx,cy-r],[cx+q,cy-q],[cx+r,cy],[cx+q,cy+q],[cx,cy+r],[cx-q,cy+q]];
+  return '<path d="'+pathD(pts)+'" fill="none" stroke="'+color+'" stroke-width="'+w+'"/>';
+}
+function octFill(cx,cy,r,fill){
+  const q=(r*7/10)|0;
+  return poly([[cx-r,cy],[cx-q,cy-q],[cx,cy-r],[cx+q,cy-q],[cx+r,cy],[cx+q,cy+q],[cx,cy+r],[cx-q,cy+q]],fill);
+}
 function eyeGlyph(st,side,cx,cy,r,fill,rng){
   let e='';
   const X=(rr,bb)=>xmark(cx,cy,rr,bb,fill,rng);
@@ -92,6 +102,27 @@ function eyeGlyph(st,side,cx,cy,r,fill,rng){
     case 6: if(!side) e+=X(r,3); break; // right eye = pure void
     case 7: break;                       // hollow: both void
     case 8: e+=X(side?(r>>1)+1:r+1,3); break;
+    case 9: e+=rect(cx-r,cy-1,2*r,2,fill); break; // SLIT
+    case 10: e+=rect(cx-1,cy-r,3,2*r,fill); e+=rect(cx+1,cy-2,r+2,3,fill); break; // GLITCH BAR
+    case 11: for(let i=0;i<5;i++) e+=rect(cx-r+rng.int(2*r),cy-r+rng.int(2*r),2,2,fill); break; // PIXEL STORM
+    case 12: e+=X(r,3); e+=rect(cx-1,cy-r-4,2,3,fill)+rect(cx-1,cy+r+1,2,3,fill)+rect(cx-r-4,cy-1,3,2,fill)+rect(cx+r+1,cy-1,3,2,fill); break; // CROSSHAIR
+    case 13: e+=rect(cx-r,cy-4,2*r,2,fill)+rect(cx-r,cy-1,2*r,2,fill)+rect(cx-r,cy+2,2*r,2,fill); break; // TRIPLE SLIT
+    case 14: e+=octRing(cx,cy,r,3,fill); break; // VOID RING
+    case 15: e+=X(r,3); e+=rect(cx-1,cy-3,2,6,WHITE)+rect(cx-3,cy-1,6,2,WHITE); break; // NAILED X
+    case 16: if(side) e+=octRing(cx,cy,r-1,3,fill); else e+=rect(cx-1,cy-r,3,2*r,fill); break; // BINARY (1|0)
+    case 17: e+=octRing(cx,cy,r+1,4,fill); e+=rect(cx-2,cy-2,3,3,fill); break; // TARGET
+    case 18: { // SPIRAL: square spiral inward
+      let d='M'+((cx-r)*U)+' '+((cy-r)*U);
+      const dirs=[[1,0],[0,1],[-1,0],[0,-1]];
+      for(let k=0;k<7;k++){ const len=k<3?2*r:2*r-3*((k-1)>>1); if(len<2) break;
+        const dxy=dirs[k%4]; d+= dxy[0]!==0 ? 'h'+(dxy[0]*len*U) : 'v'+(dxy[1]*len*U); }
+      e+='<path d="'+d+'" fill="none" stroke="'+fill+'" stroke-width="3"/>'; break; }
+    case 19: e+=X(r,3); e+=rect(cx+1,cy+r,2,7+rng.int(4),fill); break; // WEEPING X
+    case 20: if(side) e+=octRing(cx,cy,r,3,fill); else e+=X(r,3); break; // SPLIT PAIR
+    case 21: e+=xmark(cx+2,cy+2,r,3,PINK,rng); e+=X(r,3); e+=xmark(cx,cy,(r>>1),2,WHITE,rng); break; // BURNING X
+    case 22: e+=poly(offsetPts([[0,-r-1],[2,-2],[r+1,0],[2,2],[0,r+1],[-2,2],[-r-1,0],[-2,-2]],cx,cy),fill); break; // STAR
+    case 23: e+=octFill(cx,cy,r,fill); break; // DEAD LIGHT
+    // 24 ALL SEEING handled at drawEyes level
   }
   return e;
 }
@@ -103,28 +134,72 @@ function buildGenesis(sState){
   const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
   const t=drawTraits(rng);
   // column noise: a smooth random walk shared by every line (organic wobble)
-  const noiseCols=[]; { let n=0; for(let c=0;c<=50;c++){ n+=(rng.int(3)-1)*12; if(n>150)n=150; if(n<-150)n=-150; noiseCols.push(n); } }
-  // spike map: line index -> [xIndex, amplitude px]
-  const spikes={}; { const nS=[0,1+rng.int(2),3+rng.int(3)][t.spike];
-    for(let i=0;i<nS;i++){ const li=rng.int(47); (spikes[li]=spikes[li]||[]).push([rng.int(34),(25+rng.int(25))*(rng.int(3)?1:-1)]); } }
+  const noiseAmp = t.form===15 ? 24 : 12; // PHANTOM: the figure barely holds together
+  const noiseCols=[]; { let n=0; for(let c=0;c<=50;c++){ n+=(rng.int(3)-1)*noiseAmp; if(n>150)n=150; if(n<-150)n=-150; noiseCols.push(n); } }
+  // --- FIELD LINE LIST per LINES style ---
+  const lines=[]; // {y, w, dash?, figOnly?}
+  if(t.lineW<=2){ const w=[3,4,6][t.lineW]; for(let li=0;li<47;li++) lines.push({y:4+li*2,w}); }
+  else if(t.lineW===3){ for(let li=0;li<93;li++) lines.push({y:4+li,w:2}); }                    // DENSE
+  else if(t.lineW===4){ for(let li=0;li<24;li++) lines.push({y:4+li*4,w:5}); }                  // SPARSE
+  else if(t.lineW===5){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:4,dash:1}); }           // DASHED
+  else if(t.lineW===6){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:li%2?6:2}); }           // DUAL WEIGHT
+  else if(t.lineW===7){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:[2,4,7][rng.int(3)]}); }// BARCODE
+  else { for(let li=0;li<16;li++) lines.push({y:4+li*6,w:3});                                   // NO SIGNAL
+         for(let li=0;li<47;li++) lines.push({y:4+li*2,w:3,figOnly:1}); }
+  // --- SPIKE STYLE pre-draws (deterministic order) ---
+  const spikes={}; let pulseLi=-1,pulseAmp=0, flatLi=-1, quake=null, lightning=false;
+  {
+    const addSpikes=(n,ampFn)=>{ for(let i=0;i<n;i++){ const li=rng.int(lines.length); (spikes[li]=spikes[li]||[]).push([rng.int(34),ampFn()]); } };
+    if(t.spike===1) addSpikes(1+rng.int(2),()=> (25+rng.int(25))*(rng.int(3)?1:-1));
+    else if(t.spike===2) addSpikes(3+rng.int(3),()=> (25+rng.int(25))*(rng.int(3)?1:-1));
+    else if(t.spike===3) addSpikes(8+rng.int(4),()=> -(8+rng.int(8)));                    // NEEDLES
+    else if(t.spike===4) addSpikes(1,()=> (60+rng.int(31))*(rng.int(3)?1:-1));            // SEISMIC
+    else if(t.spike===5){ pulseLi=rng.int(lines.length); pulseAmp=18+rng.int(10); }       // PULSE TRAIN
+    else if(t.spike===6) lightning=true;                                                  // LIGHTNING
+    else if(t.spike===7){ quake=[]; for(let i=0;i<13;i++) quake.push(rng.int(17)-8); }    // EARTHQUAKE
+    else if(t.spike===8){ const target=25+rng.int(50); flatLi=0;                          // FLATLINE SCAR
+      for(let li=0;li<lines.length;li++){ if(lines[li].y>=target){ flatLi=li; break; } } }
+  }
+  // --- TEAR STYLE pre-draws ---
+  let moth=null, splitY=-1, censor=null;
+  if(t.tear===4){ moth=[]; const nB=3+rng.int(3); for(let i=0;i<nB;i++) moth.push([rng.int(100),4+rng.int(90),5+rng.int(4)]); }
+  else if(t.tear===5) splitY=14+rng.int(66);
+  else if(t.tear===7){ censor=[]; for(let i=0;i<3;i++) censor.push([rng.int(70),rng.int(80),12+rng.int(14),8+rng.int(8)]); }
   const mw=9+rng.int(5), mouthY=t.cy+13+rng.int(3);
   const STEP=3;
-  // build every line path (displaced, torn, spiked)
+  // mouth gap band height per type (rows below mouthY-1)
+  const mouthGapLo = t.mouth>0 ? mouthY-1 : 0;
+  const mouthGapHi = t.mouth===11||t.mouth===13 ? mouthY+8 : (t.mouth===4 ? mouthY+2 : (t.mouth===14||t.mouth===15 ? mouthY+6 : mouthY+4));
+  // --- BUILD EVERY LINE PATH (displaced, torn, spiked) ---
   const linesD=[];
-  for(let li=0;li<47;li++){
-    const baseY=4+li*2; let d=''; let pen=false; let px=0,py=0; let breakLeft=0; let maxH=0;
+  for(let li=0;li<lines.length;li++){
+    const L=lines[li]; const baseY=L.y;
+    if(li===flatLi){ linesD.push({d:'',maxH:0,baseY,w:L.w}); continue; } // drawn as the scar below
+    let d=''; let pen=false; let px=0,py=0; let breakLeft=0; let maxH=0;
     for(let xi=0;xi<=33;xi++){
       const x=xi*STEP;
       const h=heightAt(t,noiseCols,x,baseY);
       if(h>maxH) maxH=h;
       let ypx=baseY*10-Math.round(h/10);
       if(spikes[li]) for(const [sx,amp] of spikes[li]) if(sx===xi) ypx+=amp;
-      // gaps: eye sockets, mouth, tears
+      if(li===pulseLi && xi%6<3) ypx-=pulseAmp;
+      if(quake) ypx+=quake[(xi+li*3)%13];
+      // gaps: figure-only lines, eye sockets, mouth, tear styles
       let gap=false;
+      if(L.figOnly && h<=300) gap=true;
       { const yv=baseY-Math.round(heightAt(t,noiseCols,x,baseY,true)/100); if(inSocket(t,x,yv,0)||inSocket(t,x,yv,1)) gap=true; }
-      if(t.mouth>0 && baseY>=mouthY-1 && baseY<=mouthY+4 && Math.abs(x-t.cx)<mw) gap=true;
+      if(t.mouth>0 && baseY>=mouthGapLo && baseY<=mouthGapHi && Math.abs(x-t.cx)<mw) gap=true;
+      if(L.dash && (xi+baseY)%7<2) gap=true;
+      if(moth){ for(const [bx,by,r] of moth){ const ddx=x-bx, ddy=baseY-by; if(ddx*ddx+ddy*ddy<r*r) gap=true; } }
+      if(splitY>=0 && baseY>=splitY && baseY<splitY+5) gap=true;
+      if(censor){ for(const [cx0,cy0,cw,ch] of censor){ if(x>=cx0&&x<cx0+cw&&baseY>=cy0&&baseY<cy0+ch) gap=true; } }
       if(breakLeft>0){ breakLeft--; gap=true; }
-      else { const inFig=h>300; const p0=[3,12,26][t.tear]+(inFig?[3,10,16][t.tear]:0);
+      else { const inFig=h>300;
+        let p0;
+        if(t.tear<=2) p0=[3,12,26][t.tear]+(inFig?[3,10,16][t.tear]:0);
+        else if(t.tear===3) p0=(xi<6||xi>27)?45:4;                          // RIPPED EDGE
+        else if(t.tear===6) p0=Math.max(3,Math.trunc((92-baseY)*13/10));    // VAPOR
+        else p0=t.tear===4?4:6;                                             // MOTH/SPLIT/CENSORED base
         if(rng.int(1000)<p0){ breakLeft=1+rng.int(5); gap=true; } }
       if(gap){ pen=false; continue; }
       const X=x*10;
@@ -132,9 +207,9 @@ function buildGenesis(sState){
       else { const dy=ypx-py; d+= dy===0 ? 'h'+(X-px) : 'l'+(X-px)+' '+dy; }
       px=X; py=ypx;
     }
-    linesD.push({d,maxH,baseY});
+    linesD.push({d,maxH,baseY,w:L.w});
   }
-  const sw=[3,4,6][t.lineW];
+  const sw=Math.max(3,Math.min(6,lines[0].w)); // reference width for echoes/marks
   let defs='';
   let f='';
   // white specks, faint
@@ -149,32 +224,62 @@ function buildGenesis(sState){
   const pinkFigAll = tier>=4, pinkFigUpper = tier===3, pinkCrest6 = tier===2;
   const crest6=new Set(figLines.slice(0,6));
   const whiteFig = tier>=6;
-  // pink echo pass: genesis trait, plus forced echo of figure lines at tier>=6
-  { let e=''; const dx=(2+rng.int(3))*U, dy=(1+rng.int(2))*U;
-    if(t.pink>0){ const k=t.pink===2?4+rng.int(3):2+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(47); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; } }
+  const invert = t.pink===5; // INVERSION: the figure runs pink from genesis
+  // echo passes: genesis PINK trait styles, plus forced echo of figure lines at tier>=6
+  { const dx=(2+rng.int(3))*U, dy=(1+rng.int(2))*U;
+    let e='', e2='';
+    if(t.pink===1||t.pink===2||t.pink===3){
+      const k=t.pink===3?8+rng.int(3):(t.pink===2?4+rng.int(3):2+rng.int(2));
+      for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; } }
+    else if(t.pink===4){ const k=3+rng.int(2); // WHITE ECHO
+      for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e2+='<path d="'+linesD[li].d+'"/>'; } }
+    else if(t.pink===6){ // TRICHROME: pink pass + white counter-pass
+      let k=3+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; }
+      k=2+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e2+='<path d="'+linesD[li].d+'"/>'; } }
     if(tier>=6) for(const L of figLines.slice(0,8)) e+='<path d="'+L.d+'"/>';
-    if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+dx+' '+dy+')">'+e+'</g>'; }
-  // the signal field, grouped by colour role
-  { let gA='',gP='',gW='';
+    if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+dx+' '+dy+')">'+e+'</g>';
+    if(e2) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'" transform="translate('+(-dx)+' '+dy+')">'+e2+'</g>'; }
+  // the signal field, grouped by (colour role, stroke width)
+  { const groups={};
     for(const L of linesD){ if(!L.d) continue;
       let col='A';
       if(isFig.has(L)){
+        if(invert) col='P';
         if(whiteFig) col='W';
         else if(pinkFigAll) col='P';
         else if(pinkFigUpper && L.baseY<t.cy) col='P';
         else if(pinkCrest6 && crest6.has(L)) col='P';
         if(!whiteFig && crest.has(L)) col='W';
       }
-      if(col==='A') gA+='<path d="'+L.d+'"/>'; else if(col==='P') gP+='<path d="'+L.d+'"/>'; else gW+='<path d="'+L.d+'"/>';
+      const key=col+'|'+L.w;
+      (groups[key]=groups[key]||[]).push(L.d);
     }
-    const bgw = tier>=5? Math.max(2,sw-1) : sw;
-    if(gA) f+='<g fill="none" stroke="'+ACID+'" stroke-width="'+bgw+'">'+gA+'</g>';
-    if(gP) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'">'+gP+'</g>';
-    if(gW) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'">'+gW+'</g>'; }
+    for(const col of ['A','P','W']){
+      for(let w=2;w<=7;w++){
+        const g2=groups[col+'|'+w]; if(!g2) continue;
+        const stroke = col==='A'?ACID : col==='P'?PINK : WHITE;
+        const wOut = (col==='A'&&tier>=5) ? Math.max(2,w-1) : w;
+        f+='<g fill="none" stroke="'+stroke+'" stroke-width="'+wOut+'">';
+        for(const d of g2) f+='<path d="'+d+'"/>';
+        f+='</g>';
+      }
+    } }
+  // FLATLINE SCAR: one perfect white line cutting through everything
+  if(flatLi>=0) f+='<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="4"/>';
+  // LIGHTNING: one jagged bolt across the field
+  if(lightning){ let d='M0 '+((20+rng.int(60))*U); let ly=0;
+    for(let x=8;x<=100;x+=8){ const ny=(10+rng.int(80)); d+='L'+(x*U)+' '+(ny*U); ly=ny; }
+    f+='<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="5"/>'
+     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="2"/>'; }
+  // HEARTBEAT: a single pink pulse line — the signal refuses to die
+  if(t.pink===7){ const hy=(20+rng.int(60))*U; const bx=(10+rng.int(60))*U;
+    f+='<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="4"/>'; }
   // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
   const rB=t.eyeR;
   const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
   const glyph=(st,side,cx,cy,r,fill)=>eyeGlyph(st,side,cx,cy,r,fill,rng);
+  // screen-space eye centres (used by several treatments)
+  const eyeScr=eyePos.map(([ex,ey2,r,side])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r,side]; });
   const drawEyes=(fill,ox,oy)=>{
     let e='';
     if(t.eyes===3){ // continuous visor: one blade across both sockets
@@ -183,14 +288,22 @@ function buildGenesis(sState){
       const vy=ly-((dispL/3)|0)+2;
       e+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
       return e; }
+    if(t.eyes===24){ // ALL SEEING: hollow sockets + the third eye above
+      for(const [ex,cyp,r] of eyeScr) e+=octRing(ex+ox,cyp+oy,r-1,3,fill);
+      const mx=((eyeScr[0][0]+eyeScr[1][0])/2)|0;
+      const ty=Math.min(eyeScr[0][1],eyeScr[1][1])-t.eyeR-7;
+      e+=xmark(mx+ox,ty+oy,t.eyeR+2,3,fill,rng);
+      return e; }
     for(const [ex,ey2,r,side] of eyePos){
       const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100);
       e+=glyph(t.eyes,side,ex+ox,ey2-((disp/3)|0)+2+oy,r,fill);
     }
     return e;
   };
-  // treatments (trait, escalated by kill tier: 10+ at least ECHO GLOW, 50+ FULL SIGNAL)
-  { const base=t.treat; t.treat = tier>=4 ? 4 : (tier>=2 ? Math.max(1,base) : base); }
+  // treatments (trait, escalated by kill tier: 10+ at least ECHO GLOW, 50+ FULL
+  // SIGNAL — special treatments 5+ are never overridden by the ladder)
+  { const base=t.treat; if(base<=4) t.treat = tier>=4 ? 4 : (tier>=2 ? Math.max(1,base) : base); }
+  let mainFill=ACID;
   if(t.treat===1||t.treat===4){ f+=drawEyes(PINK,3,2); f+=drawEyes(ACID,-2,-2); }
   else if(t.treat===2||(t.mosh>0&&t.treat===0)) f+=drawEyes(PINK,2,2);
   if(t.treat===3||t.treat===4){ // ripple rings: the field reacting to the stare
@@ -200,7 +313,24 @@ function buildGenesis(sState){
       for(let k=1;k<=(t.treat===4?1:2);k++){ const rr=r+3+k*4;
         const oct=[[ex-rr,cyp],[ex-(rr*7/10|0),cyp-(rr*7/10|0)],[ex,cyp-rr],[ex+(rr*7/10|0),cyp-(rr*7/10|0)],[ex+rr,cyp],[ex+(rr*7/10|0),cyp+(rr*7/10|0)],[ex,cyp+rr],[ex-(rr*7/10|0),cyp+(rr*7/10|0)]];
         f+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="3"/>'; } } }
-  f+=drawEyes(ACID,0,0);
+  else if(t.treat===5){ // STATIC: white interference specks around the stare
+    const n=10+rng.int(6); const x0=eyeScr[0][0]-10, x1=eyeScr[1][0]+10;
+    let d=''; for(let i=0;i<n;i++){ const x=x0+rng.int(Math.max(4,x1-x0)); const y=Math.min(eyeScr[0][1],eyeScr[1][1])-8+rng.int(16); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; }
+    f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  else if(t.treat===6){ // CROSS FLARE: rays off each eye
+    for(const [ex,cyp,r] of eyeScr){
+      f+=rect(ex-1,cyp-r-8,2,6,ACID)+rect(ex-1,cyp+r+2,2,6,ACID)+rect(ex-r-8,cyp-1,6,2,ACID)+rect(ex+r+2,cyp-1,6,2,ACID);
+      f+=rect(ex-1,cyp-r-10,2,2,PINK)+rect(ex-1,cyp+r+8,2,2,PINK); } }
+  else if(t.treat===7){ for(const [ex,cyp,r] of eyeScr) f+=octRing(ex,cyp,r+5,3,WHITE); } // HALO EYES
+  else if(t.treat===8){ f+=drawEyes(PINK,8,0); f+=drawEyes(WHITE,4,0); } // SMEAR TRAIL
+  else if(t.treat===9){ // INVERTED: knockout — black glyphs on solid acid patches
+    for(const [ex,cyp,r] of eyeScr) f+=rect(ex-r-3,cyp-r+1,2*r+6,2*r-1,ACID);
+    mainFill=BLACK; }
+  else if(t.treat===10){ f+=drawEyes(PINK,4,3); f+=drawEyes(WHITE,-4,-3); } // PRISM
+  else if(t.treat===11){ // GOD RAYS: the stare reaches the edge of the signal
+    for(const [ex,cyp] of eyeScr){
+      f+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="2"/>'; } }
+  f+=drawEyes(mainFill,0,0);
   // hunter marks: kill notches above the left eye (1 per kill, capped at 9)
   if(sState.kills>0){ const n=Math.min(9,sState.kills); const [lx,ly]=eyePos[0];
     const disp=Math.round(heightAt(t,noiseCols,lx,ly,true)/100); const ny2=ly-((disp/3)|0)-t.eyeR-5;
@@ -218,9 +348,27 @@ function buildGenesis(sState){
       f+='<path d="M'+((t.cx-t.rw+2)*U)+' '+(sy2*U)+'l'+((t.rw-4+drng.int(8))*U)+' '+((drng.int(5)-2)*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
     } }
   // mouth details on the gap
-  if(t.mouth===2){ for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=4){ const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=rect(x,mouthY-((disp/3)|0)+2,2,5,ACID); } }
-  else if(t.mouth===3){ for(let i=-1;i<=1;i++){ const x=t.cx+i*6; const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=xmark(x,mouthY-((disp/3)|0)+3,2,1,ACID,rng); } }
-  else if(t.mouth===1&&t.pink>0){ const disp=Math.round(heightAt(t,noiseCols,t.cx,mouthY,true)/100); f+=rect(t.cx-mw+2,mouthY-((disp/3)|0)+3,mw,1,PINK); }
+  if(t.mouth>0){
+    const dispM=Math.round(heightAt(t,noiseCols,t.cx,mouthY,true)/100);
+    const my=mouthY-((dispM/3)|0)+2; // displaced mouth baseline (units)
+    switch(t.mouth){
+      case 1: if(t.pink>0) f+=rect(t.cx-mw+2,my+1,mw,1,PINK); break; // GASH
+      case 2: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=4){ const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=rect(x,mouthY-((disp/3)|0)+2,2,5,ACID); } break; // GRIN
+      case 3: for(let i=-1;i<=1;i++){ const x=t.cx+i*6; const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=xmark(x,mouthY-((disp/3)|0)+3,2,1,ACID,rng); } break; // SEWN
+      case 4: f+=rect(t.cx-mw+2,my+1,2*mw-4,1,WHITE); break; // WIRE
+      case 5: for(let x=t.cx-mw+2,i=0;x<t.cx+mw-1;x+=4,i++){ if(i%2===0) f+=rect(x,my,2,5,ACID); else f+=xmark(x+1,my+2,2,1,PINK,rng); } break; // STITCHED GRIN
+      case 6: f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID)+rect(t.cx-mw+3,my+3,2*mw-6,2,PINK); break; // DOUBLE GASH
+      case 7: f+=rect(t.cx,my+1,mw,2,ACID)+rect(t.cx+mw-2,my-2,2,3,ACID); break; // SIDE SMIRK
+      case 8: { f+=rect(t.cx-mw+2,my+1,2*mw-4,1,WHITE); for(let x=t.cx-mw+3;x<t.cx+mw-2;x+=3) f+=rect(x,my-1,1,5,WHITE); break; } // ZIPPER
+      case 9: f+=poly(offsetPts([[-mw+2,3],[mw-2,-2],[mw-2,0],[-mw+2,5]],t.cx,my),ACID); break; // SNARL
+      case 10: f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID)+drip(t.cx-2,my+2,6+rng.int(4),1,PINK,rng)+drip(t.cx+4,my+2,4+rng.int(3),1,PINK,rng); break; // DRIP
+      case 11: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=3){ const hh=5+rng.int(5); f+=rect(x,my,2,hh,ACID); } break; // SCREAM
+      case 12: { f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID); f+=poly(offsetPts([[-4,2],[-1,2],[-2,7]],t.cx,my),WHITE)+poly(offsetPts([[2,2],[5,2],[4,7]],t.cx,my),WHITE); break; } // FANGS
+      case 13: f+=octRing(t.cx,my+3,5,4,ACID); break; // HOWL
+      case 14: f+=rect(t.cx-mw,my-2,2*mw,7,BLACK)+'<rect x="'+((t.cx-mw)*U)+'" y="'+((my-2)*U)+'" width="'+(2*mw*U)+'" height="70" fill="none" stroke="'+ACID+'" stroke-width="3"/>'+rect(t.cx-4,my-1,1,5,ACID)+rect(t.cx,my-1,1,5,ACID)+rect(t.cx+4,my-1,1,5,ACID); break; // MUZZLE
+      case 15: f+=rect(t.cx-mw+1,my-1,mw+3,2,ACID)+rect(t.cx-mw+4,my+2,mw+3,2,PINK)+rect(t.cx-mw-1,my+5,mw+3,2,WHITE); break; // GLITCH MOUTH
+    }
+  }
   // ward sigil above the crown; block mark at the hem
   f+=sigilSVG(s.wardId,8,8,rng,ACID);
   f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
@@ -266,8 +414,16 @@ function buildGenesis(sState){
     }
   }
   const slices=[];
-  if(t.mosh>0){ const n=t.mosh===2?4+rng.int(2):2+rng.int(2);
+  if(t.mosh===1||t.mosh===2){ const n=t.mosh===2?4+rng.int(2):2+rng.int(2);
     for(let i=0;i<n;i++) slices.push({y:6+rng.int(84),h:2+rng.int(5),dx:(2+rng.int(7))*(rng.int(2)?1:-1)}); }
+  else if(t.mosh===3){ slices.push({y:6+rng.int(70),h:8+rng.int(5),dx:(12+rng.int(7))*(rng.int(2)?1:-1)}); } // TEARDROP
+  else if(t.mosh===4){ const n=8+rng.int(3); // CORRUPTED
+    for(let i=0;i<n;i++) slices.push({y:4+rng.int(88),h:2+rng.int(3),dx:(3+rng.int(7))*(rng.int(2)?1:-1)}); }
+  else if(t.mosh===5){ const d5=6+rng.int(4); const sgn=rng.int(2)?1:-1; // SPLIT
+    slices.push({y:4,h:46,dx:d5*sgn}); slices.push({y:50,h:46,dx:-d5*sgn}); }
+  else if(t.mosh===6){ // MELTDOWN: one smear band + corruption
+    slices.push({y:30+rng.int(40),h:6+rng.int(5),smear:1});
+    for(let i=0;i<3;i++) slices.push({y:6+rng.int(84),h:2+rng.int(4),dx:(4+rng.int(7))*(rng.int(2)?1:-1)}); }
   if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
     for(let k2=0;k2<sState.deaths;k2++) slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)});
   }
@@ -303,7 +459,7 @@ function buildCoffinSVG(s){
   const C=terminal?RED:WHITE;
   let f='';
   // the still field: flat lines, torn, silent around the void
-  const sw=[3,4,6][t.lineW];
+  const sw=t.lineW<=2?[3,4,6][t.lineW]:4;
   for(let li=0;li<47;li++){
     const y=4+li*2; let d='',pen=false,px=0,breakLeft=0;
     for(let xi=0;xi<=33;xi++){
@@ -484,7 +640,7 @@ function renderBanner(s){
   const used=new Set();
   const rng=new Rng(concatBytes(genesisSeed(s.genesisHash,s.tokenId),strBytes('BNR')));
   const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId)));
-  const sw=[3,4,6][t.lineW];
+  const sw=t.lineW<=2?[3,4,6][t.lineW]:4;
   let body='<rect width="3000" height="1000" fill="'+BLACK+'"/>';
   // the signal continues past the portrait
   for(let li=0;li<47;li++){

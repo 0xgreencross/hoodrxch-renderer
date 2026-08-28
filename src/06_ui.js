@@ -83,8 +83,13 @@ function drawGallery(){
     for(const k in tn) counts[k][tn[k]]=(counts[k][tn[k]]||0)+1;
     h+='<div class="cell">'+svgImg(svg,64)+'<span>#'+id+'</span></div>'; }
   gal.innerHTML=h;
-  let t='<h2 style="color:var(--mute)">RARITY (666 GENESIS, demo genesisHash)</h2><table><tr><th>Trait</th><th>Value</th><th>Count</th><th>%</th><th></th></tr>';
-  for(const k in counts){ const ent=Object.entries(counts[k]).sort((a,b)=>b[1]-a[1]); for(const [n,c] of ent) t+='<tr><td>'+k+'</td><td>'+n+'</td><td>'+c+'</td><td>'+(c/6.66).toFixed(1)+'</td><td><span class="bar" style="width:'+(c/2)+'px"></span></td></tr>'; }
+  const TIER_LOOKUP={form:[FORM_NAMES,FORM_TIER],lines:[LINE_NAMES,LINE_TIER],tear:[TEAR_NAMES,TEAR_TIER],spikes:[SPIKE_NAMES,SPIKE_TIER],eyes:[EYE_NAMES,EYE_TIER],treatment:[TREAT_NAMES,TREAT_TIER],mouth:[MOUTH_NAMES,MOUTH_TIER],pink:[PINKAMT_NAMES,PINK_TIER],mosh:[MOSH_NAMES,MOSH_TIER]};
+  const TIER_COL=['#777','#d8d8d8','#7ec8ff','#CCFF00','#FF3EB5','#FF2A2A'];
+  let t='<h2 style="color:var(--mute)">RARITY (666 GENESIS, demo genesisHash) — tiers: COMMON &lt; UNCOMMON &lt; RARE &lt; ULTRA RARE &lt; LEGENDARY &lt; EPIC</h2><table><tr><th>Trait</th><th>Value</th><th>Tier</th><th>Count</th><th>%</th><th></th></tr>';
+  for(const k in counts){ const ent=Object.entries(counts[k]).sort((a,b)=>b[1]-a[1]);
+    for(const [n,c] of ent){ let tierTxt='—';
+      if(TIER_LOOKUP[k]){ const idx=TIER_LOOKUP[k][0].indexOf(n); if(idx>=0){ const ti=TIER_LOOKUP[k][1][idx]; tierTxt='<span style="color:'+TIER_COL[ti]+'">'+RARITY_NAMES[ti]+'</span>'; } }
+      t+='<tr><td>'+k+'</td><td>'+n+'</td><td>'+tierTxt+'</td><td>'+c+'</td><td>'+(c/6.66).toFixed(1)+'</td><td><span class="bar" style="width:'+(c/2)+'px"></span></td></tr>'; } }
   document.getElementById('rarity').innerHTML=t+'</table>';
 }
 document.querySelectorAll('header button').forEach(b=>b.addEventListener('click',()=>{
