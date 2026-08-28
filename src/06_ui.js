@@ -23,7 +23,7 @@ function buildControls(){
   c.addEventListener('input',e=>{ const k=e.target.dataset.k; if(!k) return; const f=FIELDS.find(x=>x[0]===k);
     if(f[1]==='b') S[k]=e.target.checked; else if(f[1]==='t') S[k]=e.target.value; else S[k]=Number(e.target.value);
     if(k==='tokenId') S.genesisHash=demoGenesisHash(S.tokenId);
-    refresh(); });
+    coerce(k); syncControls(); refresh(); });
   c.addEventListener('click',e=>{ const p=e.target.dataset.p; if(!p) return;
     if(p==='random'){ S=defaultState(1+Math.floor(Math.random()*666)); }
     if(p==='reset'){ S=defaultState(S.tokenId); }
@@ -31,6 +31,29 @@ function buildControls(){
     syncControls(); refresh(); });
 }
 function syncControls(){ for(const f of FIELDS){ const el=document.querySelector('[data-k="'+f[0]+'"]'); if(!el) continue; if(f[1]==='b') el.checked=!!S[f[0]]; else el.value=S[f[0]]; } }
+// keep companion fields consistent so single control changes produce legal states
+// (the renderer itself still diagnoses impossible states — this is UI convenience only)
+function coerce(k){
+  if(k==='lifeState'){
+    if(S.lifeState===0){ S.marked=false; if(S.exposureState===5||S.exposureState===6) S.exposureState=1; if(S.deaths>2) S.deaths=2; S.sealsRemaining=3-S.deaths; }
+    if(S.lifeState===1){ S.marked=true; S.witsecApplies=false; S.laidLow=false; if(S.exposureState===2||S.exposureState===3||S.exposureState===5||S.exposureState===6) S.exposureState=1; if(S.deaths>2) S.deaths=2; S.sealsRemaining=3-S.deaths; if(!S.markedByTokenId) S.markedByTokenId=66; if(!S.purgeDeadline) S.purgeDeadline=1790000000; }
+    if(S.lifeState===2){ S.exposureState=5; if(S.deaths<1) S.deaths=1; if(S.deaths>2) S.deaths=2; S.sealsRemaining=3-S.deaths; S.marked=false; S.hunterSelected=false; S.witsecApplies=false; S.laidLow=false; S.buyerProtected=false; }
+    if(S.lifeState===3){ S.exposureState=6; S.deaths=3; S.sealsRemaining=0; S.marked=false; S.hunterSelected=false; S.witsecApplies=false; S.laidLow=false; S.buyerProtected=false; }
+  }
+  if(k==='marked'){ if(S.marked){ coerceTo(1); } else if(S.lifeState===1){ S.lifeState=0; S.markedByTokenId=0; S.purgeDeadline=0; } }
+  if(k==='deaths'){ if(S.lifeState===3){ S.deaths=3; } else { if(S.deaths>2) S.deaths=2; S.sealsRemaining=3-S.deaths; if(S.deaths===0&&S.exposureState===5){ S.exposureState=1; S.lifeState=0; } } }
+  if(k==='sealsRemaining'){ if(S.lifeState===3){ S.sealsRemaining=0; } else { if(S.sealsRemaining<1) S.sealsRemaining=1; S.deaths=3-S.sealsRemaining; } }
+  if(k==='witsecApplies'&&S.witsecApplies){ S.laidLow=false; S.buyerProtected=false; S.marked=false; if(S.lifeState===1) S.lifeState=0; S.exposureState=3; }
+  if(k==='laidLow'&&S.laidLow){ S.witsecApplies=false; S.buyerProtected=false; S.marked=false; if(S.lifeState===1) S.lifeState=0; S.exposureState=2; }
+  if(k==='buyerProtected'&&S.buyerProtected){ S.witsecApplies=false; S.laidLow=false; S.exposureState=4; }
+  if((k==='witsecApplies'||k==='laidLow'||k==='buyerProtected')&&!S[k]){ if(!S.witsecApplies&&!S.laidLow&&!S.buyerProtected&&S.exposureState>=2&&S.exposureState<=4) S.exposureState=1; }
+  if(k==='latestSeasonBadgeFlags'){ if(S.latestSeasonBadgeFlags===2) S.latestSeasonBadgeFlags=3;
+    if(S.latestSeasonBadgeFlags===0){ S.latestSeasonRank=0; S.latestAwardSeasonId=0; }
+    else { if(!S.latestAwardSeasonId) S.latestAwardSeasonId=1; S.latestSeasonRank=S.latestSeasonBadgeFlags===3?2:7; } }
+  if(k==='latestSeasonRank'){ if(S.latestSeasonRank===0){ S.latestSeasonBadgeFlags=0; S.latestAwardSeasonId=0; }
+    else { if(!S.latestAwardSeasonId) S.latestAwardSeasonId=1; S.latestSeasonBadgeFlags = S.latestSeasonRank<=5?3 : S.latestSeasonRank<=10?1 : 0; if(S.latestSeasonBadgeFlags===0){ S.latestSeasonRank=0; S.latestAwardSeasonId=0; } } }
+}
+function coerceTo(ls){ S.lifeState=ls; coerce('lifeState'); }
 // previews use <img data:> so that <defs> ids never collide between inline SVGs
 function svgImg(svg,px){ return '<img class="sq" width="'+px+'" height="'+px+'" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))+'">'; }
 function svgTag(svg,px,cls){ return '<div class="'+(cls||'')+'" style="width:'+px+'px;height:'+px+'px">'+svgImg(svg,px)+'</div>'; }
