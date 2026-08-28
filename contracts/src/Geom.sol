@@ -118,6 +118,21 @@ library Geom {
         return string(abi.encodePacked(s1, s2));
     }
 
+    /// solid drip: a tapered polygon hanging from (x,y) of length len (units)
+    function drip(int256 x, int256 y, int256 len, int256 w, string memory fill, Rng.R memory rng)
+        internal
+        pure
+        returns (string memory)
+    {
+        Pt[] memory pts = new Pt[](5);
+        pts[0] = Pt(x - w, y);
+        pts[1] = Pt(x + w, y);
+        pts[2] = Pt(x + w, y + len - 2);
+        pts[3] = Pt(x, y + len);
+        pts[4] = Pt(x - w, y + len - 2);
+        return poly(jitterPts(pts, rng, 1), fill);
+    }
+
     /// displacement slice of group #f: band [y,y+h) shifted dx units
     function slice(uint256 idx, int256 y, int256 h, int256 dx, string memory groundFill)
         internal

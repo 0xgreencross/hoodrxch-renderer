@@ -49,7 +49,7 @@ library StatusLib {
         Rng.R memory rng = Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.tokenId));
         Mask.Traits memory t = Mask.drawTraits(rng);
         Buf.B memory f = Buf.init(24000);
-        int256 swv = t.lineW == 0 ? int256(3) : t.lineW == 1 ? int256(4) : int256(6);
+        int256 swv = t.lineW <= 2 ? (t.lineW == 0 ? int256(3) : t.lineW == 1 ? int256(4) : int256(6)) : int256(4);
         for (uint256 li = 0; li < 47; li++) {
             int256 y = 4 + int256(li) * 2;
             Buf.B memory d = Buf.init(1024);

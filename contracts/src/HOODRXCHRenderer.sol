@@ -183,7 +183,25 @@ contract HOODRXCHRenderer {
         body.app(bytes('<use href="#f"/>'));
         for (uint256 ci = 0; ci < g.slices.length; ci++) {
             T.Slc memory sl = g.slices[ci];
-            body.app(Geom.slice(ci + 1, sl.y, sl.h, sl.dx, T.BLACK));
+            if (sl.smear) {
+                body.app(
+                    abi.encodePacked(
+                        '<clipPath id="c',
+                        Num.utoa(ci + 1),
+                        '"><rect x="0" y="',
+                        Num.itoa(sl.y * 10),
+                        '" width="1000" height="',
+                        Num.itoa(sl.h * 10),
+                        '"/></clipPath><g clip-path="url(#c',
+                        Num.utoa(ci + 1),
+                        ')"><rect width="1000" height="1000" fill="',
+                        T.BLACK,
+                        '"/><use href="#f" transform="translate(-500 0) scale(2 1)"/></g>'
+                    )
+                );
+            } else {
+                body.app(Geom.slice(ci + 1, sl.y, sl.h, sl.dx, T.BLACK));
+            }
         }
         if (status == 1) body.app(StatusLib.markedOverlay(g));
         else if (status == 4) body.app(StatusLib.witsecOverlay(g));

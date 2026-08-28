@@ -41,16 +41,118 @@ library Mask {
         int256 pink;
         int256 mosh;
         int256 form;
+        int256 x2mode; // 0 none · 1 twin peak · 2 horns · 3 crater
+        int256 x2amp;
+        int256 x2dx;
+    }
+
+    // --- TRAIT ENGINE V2: per-mille weight tables (six rarity tiers) ---
+    function wForm() internal pure returns (uint16[16] memory) {
+        return [uint16(195), 185, 95, 95, 90, 80, 55, 55, 30, 30, 28, 25, 12, 12, 8, 5];
+    }
+
+    function wLine() internal pure returns (uint16[9] memory) {
+        return [uint16(240), 260, 210, 90, 90, 55, 35, 15, 5];
+    }
+
+    function wTear() internal pure returns (uint16[8] memory) {
+        return [uint16(330), 330, 150, 90, 50, 30, 15, 5];
+    }
+
+    function wSpike() internal pure returns (uint16[9] memory) {
+        return [uint16(300), 330, 130, 90, 50, 45, 35, 15, 5];
+    }
+
+    function wEye() internal pure returns (uint16[25] memory) {
+        return [uint16(155), 100, 55, 100, 45, 95, 45, 40, 30, 50, 45, 40, 30, 28, 27, 25, 25, 12, 12, 12, 9, 5, 5, 5, 5];
+    }
+
+    function wTreat() internal pure returns (uint16[12] memory) {
+        return [uint16(190), 240, 190, 90, 120, 60, 35, 25, 25, 12, 8, 5];
+    }
+
+    function wMouth() internal pure returns (uint16[16] memory) {
+        return [uint16(200), 165, 160, 128, 60, 55, 50, 45, 32, 30, 28, 14, 13, 8, 7, 5];
+    }
+
+    function wPink() internal pure returns (uint16[8] memory) {
+        return [uint16(320), 350, 150, 80, 50, 30, 15, 5];
+    }
+
+    function wMosh() internal pure returns (uint16[7] memory) {
+        return [uint16(360), 330, 160, 80, 50, 15, 5];
+    }
+
+    /// weighted pick against a cumulative per-mille table
+    function pick(Rng.R memory rng, uint16[] memory W) internal pure returns (int256) {
+        int256 r = rng.r1000();
+        for (uint256 i = 0; i < W.length; i++) {
+            r -= int256(uint256(W[i]));
+            if (r < 0) return int256(i);
+        }
+        return int256(W.length - 1);
+    }
+
+    function dyn16(uint16[16] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](16);
+        for (uint256 i = 0; i < 16; i++) o[i] = a[i];
+    }
+
+    function dyn9(uint16[9] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](9);
+        for (uint256 i = 0; i < 9; i++) o[i] = a[i];
+    }
+
+    function dyn8(uint16[8] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](8);
+        for (uint256 i = 0; i < 8; i++) o[i] = a[i];
+    }
+
+    function dyn25(uint16[25] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](25);
+        for (uint256 i = 0; i < 25; i++) o[i] = a[i];
+    }
+
+    function dyn12(uint16[12] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](12);
+        for (uint256 i = 0; i < 12; i++) o[i] = a[i];
+    }
+
+    function dyn7(uint16[7] memory a) private pure returns (uint16[] memory o) {
+        o = new uint16[](7);
+        for (uint256 i = 0; i < 7; i++) o[i] = a[i];
     }
 
     function drawTraits(Rng.R memory rng) internal pure returns (Traits memory t) {
+        t.form = pick(rng, dyn16(wForm()));
+        // anatomy per form (ranges keep continuous variety inside each silhouette)
         t.cx = 44 + rng.rInt(13);
         t.cy = 50 + rng.rInt(9);
-        t.rw = 24 + rng.rInt(15);
-        t.rh = 28 + rng.rInt(13);
-        t.amp = 18 + rng.rInt(10);
-        t.peak = rng.rInt(17) - 8;
-        t.pamp = 5 + rng.rInt(6);
+        t.rw = 25 + rng.rInt(9);
+        t.rh = 29 + rng.rInt(11);
+        t.amp = 19 + rng.rInt(7);
+        t.peak = rng.rInt(9) - 4;
+        t.pamp = 6 + rng.rInt(4);
+        if (t.form == 0) { t.rw = 30 + rng.rInt(9); t.amp = 20 + rng.rInt(7); }
+        else if (t.form == 1) { t.rw = 22 + rng.rInt(5); t.rh = 30 + rng.rInt(11); }
+        else if (t.form == 2) { t.peak = -(8 + rng.rInt(7)); t.rw = 25 + rng.rInt(9); }
+        else if (t.form == 3) { t.peak = 8 + rng.rInt(7); t.rw = 25 + rng.rInt(9); }
+        else if (t.form == 4) { t.amp = 14 + rng.rInt(4); t.rw = 27 + rng.rInt(8); }
+        else if (t.form == 5) { t.rh = 38 + rng.rInt(7); t.rw = 24 + rng.rInt(7); t.amp = 20 + rng.rInt(7); }
+        else if (t.form == 6) { t.rw = 20 + rng.rInt(5); t.pamp = 12 + rng.rInt(5); t.rh = 34 + rng.rInt(9); }
+        else if (t.form == 7) { t.amp = 12 + rng.rInt(4); t.cy = 55 + rng.rInt(4); t.rh = 26 + rng.rInt(7); }
+        else if (t.form == 8) { t.x2mode = 1; t.x2amp = 8 + rng.rInt(5); t.x2dx = 10 + rng.rInt(5); }
+        else if (t.form == 9) { t.x2mode = 2; t.x2amp = 10 + rng.rInt(5); }
+        else if (t.form == 10) {
+            int256 pv = 12 + rng.rInt(5);
+            t.peak = rng.rInt(2) != 0 ? pv : -pv;
+            t.cx = rng.rInt(2) != 0 ? 38 + rng.rInt(5) : 52 + rng.rInt(5);
+        }
+        else if (t.form == 11) { t.x2mode = 3; t.x2amp = 8 + rng.rInt(5); }
+        else if (t.form == 12) { t.rw = 36 + rng.rInt(5); t.amp = 26 + rng.rInt(5); t.rh = 34 + rng.rInt(7); }
+        else if (t.form == 13) { t.rw = 18 + rng.rInt(4); t.pamp = 14 + rng.rInt(5); t.rh = 38 + rng.rInt(7); t.amp = 16 + rng.rInt(5); }
+        else if (t.form == 14) { t.cy = 44 + rng.rInt(3); t.rh = 40 + rng.rInt(5); }
+        else if (t.form == 15) { t.amp = 10 + rng.rInt(4); }
         t.jawY = t.cy + 22 + rng.rInt(8);
         t.sLdx = -(8 + rng.rInt(6));
         t.sLdy = -(4 + rng.rInt(6));
@@ -61,37 +163,15 @@ library Mask {
         t.sRr = 6 + rng.rInt(5);
         t.sRd = 13 + rng.rInt(9);
         t.nas = 4 + rng.rInt(4);
-        t.lineW = rng.rInt(3);
-        int256 te = rng.rInt(100);
-        t.tear = te < 35 ? int256(0) : (te < 78 ? int256(1) : int256(2));
-        int256 sp = rng.rInt(100);
-        t.spike = sp < 30 ? int256(0) : (sp < 80 ? int256(1) : int256(2));
-        int256 ey = rng.rInt(100);
-        t.eyes = ey < 26
-            ? int256(0)
-            : ey < 38
-                ? int256(1)
-                : ey < 46 ? int256(2) : ey < 62 ? int256(3) : ey < 70 ? int256(4) : ey < 82 ? int256(5) : ey < 90 ? int256(6) : ey < 96 ? int256(7) : int256(8);
+        t.lineW = pick(rng, dyn9(wLine()));
+        t.tear = pick(rng, dyn8(wTear()));
+        t.spike = pick(rng, dyn9(wSpike()));
+        t.eyes = pick(rng, dyn25(wEye()));
         t.eyeR = 6 + rng.rInt(3);
-        int256 tr = rng.rInt(100);
-        t.treat = tr < 15 ? int256(0) : tr < 40 ? int256(1) : tr < 60 ? int256(2) : tr < 75 ? int256(3) : int256(4);
-        int256 mo = rng.rInt(100);
-        t.mouth = mo < 22 ? int256(0) : 1 + ((mo - 22) % 3);
-        int256 p = rng.rInt(100);
-        t.pink = p < 30 ? int256(0) : (p < 78 ? int256(1) : int256(2));
-        int256 g = rng.rInt(100);
-        t.mosh = g < 38 ? int256(0) : (g < 78 ? int256(1) : int256(2));
-        t.form = t.rw >= 33
-            ? int256(0)
-            : (
-                t.rw <= 27
-                    ? int256(1)
-                    : (
-                        t.pamp >= 12
-                            ? int256(2)
-                            : (t.peak <= -4 ? int256(3) : (t.peak >= 4 ? int256(4) : (t.amp <= 15 ? int256(5) : (t.rh >= 36 ? int256(6) : int256(7)))))
-                    )
-            );
+        t.treat = pick(rng, dyn12(wTreat()));
+        t.mouth = pick(rng, dyn16(wMouth()));
+        t.pink = pick(rng, dyn8(wPink()));
+        t.mosh = pick(rng, dyn7(wMosh()));
     }
 
     /// bump: A * ((1e4-d2)/1e4)^2 * 100
@@ -132,6 +212,16 @@ library Mask {
         b += bump100(x, y, t.cx + t.peak, t.cy - t.rh + 6, 14, 16, t.pamp);
         b += bumpFlat100(x, y, t.cx + t.peak / 2, t.cy + 18, t.rw + 5, 14, t.amp >> 1);
         b -= bump100(x, y, t.cx + t.peak / 3, t.cy + 7, 4, 6, t.nas);
+        // form modifiers: twin peak / horns / crater
+        if (t.x2mode == 1) {
+            b += bump100(x, y, t.cx - t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
+            b += bump100(x, y, t.cx + t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
+        } else if (t.x2mode == 2) {
+            b += bump100(x, y, t.cx - t.rw + 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
+            b += bump100(x, y, t.cx + t.rw - 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
+        } else if (t.x2mode == 3) {
+            b -= bump100(x, y, t.cx + t.peak / 2, t.cy - t.rh + 8, 9, 10, t.x2amp);
+        }
         if (y > t.jawY) {
             int256 f = Num.max(0, 1400 - (y - t.jawY) * 100);
             b = (b * f) / 1400;

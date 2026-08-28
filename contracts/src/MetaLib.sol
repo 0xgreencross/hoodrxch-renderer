@@ -41,48 +41,61 @@ library MetaLib {
     }
 
     function formName(int256 v) internal pure returns (string memory) {
-        string[8] memory n = ["BROAD", "LEAN", "SPIRE", "SKEW L", "SKEW R", "SUNKEN", "TOWERING", "HOLLOW"];
+        string[16] memory n = [
+            "BROAD", "LEAN", "SKEW L", "SKEW R", "HOLLOW", "TOWERING", "SPIRE", "SUNKEN",
+            "TWIN PEAK", "HORNED", "TILTED", "CRATER", "COLOSSUS", "NEEDLE", "WRAITH TALL", "PHANTOM"
+        ];
         return n[uint256(v)];
     }
 
     function lineName(int256 v) internal pure returns (string memory) {
-        string[3] memory n = ["FINE", "MID", "HEAVY"];
+        string[9] memory n = ["FINE", "MID", "HEAVY", "DENSE", "SPARSE", "DASHED", "DUAL WEIGHT", "BARCODE", "NO SIGNAL"];
         return n[uint256(v)];
     }
 
     function tearName(int256 v) internal pure returns (string memory) {
-        string[3] memory n = ["CLEAN", "TORN", "SHREDDED"];
+        string[8] memory n = ["CLEAN", "TORN", "SHREDDED", "RIPPED EDGE", "MOTH EATEN", "SPLIT FIELD", "VAPOR", "CENSORED"];
         return n[uint256(v)];
     }
 
     function spikeName(int256 v) internal pure returns (string memory) {
-        string[3] memory n = ["NONE", "FEW", "STORM"];
+        string[9] memory n =
+            ["NONE", "FEW", "STORM", "NEEDLES", "SEISMIC", "PULSE TRAIN", "LIGHTNING", "EARTHQUAKE", "FLATLINE SCAR"];
         return n[uint256(v)];
     }
 
     function eyeName(int256 v) internal pure returns (string memory) {
-        string[9] memory n =
-            ["X", "BROKEN X", "SMEARED X", "VISOR", "SPLIT VISOR", "X + SLIT", "X + VOID", "HOLLOW", "DOUBLE X"];
+        string[25] memory n = [
+            "X", "BROKEN X", "SMEARED X", "VISOR", "SPLIT VISOR", "X + SLIT", "X + VOID", "HOLLOW", "DOUBLE X",
+            "SLIT", "GLITCH BAR", "PIXEL STORM", "CROSSHAIR", "TRIPLE SLIT", "VOID RING", "NAILED X", "BINARY",
+            "TARGET", "SPIRAL", "WEEPING X", "SPLIT PAIR", "BURNING X", "STAR", "DEAD LIGHT", "ALL SEEING"
+        ];
         return n[uint256(v)];
     }
 
     function treatName(int256 v) internal pure returns (string memory) {
-        string[5] memory n = ["RAW", "ECHO GLOW", "CHROMATIC", "RIPPLE", "FULL SIGNAL"];
+        string[12] memory n = [
+            "RAW", "ECHO GLOW", "CHROMATIC", "RIPPLE", "FULL SIGNAL",
+            "STATIC", "CROSS FLARE", "HALO EYES", "SMEAR TRAIL", "INVERTED", "PRISM", "GOD RAYS"
+        ];
         return n[uint256(v)];
     }
 
     function mouthName(int256 v) internal pure returns (string memory) {
-        string[4] memory n = ["NONE", "GASH", "GRIN", "SEWN"];
+        string[16] memory n = [
+            "NONE", "GASH", "GRIN", "SEWN", "WIRE", "STITCHED GRIN", "DOUBLE GASH", "SIDE SMIRK",
+            "ZIPPER", "SNARL", "DRIP", "SCREAM", "FANGS", "HOWL", "MUZZLE", "GLITCH MOUTH"
+        ];
         return n[uint256(v)];
     }
 
     function pinkName(int256 v) internal pure returns (string memory) {
-        string[3] memory n = ["NONE", "ECHO", "BLEED"];
+        string[8] memory n = ["NONE", "ECHO", "BLEED", "FLOOD", "WHITE ECHO", "INVERSION", "TRICHROME", "HEARTBEAT"];
         return n[uint256(v)];
     }
 
     function moshName(int256 v) internal pure returns (string memory) {
-        string[3] memory n = ["NONE", "SHIFTS", "HEAVY"];
+        string[7] memory n = ["NONE", "SHIFTS", "HEAVY", "TEARDROP", "CORRUPTED", "SPLIT", "MELTDOWN"];
         return n[uint256(v)];
     }
 

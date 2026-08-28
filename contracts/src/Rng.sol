@@ -32,6 +32,13 @@ library Rng {
         return int256(uint256(nextByte(r)) % n);
     }
 
+    /// per-mille roll [0,1000) from two bytes (rarity weight tables)
+    function r1000(R memory r) internal pure returns (int256) {
+        uint256 hi = uint256(nextByte(r));
+        uint256 lo = uint256(nextByte(r));
+        return int256((hi * 256 + lo) % 1000);
+    }
+
     /// jitter in [-2..2]: {-2,-1,-1,0,0,0,1,1,2}[byte % 9]
     function jit(R memory r) internal pure returns (int256) {
         int8[9] memory t = [int8(-2), -1, -1, 0, 0, 0, 1, 1, 2];

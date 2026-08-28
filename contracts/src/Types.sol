@@ -16,6 +16,7 @@ library T {
         int256 y;
         int256 h;
         int256 dx;
+        bool smear;
     }
 
     struct Gen {
