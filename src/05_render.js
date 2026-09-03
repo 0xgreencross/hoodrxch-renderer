@@ -520,8 +520,14 @@ function markedOverlay(g,rng){
   // corner brackets
   const L=9;
   o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)+'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)+'" fill="none" stroke="'+RED+'" stroke-width="14"/>';
-  // the warrant slash: one red band corner to corner — condemned
-  o+=poly([[0,100],[0,93],[93,0],[100,0],[100,7],[7,100]],RED);
+  // the warrant lock: red scope ring + full-bleed hairlines + chevrons closing in
+  { const cx=t.cx, cy=t.cy-2, R=t.rh+12;
+    o+=octRing(cx,cy,R,10,RED);
+    o+='<path d="M0 '+(cy*U)+'H'+((cx-R)*U)+'M'+((cx+R)*U)+' '+(cy*U)+'H1000M'+(cx*U)+' 0V'+(Math.max(0,cy-R)*U)+'M'+(cx*U)+' '+((cy+R)*U)+'V1000" stroke="'+RED+'" stroke-width="6" fill="none"/>';
+    o+=poly([[cx-5,cy-R+3],[cx+5,cy-R+3],[cx,cy-R+11]],RED);
+    o+=poly([[cx-5,cy+R-3],[cx+5,cy+R-3],[cx,cy+R-11]],RED);
+    o+=poly([[cx-R+3,cy-5],[cx-R+3,cy+5],[cx-R+11,cy]],RED);
+    o+=poly([[cx+R-3,cy-5],[cx+R-3,cy+5],[cx+R-11,cy]],RED); }
   // warrant strip: purge countdown ticks along the crown edge
   for(let i=0;i<8;i++) o+=rect(33+i*4,2,2,3,RED);
   return o;
