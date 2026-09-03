@@ -200,8 +200,7 @@ library StatusLib {
     // --- overlays -----------------------------------------------------------
 
     function markedOverlay(T.Gen memory g) internal pure returns (string memory) {
-        g;
-        Buf.B memory o = Buf.init(2048);
+        Buf.B memory o = Buf.init(4096);
         o.app(
             abi.encodePacked(
                 '<path d="M30 120V30H120M880 30H970V120M970 880V970H880M120 970H30V880" fill="none" stroke="',
@@ -209,14 +208,30 @@ library StatusLib {
                 '" stroke-width="14"/>'
             )
         );
-        Geom.Pt[] memory p = new Geom.Pt[](6);
-        p[0] = Geom.Pt(0, 100);
-        p[1] = Geom.Pt(0, 93);
-        p[2] = Geom.Pt(93, 0);
-        p[3] = Geom.Pt(100, 0);
-        p[4] = Geom.Pt(100, 7);
-        p[5] = Geom.Pt(7, 100);
-        o.app(Geom.poly(p, T.RED));
+        {
+            int256 cx = g.t.cx;
+            int256 cy = g.t.cy - 2;
+            int256 R = g.t.rh + 12;
+            o.app(GenesisLib.octRing(cx, cy, R, 10, T.RED));
+            o.app(
+                abi.encodePacked(
+                    '<path d="M0 ', Num.itoa(cy * 10), "H", Num.itoa((cx - R) * 10),
+                    "M", Num.itoa((cx + R) * 10), " ", Num.itoa(cy * 10), "H1000M",
+                    Num.itoa(cx * 10), " 0V", Num.itoa(Num.max(0, cy - R) * 10),
+                    "M", Num.itoa(cx * 10), " ", Num.itoa((cy + R) * 10),
+                    'V1000" stroke="', T.RED, '" stroke-width="6" fill="none"/>'
+                )
+            );
+            Geom.Pt[] memory p = new Geom.Pt[](3);
+            p[0] = Geom.Pt(cx - 5, cy - R + 3); p[1] = Geom.Pt(cx + 5, cy - R + 3); p[2] = Geom.Pt(cx, cy - R + 11);
+            o.app(Geom.poly(p, T.RED));
+            p[0] = Geom.Pt(cx - 5, cy + R - 3); p[1] = Geom.Pt(cx + 5, cy + R - 3); p[2] = Geom.Pt(cx, cy + R - 11);
+            o.app(Geom.poly(p, T.RED));
+            p[0] = Geom.Pt(cx - R + 3, cy - 5); p[1] = Geom.Pt(cx - R + 3, cy + 5); p[2] = Geom.Pt(cx - R + 11, cy);
+            o.app(Geom.poly(p, T.RED));
+            p[0] = Geom.Pt(cx + R - 3, cy - 5); p[1] = Geom.Pt(cx + R - 3, cy + 5); p[2] = Geom.Pt(cx + R - 11, cy);
+            o.app(Geom.poly(p, T.RED));
+        }
         for (uint256 i = 0; i < 8; i++) {
             o.app(Geom.rect(33 + int256(i) * 4, 2, 2, 3, T.RED));
         }
