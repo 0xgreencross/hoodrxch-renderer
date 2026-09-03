@@ -139,9 +139,9 @@ contract Differential is Test {
     function test_FX_009() public view {
         RenderStateV1 memory s = state_FX_009();
         assertEq(r.stateHash(s), bytes32(0x28c76e634f013fac2ce1a51f08e73c8ccea2113256400575512af12117be37a6), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x8e9030e463e5dbf8b52ef19048798491ceb2ccf843776a32995d2a9408f9119f), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xb334ee5b019324785823521c70f0bc32594d1e1e745414f6439f0b8212464752), "metadata");
-        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0xbf5fb27287828017f109b1be67a041f7e8829ffbf8418e796be7b31cebc5084a), "banner");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xe6bc14869bfddbab66c89a8e5e77ab000e50450b2a5e9e0c080d6bf27e2c96e4), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x2a815a4c4ed3cba2b4d7caefe768402dfa0e4b13547f05dfa7de3c0941f4fc58), "metadata");
+        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x10e02baa41868a5c412f40aedaa7845d061f5cae3fffe20ba170ab8a1ed05135), "banner");
     }
 
     function state_FX_010() internal pure returns (RenderStateV1 memory s) {
@@ -156,8 +156,8 @@ contract Differential is Test {
     function test_FX_010() public view {
         RenderStateV1 memory s = state_FX_010();
         assertEq(r.stateHash(s), bytes32(0x2f0b6ba156c0795c504fc47686ac3c52c251bc6f67a7a90fff44ecb6d7ec8b91), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x25bef477e4a4c096f7e81328d4e4c20f4205f0c57cfa7b77a310e033287d0a07), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x1ab1686bacd1cf10e64cebf10cc40d3c874b30ee0c4c1fe39be83c9706534a57), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xf4623438cd7432c1c6efb4d239a659848e4da818262e7698fa3d0fbfe1726cde), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x12f4bf165fd7bc9ed63beb4d8338b75dde96f81daa8c358ef917cf4107f9ad27), "metadata");
     }
 
     function state_FX_011() internal pure returns (RenderStateV1 memory s) {
