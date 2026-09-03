@@ -539,18 +539,18 @@ function eyeGlyph(st,side,cx,cy,r,fill,rng){
     case 11: for(let i=0;i<5;i++) e+=rect(cx-r+rng.int(2*r),cy-r+rng.int(2*r),2,2,fill); break; // PIXEL STORM
     case 12: e+=X(r,3); e+=rect(cx-1,cy-r-4,2,3,fill)+rect(cx-1,cy+r+1,2,3,fill)+rect(cx-r-4,cy-1,3,2,fill)+rect(cx+r+1,cy-1,3,2,fill); break; // CROSSHAIR
     case 13: e+=rect(cx-r,cy-4,2*r,2,fill)+rect(cx-r,cy-1,2*r,2,fill)+rect(cx-r,cy+2,2*r,2,fill); break; // TRIPLE SLIT
-    case 14: e+=octRing(cx,cy,r,3,fill); break; // VOID RING
+    case 14: e+=octRing(cx,cy,r,9,fill); break; // VOID RING
     case 15: e+=X(r,3); e+=rect(cx-1,cy-3,2,6,WHITE)+rect(cx-3,cy-1,6,2,WHITE); break; // NAILED X
-    case 16: if(side) e+=octRing(cx,cy,r-1,3,fill); else e+=rect(cx-1,cy-r,3,2*r,fill); break; // BINARY (1|0)
-    case 17: e+=octRing(cx,cy,r+1,4,fill); e+=rect(cx-2,cy-2,3,3,fill); break; // TARGET
+    case 16: if(side) e+=octRing(cx,cy,r-1,9,fill); else e+=rect(cx-1,cy-r,3,2*r,fill); break; // BINARY (1|0)
+    case 17: e+=octRing(cx,cy,r+1,10,fill); e+=rect(cx-2,cy-2,3,3,fill); break; // TARGET
     case 18: { // SPIRAL: square spiral inward
       let d='M'+((cx-r)*U)+' '+((cy-r)*U);
       const dirs=[[1,0],[0,1],[-1,0],[0,-1]];
       for(let k=0;k<7;k++){ const len=k<3?2*r:2*r-3*((k-1)>>1); if(len<2) break;
         const dxy=dirs[k%4]; d+= dxy[0]!==0 ? 'h'+(dxy[0]*len*U) : 'v'+(dxy[1]*len*U); }
-      e+='<path d="'+d+'" fill="none" stroke="'+fill+'" stroke-width="3"/>'; break; }
+      e+='<path d="'+d+'" fill="none" stroke="'+fill+'" stroke-width="6"/>'; break; }
     case 19: e+=X(r,3); e+=rect(cx+1,cy+r,2,7+rng.int(4),fill); break; // WEEPING X
-    case 20: if(side) e+=octRing(cx,cy,r,3,fill); else e+=X(r,3); break; // SPLIT PAIR
+    case 20: if(side) e+=octRing(cx,cy,r,9,fill); else e+=X(r,3); break; // SPLIT PAIR
     case 21: e+=xmark(cx+2,cy+2,r,3,PINK,rng); e+=X(r,3); e+=xmark(cx,cy,(r>>1),2,WHITE,rng); break; // BURNING X
     case 22: e+=poly(offsetPts([[0,-r-1],[2,-2],[r+1,0],[2,2],[0,r+1],[-2,2],[-r-1,0],[-2,-2]],cx,cy),fill); break; // STAR
     case 23: e+=octFill(cx,cy,r,fill); break; // DEAD LIGHT
@@ -697,15 +697,15 @@ function buildGenesis(sState){
       }
     } }
   // FLATLINE SCAR: one perfect white line cutting through everything
-  if(flatLi>=0) f+='<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="4"/>';
+  if(flatLi>=0) f+='<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="6"/>';
   // LIGHTNING: one jagged bolt across the field
   if(lightning){ let d='M0 '+((20+rng.int(60))*U); let ly=0;
     for(let x=8;x<=100;x+=8){ const ny=(10+rng.int(80)); d+='L'+(x*U)+' '+(ny*U); ly=ny; }
-    f+='<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="5"/>'
-     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="2"/>'; }
+    f+='<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'
+     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="3"/>'; }
   // HEARTBEAT: a single pink pulse line — the signal refuses to die
   if(t.pink===7){ const hy=(20+rng.int(60))*U; const bx=(10+rng.int(60))*U;
-    f+='<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="4"/>'; }
+    f+='<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'; }
   // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
   const rB=t.eyeR;
   const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
@@ -721,7 +721,7 @@ function buildGenesis(sState){
       e+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
       return e; }
     if(t.eyes===24){ // ALL SEEING: hollow sockets + the third eye above
-      for(const [ex,cyp,r] of eyeScr) e+=octRing(ex+ox,cyp+oy,r-1,3,fill);
+      for(const [ex,cyp,r] of eyeScr) e+=octRing(ex+ox,cyp+oy,r-1,9,fill);
       const mx=((eyeScr[0][0]+eyeScr[1][0])/2)|0;
       const ty=Math.min(eyeScr[0][1],eyeScr[1][1])-t.eyeR-7;
       e+=xmark(mx+ox,ty+oy,t.eyeR+2,3,fill,rng);
@@ -744,7 +744,7 @@ function buildGenesis(sState){
       const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); const cyp=ey2-((disp/3)|0)+2;
       for(let k=1;k<=(t.treat===4?1:2);k++){ const rr=r+3+k*4;
         const oct=[[ex-rr,cyp],[ex-(rr*7/10|0),cyp-(rr*7/10|0)],[ex,cyp-rr],[ex+(rr*7/10|0),cyp-(rr*7/10|0)],[ex+rr,cyp],[ex+(rr*7/10|0),cyp+(rr*7/10|0)],[ex,cyp+rr],[ex-(rr*7/10|0),cyp+(rr*7/10|0)]];
-        f+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="3"/>'; } } }
+        f+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="5"/>'; } } }
   else if(t.treat===5){ // STATIC: white interference specks around the stare
     const n=10+rng.int(6); const x0=eyeScr[0][0]-10, x1=eyeScr[1][0]+10;
     let d=''; for(let i=0;i<n;i++){ const x=x0+rng.int(Math.max(4,x1-x0)); const y=Math.min(eyeScr[0][1],eyeScr[1][1])-8+rng.int(16); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; }
@@ -753,7 +753,7 @@ function buildGenesis(sState){
     for(const [ex,cyp,r] of eyeScr){
       f+=rect(ex-1,cyp-r-8,2,6,ACID)+rect(ex-1,cyp+r+2,2,6,ACID)+rect(ex-r-8,cyp-1,6,2,ACID)+rect(ex+r+2,cyp-1,6,2,ACID);
       f+=rect(ex-1,cyp-r-10,2,2,PINK)+rect(ex-1,cyp+r+8,2,2,PINK); } }
-  else if(t.treat===7){ for(const [ex,cyp,r] of eyeScr) f+=octRing(ex,cyp,r+5,3,WHITE); } // HALO EYES
+  else if(t.treat===7){ for(const [ex,cyp,r] of eyeScr) f+=octRing(ex,cyp,r+5,5,WHITE); } // HALO EYES
   else if(t.treat===8){ f+=drawEyes(PINK,8,0); f+=drawEyes(WHITE,4,0); } // SMEAR TRAIL
   else if(t.treat===9){ // INVERTED: knockout — black glyphs on solid acid patches
     for(const [ex,cyp,r] of eyeScr) f+=rect(ex-r-3,cyp-r+1,2*r+6,2*r-1,ACID);
@@ -761,7 +761,7 @@ function buildGenesis(sState){
   else if(t.treat===10){ f+=drawEyes(PINK,4,3); f+=drawEyes(WHITE,-4,-3); } // PRISM
   else if(t.treat===11){ // GOD RAYS: the stare reaches the edge of the signal
     for(const [ex,cyp] of eyeScr){
-      f+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="2"/>'; } }
+      f+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="4"/>'; } }
   f+=drawEyes(mainFill,0,0);
   // hunter marks: kill notches above the left eye (1 per kill, capped at 9)
   if(sState.kills>0){ const n=Math.min(9,sState.kills); const [lx,ly]=eyePos[0];
@@ -797,7 +797,7 @@ function buildGenesis(sState){
       case 11: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=3){ const hh=5+rng.int(5); f+=rect(x,my,2,hh,ACID); } break; // SCREAM
       case 12: { f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID); f+=poly(offsetPts([[-4,2],[-1,2],[-2,7]],t.cx,my),WHITE)+poly(offsetPts([[2,2],[5,2],[4,7]],t.cx,my),WHITE); break; } // FANGS
       case 13: f+=octRing(t.cx,my+3,5,4,ACID); break; // HOWL
-      case 14: f+=rect(t.cx-mw,my-2,2*mw,7,BLACK)+'<rect x="'+((t.cx-mw)*U)+'" y="'+((my-2)*U)+'" width="'+(2*mw*U)+'" height="70" fill="none" stroke="'+ACID+'" stroke-width="3"/>'+rect(t.cx-4,my-1,1,5,ACID)+rect(t.cx,my-1,1,5,ACID)+rect(t.cx+4,my-1,1,5,ACID); break; // MUZZLE
+      case 14: f+=rect(t.cx-mw,my-2,2*mw,7,BLACK)+'<rect x="'+((t.cx-mw)*U)+'" y="'+((my-2)*U)+'" width="'+(2*mw*U)+'" height="70" fill="none" stroke="'+ACID+'" stroke-width="5"/>'+rect(t.cx-4,my-1,1,5,ACID)+rect(t.cx,my-1,1,5,ACID)+rect(t.cx+4,my-1,1,5,ACID); break; // MUZZLE
       case 15: f+=rect(t.cx-mw+1,my-1,mw+3,2,ACID)+rect(t.cx-mw+4,my+2,mw+3,2,PINK)+rect(t.cx-mw-1,my+5,mw+3,2,WHITE); break; // GLITCH MOUTH
     }
   }
