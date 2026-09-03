@@ -189,7 +189,7 @@ library GenesisLib {
                 )
             );
         }
-        if (st == 14) return octRing(cx, cy, r, 3, fill); // VOID RING
+        if (st == 14) return octRing(cx, cy, r, 9, fill); // VOID RING
         if (st == 15) { // NAILED X
             return string(
                 abi.encodePacked(
@@ -200,11 +200,11 @@ library GenesisLib {
             );
         }
         if (st == 16) { // BINARY (1|0)
-            if (side == 1) return octRing(cx, cy, r - 1, 3, fill);
+            if (side == 1) return octRing(cx, cy, r - 1, 9, fill);
             return Geom.rect(cx - 1, cy - r, 3, 2 * r, fill);
         }
         if (st == 17) { // TARGET
-            return string(abi.encodePacked(octRing(cx, cy, r + 1, 4, fill), Geom.rect(cx - 2, cy - 2, 3, 3, fill)));
+            return string(abi.encodePacked(octRing(cx, cy, r + 1, 10, fill), Geom.rect(cx - 2, cy - 2, 3, 3, fill)));
         }
         if (st == 18) { // SPIRAL
             Buf.B memory d = Buf.init(256);
@@ -217,14 +217,14 @@ library GenesisLib {
                 if (dxy[0] != 0) d.app(abi.encodePacked("h", Num.itoa(dxy[0] * len * 10)));
                 else d.app(abi.encodePacked("v", Num.itoa(dxy[1] * len * 10)));
             }
-            return string(abi.encodePacked('<path d="', d.fin(), '" fill="none" stroke="', fill, '" stroke-width="3"/>'));
+            return string(abi.encodePacked('<path d="', d.fin(), '" fill="none" stroke="', fill, '" stroke-width="6"/>'));
         }
         if (st == 19) { // WEEPING X
             string memory x1 = Geom.xmark(cx, cy, r, 3, fill, rng);
             return string(abi.encodePacked(x1, Geom.rect(cx + 1, cy + r, 2, 7 + rng.rInt(4), fill)));
         }
         if (st == 20) { // SPLIT PAIR
-            if (side == 1) return octRing(cx, cy, r, 3, fill);
+            if (side == 1) return octRing(cx, cy, r, 9, fill);
             return Geom.xmark(cx, cy, r, 3, fill, rng);
         }
         if (st == 21) { // BURNING X
@@ -268,7 +268,7 @@ library GenesisLib {
         if (c.t.eyes == 24) { // ALL SEEING
             bytes memory e;
             for (uint256 i = 0; i < 2; i++) {
-                e = abi.encodePacked(e, octRing(c.eyeScr[i][0] + ox, c.eyeScr[i][1] + oy, c.eyeScr[i][2] - 1, 3, fill));
+                e = abi.encodePacked(e, octRing(c.eyeScr[i][0] + ox, c.eyeScr[i][1] + oy, c.eyeScr[i][2] - 1, 9, fill));
             }
             int256 mx = (c.eyeScr[0][0] + c.eyeScr[1][0]) / 2;
             int256 ty = Num.min(c.eyeScr[0][1], c.eyeScr[1][1]) - c.t.eyeR - 7;
@@ -646,7 +646,7 @@ library GenesisLib {
             f.app(
                 abi.encodePacked(
                     '<path d="M0 ', Num.itoa(c.lines[uint256(c.flatLi)].y * 10),
-                    'h1000" fill="none" stroke="', T.WHITE, '" stroke-width="4"/>'
+                    'h1000" fill="none" stroke="', T.WHITE, '" stroke-width="6"/>'
                 )
             );
         }
@@ -659,8 +659,8 @@ library GenesisLib {
                 d.app(abi.encodePacked("L", Num.itoa(x * 10), " ", Num.itoa(ny * 10)));
             }
             string memory dd = d.fin();
-            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.PINK, '" stroke-width="5"/>'));
-            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.WHITE, '" stroke-width="2"/>'));
+            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>'));
+            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.WHITE, '" stroke-width="3"/>'));
         }
         // HEARTBEAT
         if (c.t.pink == 7) {
@@ -669,7 +669,7 @@ library GenesisLib {
             f.app(
                 abi.encodePacked(
                     '<path d="M0 ', Num.itoa(hy), "h", Num.itoa(bx), "l15 -70 15 140 15 -70h",
-                    Num.itoa(1000 - bx - 45), '" fill="none" stroke="', T.PINK, '" stroke-width="4"/>'
+                    Num.itoa(1000 - bx - 45), '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>'
                 )
             );
         }
@@ -779,7 +779,7 @@ library GenesisLib {
                     f.app(
                         abi.encodePacked(
                             '<path d="', Geom.pathD(oct), '" fill="none" stroke="', k == 1 ? T.ACID : T.PINK,
-                            '" stroke-width="3"/>'
+                            '" stroke-width="5"/>'
                         )
                     );
                 }
@@ -809,7 +809,7 @@ library GenesisLib {
             }
         } else if (c.t.treat == 7) { // HALO EYES
             for (uint256 i = 0; i < 2; i++) {
-                f.app(octRing(c.eyeScr[i][0], c.eyeScr[i][1], c.eyeScr[i][2] + 5, 3, T.WHITE));
+                f.app(octRing(c.eyeScr[i][0], c.eyeScr[i][1], c.eyeScr[i][2] + 5, 5, T.WHITE));
             }
         } else if (c.t.treat == 8) { // SMEAR TRAIL
             f.app(drawEyes(c, T.PINK, 8, 0));
@@ -832,7 +832,7 @@ library GenesisLib {
                         '<path d="M', Num.itoa(ex * 10), " ", Num.itoa(cyp * 10), "L0 0M", Num.itoa(ex * 10), " ",
                         Num.itoa(cyp * 10), "L1000 0M", Num.itoa(ex * 10), " ", Num.itoa(cyp * 10), "L",
                         ex > 50 ? "1000" : "0", " ", Num.itoa(cyp * 10 - 300), '" fill="none" stroke="', T.ACID,
-                        '" stroke-width="2"/>'
+                        '" stroke-width="4"/>'
                     )
                 );
             }
@@ -949,7 +949,7 @@ library GenesisLib {
             f.app(
                 abi.encodePacked(
                     '<rect x="', Num.itoa((t.cx - mw) * 10), '" y="', Num.itoa((my - 2) * 10), '" width="',
-                    Num.itoa(2 * mw * 10), '" height="70" fill="none" stroke="', T.ACID, '" stroke-width="3"/>'
+                    Num.itoa(2 * mw * 10), '" height="70" fill="none" stroke="', T.ACID, '" stroke-width="5"/>'
                 )
             );
             f.app(Geom.rect(t.cx - 4, my - 1, 1, 5, T.ACID));
