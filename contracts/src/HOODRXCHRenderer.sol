@@ -178,7 +178,7 @@ contract HOODRXCHRenderer {
         }
         T.Gen memory g = GenesisLib.build(s);
         Glyphs.Used memory used = Glyphs.newUsed();
-        Buf.B memory body = Buf.init(48000);
+        Buf.B memory body = Buf.init(112000);
         body.app(abi.encodePacked('<rect width="1000" height="1000" fill="', T.BLACK, '"/>'));
         body.app(bytes('<use href="#f"/>'));
         for (uint256 ci = 0; ci < g.slices.length; ci++) {

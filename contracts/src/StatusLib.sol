@@ -239,22 +239,51 @@ library StatusLib {
     }
 
     function witsecOverlay(T.Gen memory g) internal pure returns (string memory) {
-        int256 lx = g.eyeScreen[0][0];
-        int256 ly = g.eyeScreen[0][1];
-        int256 lr = g.eyeScreen[0][2];
-        int256 rx2 = g.eyeScreen[1][0];
-        int256 ry2 = g.eyeScreen[1][1];
-        int256 rr2 = g.eyeScreen[1][2];
-        int256 y = Num.min(ly, ry2) - 5;
-        int256 x0 = lx - lr - 4;
-        int256 x1 = rx2 + rr2 + 4;
-        return string(
-            abi.encodePacked(
-                Geom.rect(x0, y, x1 - x0, 9, T.WHITE),
-                Geom.rect(x0 + 3, y + 11, (x1 - x0) >> 1, 3, T.WHITE),
-                Geom.rect(x0 + ((x1 - x0) >> 1) + 6, y + 11, (x1 - x0) >> 2, 3, T.WHITE)
-            )
-        );
+        int256 y;
+        int256 x0;
+        int256 x1;
+        {
+            int256 lx = g.eyeScreen[0][0];
+            int256 ly = g.eyeScreen[0][1];
+            int256 lr = g.eyeScreen[0][2];
+            int256 rx2 = g.eyeScreen[1][0];
+            int256 ry2 = g.eyeScreen[1][1];
+            int256 rr2 = g.eyeScreen[1][2];
+            y = Num.min(ly, ry2) - 8;
+            x0 = Num.max(0, lx - lr - 8);
+            x1 = Num.min(100, rx2 + rr2 + 8);
+        }
+        Buf.B memory o = Buf.init(62000);
+        o.app(abi.encodePacked('<g shape-rendering="crispEdges">', Geom.rect(x0, y, x1 - x0, 22, T.BLACK)));
+        for (uint256 f = 0; f < 6; f++) {
+            bytes memory v;
+            for (uint256 k = 0; k < 6; k++) {
+                v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
+            }
+            o.app(
+                abi.encodePacked(
+                    '<g display="', f > 0 ? "none" : "inline",
+                    '"><animate attributeName="display" values="', v,
+                    '" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>'
+                )
+            );
+            for (int256 ys = y; ys < y + 22; ys += 2) {
+                for (int256 x = x0; x < x1; x += 2) {
+                    int256 n = g.rng.rInt(100);
+                    if (n >= 44 && n < 92) {
+                        o.app(
+                            abi.encodePacked(
+                                '<rect x="', Num.itoa(x * 10), '" y="', Num.itoa(ys * 10),
+                                '" width="21" height="21" fill="', n < 86 ? T.WHITE : T.ACID, '"/>'
+                            )
+                        );
+                    }
+                }
+            }
+            o.app(bytes("</g>"));
+        }
+        o.app(bytes("</g>"));
+        return o.fin();
     }
 
     function layLowOverlay(T.Gen memory g) internal pure returns (string memory) {
