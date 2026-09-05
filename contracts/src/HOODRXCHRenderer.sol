@@ -206,7 +206,7 @@ contract HOODRXCHRenderer {
         if (status == 1) body.app(StatusLib.markedOverlay(g));
         else if (status == 4) body.app(StatusLib.witsecOverlay(g));
         else if (status == 6) body.app(StatusLib.layLowOverlay(g));
-        else if (status == 5) body.app(StatusLib.buyerOverlay());
+        else if (status == 5) body.app(StatusLib.buyerOverlay(g));
         else if (status == 7) body.app(StatusLib.hunterOverlay(g));
         body.app(StatusLib.sealHud(s));
         body.app(StatusLib.seasonChips(s, used));

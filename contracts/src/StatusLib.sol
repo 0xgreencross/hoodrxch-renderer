@@ -302,20 +302,57 @@ library StatusLib {
         return o.fin();
     }
 
-    function buyerOverlay() internal pure returns (string memory) {
-        Geom.Pt[] memory p = new Geom.Pt[](4);
-        p[0] = Geom.Pt(50, 2);
-        p[1] = Geom.Pt(53, 5);
-        p[2] = Geom.Pt(50, 8);
-        p[3] = Geom.Pt(47, 5);
-        return string(
+    function buyerOverlay(T.Gen memory g) internal pure returns (string memory) {
+        Mask.Traits memory t = g.t;
+        int256 cx = t.cx;
+        int256 cy = t.cy - 2;
+        int256 R = t.rh + 16;
+        Buf.B memory o = Buf.init(8000);
+        o.app(GenesisLib.octRing(cx, cy, R, 12, T.ACID));
+        int256[4] memory er = [R - 3, R - 27, R - 19, R - 11];
+        for (uint256 f = 0; f < 4; f++) {
+            bytes memory v;
+            for (uint256 k = 0; k < 4; k++) {
+                v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
+            }
+            o.app(
+                abi.encodePacked(
+                    '<g display="', f > 0 ? "none" : "inline",
+                    '"><animate attributeName="display" values="', v,
+                    '" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'
+                )
+            );
+            o.app(GenesisLib.octRing(cx, cy, er[f], 4, T.ACID));
+            o.app(bytes("</g>"));
+        }
+        int256 bx = cx;
+        int256 by = cy + R - 4;
+        o.app(
             abi.encodePacked(
-                '<rect x="60" y="60" width="880" height="880" fill="none" stroke="',
-                T.ACID,
-                '" stroke-width="5"/>',
-                Geom.poly(p, T.ACID)
+                '<path d="M', Num.itoa((bx - 5) * 10), " ", Num.itoa((by - 6) * 10),
+                "V", Num.itoa((by - 12) * 10), "L", Num.itoa((bx - 3) * 10), " ", Num.itoa((by - 14) * 10),
+                "H", Num.itoa((bx + 3) * 10), "L", Num.itoa((bx + 5) * 10), " ", Num.itoa((by - 12) * 10),
+                "V", Num.itoa((by - 6) * 10), '" stroke="', T.ACID, '" stroke-width="16" fill="none"/>'
             )
         );
+        Geom.Pt[] memory p = new Geom.Pt[](8);
+        p[0] = Geom.Pt(bx - 9, by - 4);
+        p[1] = Geom.Pt(bx - 6, by - 7);
+        p[2] = Geom.Pt(bx + 6, by - 7);
+        p[3] = Geom.Pt(bx + 9, by - 4);
+        p[4] = Geom.Pt(bx + 9, by + 4);
+        p[5] = Geom.Pt(bx + 6, by + 7);
+        p[6] = Geom.Pt(bx - 6, by + 7);
+        p[7] = Geom.Pt(bx - 9, by + 4);
+        o.app(Geom.poly(p, T.ACID));
+        Geom.Pt[] memory q = new Geom.Pt[](4);
+        q[0] = Geom.Pt(bx - 2, by - 2);
+        q[1] = Geom.Pt(bx, by - 4);
+        q[2] = Geom.Pt(bx + 2, by - 2);
+        q[3] = Geom.Pt(bx, by);
+        o.app(Geom.poly(q, T.BLACK));
+        o.app(Geom.rect(bx - 1, by - 1, 2, 5, T.BLACK));
+        return o.fin();
     }
 
     function hunterOverlay(T.Gen memory g) internal pure returns (string memory) {
