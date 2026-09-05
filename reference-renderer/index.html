@@ -1027,10 +1027,12 @@ function hunterOverlay(g,rng){
 }
 // seals HUD: three pips top-right — acid intact, pink broken
 function sealHud(s,rng){
+  // moved inboard (x64-75, y8) so the pips survive the circular PFP crop;
+  // broken seal = solid pink square split by a black diagonal crack
   let o='';
-  for(let i=0;i<3;i++){ const x=85+i*4, y=5;
+  for(let i=0;i<3;i++){ const x=64+i*4, y=8;
     if(i<s.sealsRemaining) o+=rect(x,y,3,3,ACID);
-    else o+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+PINK+'" stroke-width="3"/>'+'<path d="M'+(x*U)+' '+((y+3)*U)+'l30 -30" stroke="'+PINK+'" stroke-width="3" fill="none"/>';
+    else { o+=poly([[x,y],[x+3,y],[x,y+3]],PINK); o+=poly([[x+3,y+1],[x+3,y+3],[x+1,y+3]],PINK); }
   }
   return o;
 }
