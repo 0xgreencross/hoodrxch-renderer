@@ -255,35 +255,41 @@ library StatusLib {
         }
         Buf.B memory o = Buf.init(62000);
         o.app(abi.encodePacked('<g shape-rendering="crispEdges">', Geom.rect(x0, y, x1 - x0, 22, T.BLACK)));
+        int256[3] memory band = [y, x0, x1];
         for (uint256 f = 0; f < 6; f++) {
-            bytes memory v;
-            for (uint256 k = 0; k < 6; k++) {
-                v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
-            }
-            o.app(
-                abi.encodePacked(
-                    '<g display="', f > 0 ? "none" : "inline",
-                    '"><animate attributeName="display" values="', v,
-                    '" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>'
-                )
-            );
-            for (int256 ys = y; ys < y + 22; ys += 2) {
-                for (int256 x = x0; x < x1; x += 2) {
-                    int256 n = g.rng.rInt(100);
-                    if (n >= 44 && n < 92) {
-                        o.app(
-                            abi.encodePacked(
-                                '<rect x="', Num.itoa(x * 10), '" y="', Num.itoa(ys * 10),
-                                '" width="21" height="21" fill="', n < 86 ? T.WHITE : T.ACID, '"/>'
-                            )
-                        );
-                    }
-                }
-            }
-            o.app(bytes("</g>"));
+            witsecFrame(o, g, band, f);
         }
         o.app(bytes("</g>"));
         return o.fin();
+    }
+
+    /// one SMIL frame of the witsec static band, appended into o
+    function witsecFrame(Buf.B memory o, T.Gen memory g, int256[3] memory b, uint256 f) private pure {
+        bytes memory v;
+        for (uint256 k = 0; k < 6; k++) {
+            v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
+        }
+        o.app(
+            abi.encodePacked(
+                '<g display="', f > 0 ? "none" : "inline",
+                '"><animate attributeName="display" values="', v,
+                '" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>'
+            )
+        );
+        for (int256 ys = b[0]; ys < b[0] + 22; ys += 2) {
+            for (int256 x = b[1]; x < b[2]; x += 2) {
+                int256 n = g.rng.rInt(100);
+                if (n >= 44 && n < 92) {
+                    o.app(
+                        abi.encodePacked(
+                            '<rect x="', Num.itoa(x * 10), '" y="', Num.itoa(ys * 10),
+                            '" width="21" height="21" fill="', n < 86 ? T.WHITE : T.ACID, '"/>'
+                        )
+                    );
+                }
+            }
+        }
+        o.app(bytes("</g>"));
     }
 
     function layLowOverlay(T.Gen memory g) internal pure returns (string memory) {
@@ -302,6 +308,54 @@ library StatusLib {
         return o.fin();
     }
 
+    /// one SMIL frame of the collapsing echo: display-flip group + ring (dash "" = solid)
+    function echoFrame(int256 cx, int256 cy, int256 r, int256 w, string memory dash, uint256 f)
+        private
+        pure
+        returns (string memory)
+    {
+        bytes memory v;
+        for (uint256 k = 0; k < 4; k++) {
+            v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
+        }
+        string memory ring;
+        if (bytes(dash).length == 0) ring = GenesisLib.octRing(cx, cy, r, w, T.ACID);
+        else ring = octRingDash(cx, cy, r, w, dash);
+        return string(
+            abi.encodePacked(
+                '<g display="', f > 0 ? "none" : "inline",
+                '"><animate attributeName="display" values="', v,
+                '" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>',
+                ring,
+                "</g>"
+            )
+        );
+    }
+
+    /// octagon ring with dasharray — the collapsing echo's dissolve steps
+    function octRingDash(int256 cx, int256 cy, int256 r, int256 w, string memory dash)
+        private
+        pure
+        returns (string memory)
+    {
+        int256 q = (r * 7) / 10;
+        Geom.Pt[] memory pts = new Geom.Pt[](8);
+        pts[0] = Geom.Pt(cx - r, cy);
+        pts[1] = Geom.Pt(cx - q, cy - q);
+        pts[2] = Geom.Pt(cx, cy - r);
+        pts[3] = Geom.Pt(cx + q, cy - q);
+        pts[4] = Geom.Pt(cx + r, cy);
+        pts[5] = Geom.Pt(cx + q, cy + q);
+        pts[6] = Geom.Pt(cx, cy + r);
+        pts[7] = Geom.Pt(cx - q, cy + q);
+        return string(
+            abi.encodePacked(
+                '<path d="', Geom.pathD(pts), '" fill="none" stroke="', T.ACID,
+                '" stroke-width="', Num.itoa(w), '" stroke-dasharray="', dash, '"/>'
+            )
+        );
+    }
+
     function buyerOverlay(T.Gen memory g) internal pure returns (string memory) {
         Mask.Traits memory t = g.t;
         int256 cx = t.cx;
@@ -309,24 +363,18 @@ library StatusLib {
         int256 R = t.rh + 16;
         Buf.B memory o = Buf.init(8000);
         o.app(GenesisLib.octRing(cx, cy, R, 12, T.ACID));
-        int256[4] memory er = [R - 3, R - 27, R - 19, R - 11];
-        for (uint256 f = 0; f < 4; f++) {
-            bytes memory v;
-            for (uint256 k = 0; k < 4; k++) {
-                v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
-            }
-            o.app(
-                abi.encodePacked(
-                    '<g display="', f > 0 ? "none" : "inline",
-                    '"><animate attributeName="display" values="', v,
-                    '" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'
-                )
-            );
-            o.app(GenesisLib.octRing(cx, cy, er[f], 4, T.ACID));
-            o.app(bytes("</g>"));
-        }
-        int256 bx = cx;
-        int256 by = cy + R - 4;
+        // echo wave collapses inward: born at the shield, dissolving toward the face
+        o.app(echoFrame(cx, cy, R - 3, 4, "", 0));
+        o.app(echoFrame(cx, cy, R - 11, 3, "24 10", 1));
+        o.app(echoFrame(cx, cy, R - 19, 3, "14 16", 2));
+        o.app(echoFrame(cx, cy, R - 27, 2, "8 22", 3));
+        o.app(padlockSeal(cx, cy + R - 4));
+        return o.fin();
+    }
+
+    /// acid padlock clasped at (bx,by): shackle, octagonal body, black keyhole
+    function padlockSeal(int256 bx, int256 by) private pure returns (string memory) {
+        Buf.B memory o = Buf.init(1400);
         o.app(
             abi.encodePacked(
                 '<path d="M', Num.itoa((bx - 5) * 10), " ", Num.itoa((by - 6) * 10),
