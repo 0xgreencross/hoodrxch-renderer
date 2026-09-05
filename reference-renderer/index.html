@@ -989,9 +989,19 @@ function layLowOverlay(g,rng){
   return o;
 }
 function buyerOverlay(g,rng){
-  // in escrow: an acid holding frame
-  let o='<rect x="60" y="60" width="880" height="880" fill="none" stroke="'+ACID+'" stroke-width="5"/>';
-  o+=poly([[50,2],[53,5],[50,8],[47,5]],ACID);
+  // buyer protected: sealed force field — shield octagon, radiating echo (SMIL), padlock clasp
+  const t=g.traits, cx=t.cx, cy=t.cy-2, R=t.rh+16;
+  let o=octRing(cx,cy,R,12,ACID);
+  const ER=[R-3,R-27,R-19,R-11];
+  for(let f=0;f<4;f++){
+    let v=''; for(let k=0;k<4;k++) v+=(k?';':'')+(k===f?'inline':'none');
+    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+octRing(cx,cy,ER[f],4,ACID)+'</g>';
+  }
+  const bx=cx, by=cy+R-4;
+  o+='<path d="M'+((bx-5)*U)+' '+((by-6)*U)+'V'+((by-12)*U)+'L'+((bx-3)*U)+' '+((by-14)*U)+'H'+((bx+3)*U)+'L'+((bx+5)*U)+' '+((by-12)*U)+'V'+((by-6)*U)+'" stroke="'+ACID+'" stroke-width="16" fill="none"/>';
+  o+=poly([[bx-9,by-4],[bx-6,by-7],[bx+6,by-7],[bx+9,by-4],[bx+9,by+4],[bx+6,by+7],[bx-6,by+7],[bx-9,by+4]],ACID);
+  o+=poly([[bx-2,by-2],[bx,by-4],[bx+2,by-2],[bx,by]],BLACK);
+  o+=rect(bx-1,by-1,2,5,BLACK);
   return o;
 }
 function hunterOverlay(g,rng){
