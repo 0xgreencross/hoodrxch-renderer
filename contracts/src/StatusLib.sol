@@ -298,7 +298,7 @@ library StatusLib {
         int256 x0 = t.cx - t.rw - 9;
         int256 w = 2 * t.rw + 18;
         for (int256 y = t.cy - t.rh - 4; y < t.cy + 24; y += 7) {
-            o.app(Geom.rect(x0, y, w, 3, T.BLACK));
+            o.app(Geom.rect(x0, y, w, 4, T.BLACK));
         }
         Geom.Pt[] memory p = new Geom.Pt[](3);
         p[0] = Geom.Pt(t.cx - 4, t.cy - t.rh - 9);
