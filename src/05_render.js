@@ -576,9 +576,17 @@ function buyerOverlay(g,rng){
   return o;
 }
 function hunterOverlay(g,rng){
-  // volunteered hunter: quiet white sight ticks
-  const t=g.traits; const hx=t.cx, hy=t.cy-4, rr=t.rw+12; let o='';
-  o+='<path d="M'+(hx*U)+' '+((hy-rr-4)*U)+'v'+(4*U)+'M'+(hx*U)+' '+((hy+rr)*U)+'v'+(4*U)+'M'+((hx-rr-4)*U)+' '+(hy*U)+'h'+(4*U)+'M'+((hx+rr)*U)+' '+(hy*U)+'h'+(4*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
+  // volunteered hunter: the MARKED lock in white — the hunter carries the warrant
+  const t=g.traits; let o='';
+  const L=9;
+  o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)+'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)+'" fill="none" stroke="'+WHITE+'" stroke-width="14"/>';
+  { const cx=t.cx, cy=t.cy-2, R=t.rh+12;
+    o+=octRing(cx,cy,R,10,WHITE);
+    o+='<path d="M0 '+(cy*U)+'H'+((cx-R)*U)+'M'+((cx+R)*U)+' '+(cy*U)+'H1000M'+(cx*U)+' 0V'+(Math.max(0,cy-R)*U)+'M'+(cx*U)+' '+((cy+R)*U)+'V1000" stroke="'+WHITE+'" stroke-width="6" fill="none"/>';
+    o+=poly([[cx-5,cy-R+3],[cx+5,cy-R+3],[cx,cy-R+11]],WHITE);
+    o+=poly([[cx-5,cy+R-3],[cx+5,cy+R-3],[cx,cy+R-11]],WHITE);
+    o+=poly([[cx-R+3,cy-5],[cx-R+3,cy+5],[cx-R+11,cy]],WHITE);
+    o+=poly([[cx+R-3,cy-5],[cx+R-3,cy+5],[cx+R-11,cy]],WHITE); }
   return o;
 }
 // seals HUD: three pips top-right — acid intact, pink broken
