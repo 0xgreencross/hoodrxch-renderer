@@ -552,7 +552,7 @@ function layLowOverlay(g,rng){
   // gone dark: blinds close over the figure
   const t=g.traits; let o='';
   const x0=t.cx-t.rw-9, w=2*t.rw+18;
-  for(let y=t.cy-t.rh-4;y<t.cy+24;y+=7) o+=rect(x0,y,w,3,BLACK);
+  for(let y=t.cy-t.rh-4;y<t.cy+24;y+=7) o+=rect(x0,y,w,4,BLACK);
   o+=poly([[t.cx-4,t.cy-t.rh-9],[t.cx+4,t.cy-t.rh-9],[t.cx,t.cy-t.rh-5]],ACID);
   return o;
 }
