@@ -19,12 +19,12 @@ library StatusLib {
 
     function coffinPts() internal pure returns (Geom.Pt[] memory p) {
         p = new Geom.Pt[](6);
-        p[0] = Geom.Pt(43, 28);
-        p[1] = Geom.Pt(57, 28);
-        p[2] = Geom.Pt(64, 42);
-        p[3] = Geom.Pt(58, 82);
-        p[4] = Geom.Pt(42, 82);
-        p[5] = Geom.Pt(36, 42);
+        p[0] = Geom.Pt(44, 22);
+        p[1] = Geom.Pt(56, 22);
+        p[2] = Geom.Pt(65, 38);
+        p[3] = Geom.Pt(57, 86);
+        p[4] = Geom.Pt(43, 86);
+        p[5] = Geom.Pt(35, 38);
     }
 
     function inCoffin(int256 x, int256 y, int256 pad) internal pure returns (bool) {
@@ -106,9 +106,20 @@ library StatusLib {
                 Geom.pathD(Geom.jitterPts(coffinPts(), rng, 1)),
                 '" fill="none" stroke="',
                 T.WHITE,
-                '" stroke-width="6"/>'
+                '" stroke-width="7"/>'
             )
         );
+        // inner lid outline: a built object, not a wire
+        {
+            Geom.Pt[] memory ip = new Geom.Pt[](6);
+            ip[0] = Geom.Pt(45, 27);
+            ip[1] = Geom.Pt(55, 27);
+            ip[2] = Geom.Pt(63, 40);
+            ip[3] = Geom.Pt(56, 81);
+            ip[4] = Geom.Pt(44, 81);
+            ip[5] = Geom.Pt(37, 40);
+            f.app(abi.encodePacked('<path d="', Geom.pathD(ip), '" fill="none" stroke="', T.WHITE, '" stroke-width="2"/>'));
+        }
         {
             Geom.Pt[] memory P = coffinPts();
             for (uint256 i = 0; i < 6; i++) {
@@ -142,31 +153,6 @@ library StatusLib {
                 f.app(Geom.xmark(x + 1, y + 1, 2, 1, pc, rng));
             }
         }
-        if (terminal) {
-            Geom.Pt[] memory p1 = new Geom.Pt[](4);
-            p1[0] = Geom.Pt(40, 33);
-            p1[1] = Geom.Pt(44, 32);
-            p1[2] = Geom.Pt(60, 79);
-            p1[3] = Geom.Pt(56, 80);
-            f.app(Geom.poly(p1, T.RED));
-            Geom.Pt[] memory p2 = new Geom.Pt[](4);
-            p2[0] = Geom.Pt(56, 32);
-            p2[1] = Geom.Pt(60, 33);
-            p2[2] = Geom.Pt(44, 80);
-            p2[3] = Geom.Pt(40, 79);
-            f.app(Geom.poly(p2, T.RED));
-        }
-        if (terminal) {
-            f.app(abi.encodePacked('<path d="M0 540h1000" fill="none" stroke="', T.RED, '" stroke-width="5"/>'));
-        } else {
-            f.app(
-                abi.encodePacked(
-                    '<path d="M0 540h140l15 -70 15 140 15 -70h815" fill="none" stroke="',
-                    T.WHITE,
-                    '" stroke-width="5"/>'
-                )
-            );
-        }
         f.app(Mask.sigilSVG(s.wardId, 8, 8, T.ACID));
         f.app(Mask.blockMarkSVG(s.blockId, 90, 93, rng, T.ACID));
         // death slices
@@ -184,6 +170,30 @@ library StatusLib {
                 ci++;
                 body.app(Geom.slice(ci, y, h, dx, T.BLACK));
             }
+        }
+        // the verdict is drawn after the scars — planks and vitals can never be shredded
+        if (terminal) {
+            Geom.Pt[] memory p1 = new Geom.Pt[](4);
+            p1[0] = Geom.Pt(40, 33);
+            p1[1] = Geom.Pt(44, 32);
+            p1[2] = Geom.Pt(60, 79);
+            p1[3] = Geom.Pt(56, 80);
+            body.app(Geom.poly(p1, T.RED));
+            p1[0] = Geom.Pt(56, 32);
+            p1[1] = Geom.Pt(60, 33);
+            p1[2] = Geom.Pt(44, 80);
+            p1[3] = Geom.Pt(40, 79);
+            body.app(Geom.poly(p1, T.RED));
+            body.app(abi.encodePacked('<path d="M0 540h1000" fill="none" stroke="', T.RED, '" stroke-width="5"/>'));
+        } else {
+            body.app(abi.encodePacked('<path d="M0 540h1000" fill="none" stroke="', T.WHITE, '" stroke-width="5"/>'));
+            body.app(
+                abi.encodePacked(
+                    '<g transform="translate(520 0)"><path d="M-174 540h20l10 -18 10 18h25l12 -75 12 150 12 -75h25l14 -26 14 26h20" fill="none" stroke="',
+                    T.WHITE,
+                    '" stroke-width="5"/><animateTransform attributeName="transform" type="translate" values="0 0;1174 0" dur="2.8s" repeatCount="indefinite"/></g>'
+                )
+            );
         }
         body.app(flickerSVG(s));
         return string(
