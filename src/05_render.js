@@ -560,10 +560,13 @@ function buyerOverlay(g,rng){
   // buyer protected: sealed force field — shield octagon, radiating echo (SMIL), padlock clasp
   const t=g.traits, cx=t.cx, cy=t.cy-2, R=t.rh+16;
   let o=octRing(cx,cy,R,12,ACID);
-  const ER=[R-3,R-27,R-19,R-11];
+  // echo wave collapses inward: born at the shield, dissolving toward the face
+  const ER=[R-3,R-11,R-19,R-27], EW=[4,3,3,2], ED=['','24 10','14 16','8 22'];
   for(let f=0;f<4;f++){
     let v=''; for(let k=0;k<4;k++) v+=(k?';':'')+(k===f?'inline':'none');
-    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+octRing(cx,cy,ER[f],4,ACID)+'</g>';
+    let ring=octRing(cx,cy,ER[f],EW[f],ACID);
+    if(ED[f]) ring=ring.replace('"/>','" stroke-dasharray="'+ED[f]+'"/>');
+    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+ring+'</g>';
   }
   const bx=cx, by=cy+R-4;
   o+='<path d="M'+((bx-5)*U)+' '+((by-6)*U)+'V'+((by-12)*U)+'L'+((bx-3)*U)+' '+((by-14)*U)+'H'+((bx+3)*U)+'L'+((bx+5)*U)+' '+((by-12)*U)+'V'+((by-6)*U)+'" stroke="'+ACID+'" stroke-width="16" fill="none"/>';
