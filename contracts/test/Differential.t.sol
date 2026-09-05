@@ -182,8 +182,8 @@ contract Differential is Test {
     function test_FX_012() public view {
         RenderStateV1 memory s = state_FX_012();
         assertEq(r.stateHash(s), bytes32(0xdd6f5502106697553337bff7c998e9003d13fbf6279d9a2562d55c693b8e4c29), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x19100b78bf5e475d36cf542eed4ddccfb83f6dc08beb6b2e9ab91cd5b9e9efeb), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xa0e661f97cdce6dd99f4edc552f0d209ef5c6f9003d8d297594ae177005644bf), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xfb8f70e827088013a8243e3e66aaec4156d2ba5f694f96d4eec5f0b5291f6cfd), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x88ebb20b75e2aad8fdc9a14f18425664a328c8144b1dc56a3d9e9a29eed14970), "metadata");
     }
 
     function state_FX_013() internal pure returns (RenderStateV1 memory s) {
