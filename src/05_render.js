@@ -440,7 +440,8 @@ function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.t
 // TERMINAL is the only other legal use of red: flat red line, red planks,
 // three red broken seals. Identity persists: sigil, block mark, eye archetype.
 // ---------------------------------------------------------------------------
-const COFFIN_PTS=[[43,28],[57,28],[64,42],[58,82],[42,82],[36,42]];
+const COFFIN_PTS=[[44,22],[56,22],[65,38],[57,86],[43,86],[35,38]];
+const COFFIN_INSET=[[45,27],[55,27],[63,40],[56,81],[44,81],[37,40]];
 function inCoffin(x,y,pad){
   // convex test against the hexagon expanded by `pad` units from its centroid
   const cx=50,cy=54;
@@ -477,7 +478,9 @@ function buildCoffinSVG(s){
   // white specks
   { let d=''; const n=8+rng.int(10); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
   // the coffin void outline (structure stays white; red is reserved for the verdict)
-  f+='<path d="'+pathD(jitterPts(COFFIN_PTS,rng,1))+'" fill="none" stroke="'+WHITE+'" stroke-width="6"/>';
+  f+='<path d="'+pathD(jitterPts(COFFIN_PTS,rng,1))+'" fill="none" stroke="'+WHITE+'" stroke-width="7"/>';
+  // inner lid outline: a built object, not a wire
+  f+='<path d="'+pathD(COFFIN_INSET)+'" fill="none" stroke="'+WHITE+'" stroke-width="2"/>';
   // nail ticks at the vertices
   for(const [vx,vy] of COFFIN_PTS) f+=rect(vx-1,vy-1,2,2,WHITE);
   // eyes: the archetype survives the grave
@@ -490,14 +493,6 @@ function buildCoffinSVG(s){
     if(i<s.sealsRemaining) f+=rect(x,y,3,3,ACID);
     else { f+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+(terminal?RED:PINK)+'" stroke-width="3"/>'+xmark(x+1,y+1,2,1,terminal?RED:PINK,rng); }
   }
-  // terminal: nailed shut — two clean red planks across the void
-  if(terminal){
-    f+=poly([[40,33],[44,32],[60,79],[56,80]],RED);
-    f+=poly([[56,32],[60,33],[44,80],[40,79]],RED);
-  }
-  // the line itself: flat red for terminal; white with one residual blip while seals remain
-  if(terminal) f+='<path d="M0 540h1000" fill="none" stroke="'+RED+'" stroke-width="5"/>';
-  else f+='<path d="M0 540h140l15 -70 15 140 15 -70h815" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
   // identity marks
   f+=sigilSVG(s.wardId,8,8,rng,ACID);
   f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
@@ -507,6 +502,15 @@ function buildCoffinSVG(s){
     for(let k=0;k<Math.max(1,s.deaths);k++) slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); }
   let defs='<g id="f">'+f+'</g>', body='<rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f"/>';
   let ci=0; for(const sl of slices){ ++ci; body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // the verdict is drawn after the scars — planks and vitals can never be shredded
+  if(terminal){
+    body+=poly([[40,33],[44,32],[60,79],[56,80]],RED);
+    body+=poly([[56,32],[60,33],[44,80],[40,79]],RED);
+    body+='<path d="M0 540h1000" fill="none" stroke="'+RED+'" stroke-width="5"/>';
+  } else {
+    body+='<path d="M0 540h1000" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
+    body+='<g transform="translate(520 0)"><path d="M-174 540h20l10 -18 10 18h25l12 -75 12 150 12 -75h25l14 -26 14 26h20" fill="none" stroke="'+WHITE+'" stroke-width="5"/><animateTransform attributeName="transform" type="translate" values="0 0;1174 0" dur="2.8s" repeatCount="indefinite"/></g>';
+  }
   body+=flickerSVG(s);
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+'</defs>'+body+'</svg>';
 }
