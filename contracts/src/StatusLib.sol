@@ -405,32 +405,39 @@ library StatusLib {
 
     function hunterOverlay(T.Gen memory g) internal pure returns (string memory) {
         Mask.Traits memory t = g.t;
-        int256 hx = t.cx;
-        int256 hy = t.cy - 4;
-        int256 rr = t.rw + 12;
-        return string(
+        Buf.B memory o = Buf.init(4096);
+        o.app(
             abi.encodePacked(
-                '<path d="M',
-                Num.itoa(hx * 10),
-                " ",
-                Num.itoa((hy - rr - 4) * 10),
-                "v40M",
-                Num.itoa(hx * 10),
-                " ",
-                Num.itoa((hy + rr) * 10),
-                "v40M",
-                Num.itoa((hx - rr - 4) * 10),
-                " ",
-                Num.itoa(hy * 10),
-                "h40M",
-                Num.itoa((hx + rr) * 10),
-                " ",
-                Num.itoa(hy * 10),
-                'h40" stroke="',
+                '<path d="M30 120V30H120M880 30H970V120M970 880V970H880M120 970H30V880" fill="none" stroke="',
                 T.WHITE,
-                '" stroke-width="4" fill="none"/>'
+                '" stroke-width="14"/>'
             )
         );
+        {
+            int256 cx = t.cx;
+            int256 cy = t.cy - 2;
+            int256 R = t.rh + 12;
+            o.app(GenesisLib.octRing(cx, cy, R, 10, T.WHITE));
+            o.app(
+                abi.encodePacked(
+                    '<path d="M0 ', Num.itoa(cy * 10), "H", Num.itoa((cx - R) * 10),
+                    "M", Num.itoa((cx + R) * 10), " ", Num.itoa(cy * 10), "H1000M",
+                    Num.itoa(cx * 10), " 0V", Num.itoa(Num.max(0, cy - R) * 10),
+                    "M", Num.itoa(cx * 10), " ", Num.itoa((cy + R) * 10),
+                    'V1000" stroke="', T.WHITE, '" stroke-width="6" fill="none"/>'
+                )
+            );
+            Geom.Pt[] memory p = new Geom.Pt[](3);
+            p[0] = Geom.Pt(cx - 5, cy - R + 3); p[1] = Geom.Pt(cx + 5, cy - R + 3); p[2] = Geom.Pt(cx, cy - R + 11);
+            o.app(Geom.poly(p, T.WHITE));
+            p[0] = Geom.Pt(cx - 5, cy + R - 3); p[1] = Geom.Pt(cx + 5, cy + R - 3); p[2] = Geom.Pt(cx, cy + R - 11);
+            o.app(Geom.poly(p, T.WHITE));
+            p[0] = Geom.Pt(cx - R + 3, cy - 5); p[1] = Geom.Pt(cx - R + 3, cy + 5); p[2] = Geom.Pt(cx - R + 11, cy);
+            o.app(Geom.poly(p, T.WHITE));
+            p[0] = Geom.Pt(cx + R - 3, cy - 5); p[1] = Geom.Pt(cx + R - 3, cy + 5); p[2] = Geom.Pt(cx + R - 11, cy);
+            o.app(Geom.poly(p, T.WHITE));
+        }
+        return o.fin();
     }
 
     function sealHud(RenderStateV1 memory s) internal pure returns (string memory) {
