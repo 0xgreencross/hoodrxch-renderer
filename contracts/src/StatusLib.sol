@@ -451,31 +451,24 @@ library StatusLib {
     }
 
     function sealHud(RenderStateV1 memory s) internal pure returns (string memory) {
+        // moved inboard (x64-75, y8) so the pips survive the circular PFP crop;
+        // broken seal = solid pink square split by a black diagonal crack
         Buf.B memory o = Buf.init(1200);
         for (uint256 i = 0; i < 3; i++) {
-            int256 x = 85 + int256(i) * 4;
-            int256 y = 5;
+            int256 x = 64 + int256(i) * 4;
+            int256 y = 8;
             if (i < s.sealsRemaining) {
                 o.app(Geom.rect(x, y, 3, 3, T.ACID));
             } else {
-                o.app(
-                    abi.encodePacked(
-                        '<path d="M',
-                        Num.itoa(x * 10),
-                        " ",
-                        Num.itoa(y * 10),
-                        'h30v30h-30z" fill="none" stroke="',
-                        T.PINK,
-                        '" stroke-width="3"/>',
-                        '<path d="M',
-                        Num.itoa(x * 10),
-                        " ",
-                        Num.itoa((y + 3) * 10),
-                        'l30 -30" stroke="',
-                        T.PINK,
-                        '" stroke-width="3" fill="none"/>'
-                    )
-                );
+                Geom.Pt[] memory p = new Geom.Pt[](3);
+                p[0] = Geom.Pt(x, y);
+                p[1] = Geom.Pt(x + 3, y);
+                p[2] = Geom.Pt(x, y + 3);
+                o.app(Geom.poly(p, T.PINK));
+                p[0] = Geom.Pt(x + 3, y + 1);
+                p[1] = Geom.Pt(x + 3, y + 3);
+                p[2] = Geom.Pt(x + 1, y + 3);
+                o.app(Geom.poly(p, T.PINK));
             }
         }
         return o.fin();
