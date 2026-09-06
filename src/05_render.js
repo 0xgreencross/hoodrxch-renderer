@@ -369,9 +369,9 @@ function buildGenesis(sState){
       case 15: f+=rect(t.cx-mw+1,my-1,mw+3,2,ACID)+rect(t.cx-mw+4,my+2,mw+3,2,PINK)+rect(t.cx-mw-1,my+5,mw+3,2,WHITE); break; // GLITCH MOUTH
     }
   }
-  // ward sigil above the crown; block mark at the hem
-  f+=sigilSVG(s.wardId,8,8,rng,ACID);
-  f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
+  // ward sigil above the crown; block mark at the hem — pulled inboard so both survive the circular PFP crop
+  f+=sigilSVG(s.wardId,20,20,rng,ACID);
+  f+=blockMarkSVG(s.blockId,80,80,rng,ACID);
   // mosh: slice shifts
   // --- KILL-TIER HALO: a corona over the crest, one signature per tier ---
   // T1 single arc · T2 double · T3 triple broken · T4 arc + ticks · T5 corona rays · T6 full ring
@@ -493,9 +493,9 @@ function buildCoffinSVG(s){
     if(i<s.sealsRemaining) f+=rect(x,y,3,3,ACID);
     else { f+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+(terminal?RED:PINK)+'" stroke-width="3"/>'+xmark(x+1,y+1,2,1,terminal?RED:PINK,rng); }
   }
-  // identity marks
-  f+=sigilSVG(s.wardId,8,8,rng,ACID);
-  f+=blockMarkSVG(s.blockId,90,93,rng,ACID);
+  // identity marks — same inboard coords as the live render (circular-crop safe)
+  f+=sigilSVG(s.wardId,20,20,rng,ACID);
+  f+=blockMarkSVG(s.blockId,80,80,rng,ACID);
   // death scars displace the stillness too
   const slices=[];
   { const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,s.deaths||1));
@@ -614,9 +614,10 @@ function seasonChips(s,used){
   return o;
 }
 // territory achievements: acid tick ladder up the right edge (cap 12)
+// pulled inboard to x90, base y69 so all 12 ticks survive the circular PFP crop
 function territoryHud(s){
   let o=''; const n=Math.min(12,s.territoryAchievementCount);
-  for(let i=0;i<n;i++) o+=rect(95,84-i*3,3,2,ACID);
+  for(let i=0;i<n;i++) o+=rect(90,69-i*3,3,2,ACID);
   return o;
 }
 // STATS display mode: a data band across the hem
