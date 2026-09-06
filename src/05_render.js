@@ -607,9 +607,10 @@ function sealHud(s,rng){
 // latest season badges: SLOT B (top 10, white) + SLOT C (top 5, pink)
 function seasonChips(s,used){
   let o=''; if(!(s.latestSeasonBadgeFlags&1)) return o;
-  o+=text('S'+s.latestAwardSeasonId,62,632,4,ACID,used);
-  o+='<rect x="60" y="672" width="104" height="60" fill="none" stroke="'+WHITE+'" stroke-width="4"/>'+text('10',76,682,6,WHITE,used);
-  if(s.latestSeasonBadgeFlags&2) o+='<rect x="60" y="744" width="104" height="60" fill="none" stroke="'+PINK+'" stroke-width="4"/>'+text('5',94,754,6,PINK,used);
+  // nudged inboard (+40px x, -40px y) so the top-5 chip survives the circular PFP crop
+  o+=text('S'+s.latestAwardSeasonId,102,592,4,ACID,used);
+  o+='<rect x="100" y="632" width="104" height="60" fill="none" stroke="'+WHITE+'" stroke-width="4"/>'+text('10',116,642,6,WHITE,used);
+  if(s.latestSeasonBadgeFlags&2) o+='<rect x="100" y="704" width="104" height="60" fill="none" stroke="'+PINK+'" stroke-width="4"/>'+text('5',134,714,6,PINK,used);
   return o;
 }
 // territory achievements: acid tick ladder up the right edge (cap 12)
