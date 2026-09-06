@@ -153,8 +153,8 @@ library StatusLib {
                 f.app(Geom.xmark(x + 1, y + 1, 2, 1, pc, rng));
             }
         }
-        f.app(Mask.sigilSVG(s.wardId, 8, 8, T.ACID));
-        f.app(Mask.blockMarkSVG(s.blockId, 90, 93, rng, T.ACID));
+        f.app(Mask.sigilSVG(s.wardId, 20, 20, T.ACID));
+        f.app(Mask.blockMarkSVG(s.blockId, 80, 80, rng, T.ACID));
         // death slices
         Buf.B memory body = Buf.init(28000);
         body.app(abi.encodePacked('<rect width="1000" height="1000" fill="', T.BLACK, '"/><use href="#f"/>'));
@@ -500,7 +500,7 @@ library StatusLib {
         Buf.B memory o = Buf.init(1200);
         uint256 n = s.territoryAchievementCount < 12 ? s.territoryAchievementCount : 12;
         for (uint256 i = 0; i < n; i++) {
-            o.app(Geom.rect(95, 84 - int256(i) * 3, 3, 2, T.ACID));
+            o.app(Geom.rect(90, 69 - int256(i) * 3, 3, 2, T.ACID));
         }
         return o.fin();
     }

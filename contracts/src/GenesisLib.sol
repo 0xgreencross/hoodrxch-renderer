@@ -871,8 +871,8 @@ library GenesisLib {
             }
         }
         mouthMarks(c, f);
-        f.app(Mask.sigilSVG(s.wardId, 8, 8, T.ACID));
-        f.app(Mask.blockMarkSVG(s.blockId, 90, 93, c.rng, T.ACID));
+        f.app(Mask.sigilSVG(s.wardId, 20, 20, T.ACID));
+        f.app(Mask.blockMarkSVG(s.blockId, 80, 80, c.rng, T.ACID));
         if (c.tier > 0) haloInto(f, c);
     }
 
