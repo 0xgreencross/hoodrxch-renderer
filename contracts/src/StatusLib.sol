@@ -477,20 +477,21 @@ library StatusLib {
     function seasonChips(RenderStateV1 memory s, Glyphs.Used memory used) internal pure returns (string memory) {
         if (s.latestSeasonBadgeFlags & 1 == 0) return "";
         Buf.B memory o = Buf.init(3000);
-        o.app(Glyphs.text(string(abi.encodePacked("S", Num.utoa(s.latestAwardSeasonId))), 62, 632, 4, T.ACID, used));
+        // nudged inboard (+40px x, -40px y) so the top-5 chip survives the circular PFP crop
+        o.app(Glyphs.text(string(abi.encodePacked("S", Num.utoa(s.latestAwardSeasonId))), 102, 592, 4, T.ACID, used));
         o.app(
             abi.encodePacked(
-                '<rect x="60" y="672" width="104" height="60" fill="none" stroke="', T.WHITE, '" stroke-width="4"/>'
+                '<rect x="100" y="632" width="104" height="60" fill="none" stroke="', T.WHITE, '" stroke-width="4"/>'
             )
         );
-        o.app(Glyphs.text("10", 76, 682, 6, T.WHITE, used));
+        o.app(Glyphs.text("10", 116, 642, 6, T.WHITE, used));
         if (s.latestSeasonBadgeFlags & 2 != 0) {
             o.app(
                 abi.encodePacked(
-                    '<rect x="60" y="744" width="104" height="60" fill="none" stroke="', T.PINK, '" stroke-width="4"/>'
+                    '<rect x="100" y="704" width="104" height="60" fill="none" stroke="', T.PINK, '" stroke-width="4"/>'
                 )
             );
-            o.app(Glyphs.text("5", 94, 754, 6, T.PINK, used));
+            o.app(Glyphs.text("5", 134, 714, 6, T.PINK, used));
         }
         return o.fin();
     }
