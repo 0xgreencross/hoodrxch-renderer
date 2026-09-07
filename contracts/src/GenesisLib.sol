@@ -607,18 +607,19 @@ library GenesisLib {
         }
         cv.crestN = crestN;
         cv.invert = invert;
-        if (c.t.lineW <= 6) {
-            // === THE CONVEYOR: the signal flows upward through a stationary
-            // hood envelope (see JS reference for the full architecture notes)
+        // === THE CONVEYOR: every LINES style flows. BARCODE breathes its
+        // widths through a standing slot pattern; NO SIGNAL runs a slow sky
+        // band plus a fast signal band clipped to the hood silhouette.
+        if (c.t.lineW == 8) {
+            noSignalField(c, f, pre, cv);
+        } else {
             cv.stepD = c.t.lineW == 3 ? int256(10) : c.t.lineW == 4 ? int256(40) : int256(20);
             cv.cycD = c.t.lineW == 6 ? cv.stepD * 2 : cv.stepD;
             cv.NKC = uint256(cv.cycD / 2);
             cv.durS = cv.cycD == 10 ? "0.75s" : cv.cycD == 40 ? "3s" : "1.5s";
+            cv.colours = true;
+            cv.bcW = c.t.lineW == 7;
             conveyorField(c, f, pre, cv);
-        } else {
-            legacyEchoes(c, f, figIdx, cv);
-            // the signal field, grouped by (colour role, stroke width)
-            fieldGroups(c, f, figIdx, crestN, invert);
         }
         // FLATLINE SCAR
         if (c.flatLi >= 0) {
@@ -673,6 +674,9 @@ library GenesisLib {
         uint256 crestN;
         bool invert;
         uint256 nRows;
+        int256 y0Start;     // first grid row (NO SIGNAL sky band starts at -20)
+        bool colours;       // apply the kill-tier/pink ladder (sky band: no)
+        bool bcW;           // BARCODE: widths breathe through the standing slot pattern
     }
 
     /// standing disturbances: spikes/pulse swell as a line passes their anchor
@@ -728,8 +732,8 @@ library GenesisLib {
         for (uint256 j = 0; j < cv.NKC; j++) {
             uint256 rank = 0;
             for (uint256 ri = 0; ri < cv.nRows; ri++) {
-                int256 y0d = int256(ri) * cv.stepD;
-                bool fig = y0d >= 40 && y0d <= 960 && mh[ri * (cv.NKC + 1) + j] > 800;
+                int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
+                bool fig = cv.colours && y0d >= 40 && y0d <= 960 && mh[ri * (cv.NKC + 1) + j] > 800;
                 uint8 col = 0;
                 if (fig) {
                     if (cv.invert) col = 1;
@@ -753,17 +757,17 @@ library GenesisLib {
         Buf.B memory e = Buf.init(26000);
         Buf.B memory e2 = Buf.init(12000);
         for (uint256 i = 0; i < cv.nE; i++) {
-            uint256 ri = uint256(c.lines[cv.ePicks[i]].y * 10 / cv.stepD);
+            uint256 ri = uint256((c.lines[cv.ePicks[i]].y * 10 - cv.y0Start) / cv.stepD);
             e.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
         }
         for (uint256 i = 0; i < cv.nE2; i++) {
-            uint256 ri = uint256(c.lines[cv.e2Picks[i]].y * 10 / cv.stepD);
+            uint256 ri = uint256((c.lines[cv.e2Picks[i]].y * 10 - cv.y0Start) / cv.stepD);
             e2.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
         }
         if (c.tier >= 6) {
             uint256 n = 0;
             for (uint256 ri = 0; ri < cv.nRows && n < 8; ri++) {
-                int256 y0d = int256(ri) * cv.stepD;
+                int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
                 if (y0d >= 40 && y0d <= 960 && mh[ri * (cv.NKC + 1)] > 800) {
                     e.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
                     n++;
@@ -798,15 +802,25 @@ library GenesisLib {
         if (lw == 4) return 5;
         if (lw == 5) return 4;
         if (lw == 6) return ((y0d / 20) % 2) != 0 ? int256(6) : int256(2);
+        if (lw == 7) return bcSlotW(c, y0d);
+        if (lw == 8) return 3;
         return lw == 0 ? int256(3) : lw == 1 ? int256(4) : int256(6);
+    }
+
+    /// BARCODE standing slot widths: blessed draws at the blessed slots,
+    /// hash picks for the feeder slots
+    function bcSlotW(Ctx memory c, int256 y0d) internal pure returns (int256) {
+        if (y0d >= 40 && y0d <= 960 && (y0d - 40) % 20 == 0) return c.lines[uint256((y0d - 40) / 20)].w;
+        uint256 hsh = uint256(Mask.fhash(uint32(uint256(y0d + 1000)), 11)) % 3;
+        return hsh == 0 ? int256(2) : hsh == 1 ? int256(4) : int256(7);
     }
 
     function strokeOfCol(uint8 col) internal pure returns (string memory) {
         return col == 0 ? T.ACID : col == 1 ? T.PINK : T.WHITE;
     }
 
-    function widthOfCol(Ctx memory c, uint8 col, int256 w) internal pure returns (int256) {
-        return (col == 0 && c.tier >= 5) ? Num.max(2, w - 1) : w;
+    function widthOfCol(Ctx memory c, Conv memory cv, uint8 col, int256 w) internal pure returns (int256) {
+        return (col == 0 && c.tier >= 5 && !cv.bcW) ? Num.max(2, w - 1) : w;
     }
 
     function convDash(Ctx memory c, int256 y0d) internal pure returns (bytes memory) {
@@ -833,7 +847,7 @@ library GenesisLib {
         internal
         pure
     {
-        int256 y0d = int256(ri) * cv.stepD;
+        int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
         int256 w = rowWOf(c, y0d);
         uint8 c0 = colK[ri * cv.NKC];
         bool varies = false;
@@ -842,7 +856,7 @@ library GenesisLib {
         }
         f.app(
             abi.encodePacked(
-                '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, c0, w)), '"',
+                '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, cv, c0, w)), '"',
                 convDash(c, y0d), ' d="', ds[ri * (cv.NKC + 1)], '">'
             )
         );
@@ -852,6 +866,18 @@ library GenesisLib {
             f.app(ds[ri * (cv.NKC + 1) + j]);
         }
         f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite"/>'));
+        if (cv.bcW) {
+            // BARCODE breathes: linear width morph toward the slot above (wrap-exact)
+            int256 w2b = bcSlotW(c, y0d - cv.cycD);
+            if (w2b != w) {
+                f.app(
+                    abi.encodePacked(
+                        '<animate attributeName="stroke-width" values="', Num.itoa(w), ";", Num.itoa(w2b),
+                        '" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite"/>'
+                    )
+                );
+            }
+        }
         if (varies) {
             f.app(bytes('<animate attributeName="stroke" values="'));
             for (uint256 j = 0; j < cv.NKC; j++) {
@@ -859,17 +885,19 @@ library GenesisLib {
                 f.app(strokeOfCol(colK[ri * cv.NKC + j]));
             }
             f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
-            bool wv = false;
-            for (uint256 j = 1; j < cv.NKC; j++) {
-                if (widthOfCol(c, colK[ri * cv.NKC + j], w) != widthOfCol(c, c0, w)) wv = true;
-            }
-            if (wv) {
-                f.app(bytes('<animate attributeName="stroke-width" values="'));
-                for (uint256 j = 0; j < cv.NKC; j++) {
-                    if (j > 0) f.app(bytes(";"));
-                    f.app(Num.itoa(widthOfCol(c, colK[ri * cv.NKC + j], w)));
+            if (!cv.bcW) {
+                bool wv = false;
+                for (uint256 j = 1; j < cv.NKC; j++) {
+                    if (widthOfCol(c, cv, colK[ri * cv.NKC + j], w) != widthOfCol(c, cv, c0, w)) wv = true;
                 }
-                f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+                if (wv) {
+                    f.app(bytes('<animate attributeName="stroke-width" values="'));
+                    for (uint256 j = 0; j < cv.NKC; j++) {
+                        if (j > 0) f.app(bytes(";"));
+                        f.app(Num.itoa(widthOfCol(c, cv, colK[ri * cv.NKC + j], w)));
+                    }
+                    f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+                }
             }
         }
         f.app(bytes("</path>"));
@@ -941,17 +969,26 @@ library GenesisLib {
         }
     }
 
-    function conveyorField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
-        cv.nRows = uint256((1000 + cv.cycD) / cv.stepD) + 1;
-        int256[] memory mh = new int256[](cv.nRows * (cv.NKC + 1));
-        string[] memory ds = new string[](cv.nRows * (cv.NKC + 1));
+    function bandData(Ctx memory c, Pre memory pre, Conv memory cv)
+        internal
+        pure
+        returns (string[] memory ds, int256[] memory mh)
+    {
+        mh = new int256[](cv.nRows * (cv.NKC + 1));
+        ds = new string[](cv.nRows * (cv.NKC + 1));
         for (uint256 ri = 0; ri < cv.nRows; ri++) {
             for (uint256 j = 0; j <= cv.NKC; j++) {
-                (string memory d, int256 m) = convRowKey(c, pre, cv.stepD, int256(ri) * cv.stepD, int256(j) * 2);
+                (string memory d, int256 m) =
+                    convRowKey(c, pre, cv.stepD, cv.y0Start + int256(ri) * cv.stepD, int256(j) * 2);
                 ds[ri * (cv.NKC + 1) + j] = d;
                 mh[ri * (cv.NKC + 1) + j] = m;
             }
         }
+    }
+
+    function conveyorField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
+        cv.nRows = uint256((1000 + cv.cycD) / cv.stepD) + 1;
+        (string[] memory ds, int256[] memory mh) = bandData(c, pre, cv);
         uint8[] memory colK = new uint8[](cv.nRows * cv.NKC);
         convColors(c, cv, mh, colK);
         convEchoes(c, f, cv, ds, mh);
@@ -960,6 +997,123 @@ library GenesisLib {
             convEmitRow(c, f, cv, ds, colK, ri);
         }
         f.app(bytes("</g>"));
+        convHoles(c, f, pre);
+        convCovers(c, f, pre);
+    }
+
+    /// NO SIGNAL: the wraith is the only thing carrying signal — a sparse sky
+    /// band drifts at 1/3 speed while the figure band flows inside a
+    /// stationary clip of the hood silhouette
+    function noSignalField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
+        Conv memory sky;
+        sky.stepD = 60;
+        sky.cycD = 60;
+        sky.NKC = 30;
+        sky.durS = "4.5s";
+        sky.y0Start = -20;
+        sky.nRows = 19;
+        (string[] memory dsS, int256[] memory mhS) = bandData(c, pre, sky);
+        Conv memory fg;
+        fg.stepD = 20;
+        fg.cycD = 20;
+        fg.NKC = 10;
+        fg.durS = "1.5s";
+        fg.nRows = 52;
+        fg.colours = true;
+        fg.crestN = cv.crestN;
+        fg.invert = cv.invert;
+        (string[] memory dsF, int256[] memory mhF) = bandData(c, pre, fg);
+        // echo ghosts: sky slots route to the sky band, figure slots to the fig band
+        {
+            Buf.B memory e = Buf.init(26000);
+            Buf.B memory e2 = Buf.init(12000);
+            for (uint256 i = 0; i < cv.nE; i++) {
+                uint256 li = cv.ePicks[i];
+                if (li < 16) e.app(abi.encodePacked('<path d="', dsS[(li + 1) * 31], '"/>'));
+                else e.app(abi.encodePacked('<path d="', dsF[(li - 14) * 11], '"/>'));
+            }
+            for (uint256 i = 0; i < cv.nE2; i++) {
+                uint256 li = cv.e2Picks[i];
+                if (li < 16) e2.app(abi.encodePacked('<path d="', dsS[(li + 1) * 31], '"/>'));
+                else e2.app(abi.encodePacked('<path d="', dsF[(li - 14) * 11], '"/>'));
+            }
+            if (c.tier >= 6) {
+                uint256 n = 0;
+                for (uint256 ri = 0; ri < fg.nRows && n < 8; ri++) {
+                    int256 y0d = int256(ri) * 20;
+                    if (y0d >= 40 && y0d <= 960 && mhF[ri * 11] > 800) {
+                        e.app(abi.encodePacked('<path d="', dsF[ri * 11], '"/>'));
+                        n++;
+                    }
+                }
+            }
+            if (e.len > 0) {
+                f.app(
+                    abi.encodePacked(
+                        '<g fill="none" stroke="', T.PINK, '" stroke-width="', Num.itoa(swOf(c)),
+                        '" transform="translate(', Num.itoa(cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                    )
+                );
+                f.app(e.fin());
+                f.app(bytes("</g>"));
+            }
+            if (e2.len > 0) {
+                f.app(
+                    abi.encodePacked(
+                        '<g fill="none" stroke="', T.WHITE, '" stroke-width="', Num.itoa(swOf(c)),
+                        '" transform="translate(', Num.itoa(-cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                    )
+                );
+                f.app(e2.fin());
+                f.app(bytes("</g>"));
+            }
+        }
+        // sky band (all acid)
+        {
+            uint8[] memory colS = new uint8[](sky.nRows * sky.NKC);
+            f.app(bytes('<g fill="none">'));
+            for (uint256 ri = 0; ri < sky.nRows; ri++) {
+                convEmitRow(c, f, sky, dsS, colS, ri);
+            }
+            f.app(bytes("</g>"));
+        }
+        // stationary hood clip from the envelope (h > 300 in sampling space)
+        f.app(bytes('<clipPath id="nsg">'));
+        for (int256 xi = 0; xi <= 33; xi++) {
+            int256 x = xi * 3;
+            int256 runA = -1;
+            for (int256 yd = 0; yd <= 1022; yd += 2) {
+                bool gI = yd <= 1020 && Mask.heightAtD(c.t, c.noise, x, yd) > 300;
+                if (gI && runA < 0) runA = yd;
+                else if (!gI && runA >= 0) {
+                    int256 sMin = 100000;
+                    int256 sMax = -100000;
+                    for (int256 q = runA; q < yd; q += 2) {
+                        int256 sy = q - Num.jsRound(Mask.heightAtD(c.t, c.noise, x, q), 10);
+                        if (sy < sMin) sMin = sy;
+                        if (sy > sMax) sMax = sy;
+                    }
+                    f.app(
+                        abi.encodePacked(
+                            '<rect x="', Num.itoa(xi * 30 - 15), '" y="', Num.itoa(sMin - 4),
+                            '" width="30" height="', Num.itoa(sMax - sMin + 8), '"/>'
+                        )
+                    );
+                    runA = -1;
+                }
+            }
+        }
+        f.app(bytes("</clipPath>"));
+        // figure band, clipped
+        {
+            uint8[] memory colF = new uint8[](fg.nRows * fg.NKC);
+            convColors(c, fg, mhF, colF);
+            f.app(bytes('<g fill="none" clip-path="url(#nsg)">'));
+            for (uint256 ri = 0; ri < fg.nRows; ri++) {
+                convEmitRow(c, f, fg, dsF, colF, ri);
+            }
+            f.app(bytes("</g>"));
+        }
         convHoles(c, f, pre);
         convCovers(c, f, pre);
     }
