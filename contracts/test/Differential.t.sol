@@ -38,9 +38,9 @@ contract Differential is Test {
     function test_FX_001() public view {
         RenderStateV1 memory s = state_FX_001();
         assertEq(r.stateHash(s), bytes32(0x141ec7fdb59cdc558c1da9978131e0165a618e8bf668217d2a625497e6802ff8), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x7e88c29db195e5609640543d5d71a7efe9cd3c266a6312129a54958394a7d2be), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x6cd8a411a86cdb4ba559a9a3855c987d2aed2eaf23d5fe5000598b5d317ffad4), "metadata");
-        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0xbb306bd61ac87fc00be425b976f63196b5768fd67c4707397c9eb027582e6d75), "banner");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x862249cccb8eb8f57f61ca9e3ac7c06cc2f59537a52af458417fe2511ab99541), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xdfd8fb41b802830ff345738c77f4d9bf4fdd8a9545981509512dd545ec6dbf74), "metadata");
+        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x813987550484da729b908ac3d6e3c653a77d6cf68ec216a15fc211384427cea6), "banner");
     }
 
     function state_FX_002() internal pure returns (RenderStateV1 memory s) {
@@ -51,8 +51,8 @@ contract Differential is Test {
     function test_FX_002() public view {
         RenderStateV1 memory s = state_FX_002();
         assertEq(r.stateHash(s), bytes32(0xb292e2acb1c235033c0152a5614682ee58bea796891bc23562b2add67cc7cdf2), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x8bf2073b9a63577be29ddd118a83152209e98a92b02034926659fdfd70266882), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x675e89488f653ac4dd9d56055c62ea2ff8cf2f22e1e1c69d13ee95ba687f3d5e), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x95b5b922facd1cbc5ef55ca0578eea7aff295bb04c0aabd20d8fee87a337da28), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x68343d4c1754763beedf601c97daf11c770473d3730292d585ec05502fbf78e1), "metadata");
     }
 
     function state_FX_003() internal pure returns (RenderStateV1 memory s) {
@@ -63,8 +63,8 @@ contract Differential is Test {
     function test_FX_003() public view {
         RenderStateV1 memory s = state_FX_003();
         assertEq(r.stateHash(s), bytes32(0xfdc780ec885625315215544ae80820e7097536a1d9cc2f9e33a2cf2c43e2c629), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xf81418330d0f2036b4b15f903eb889dba10278625808800ca24198c4ce69d4ba), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xe4b6d76dd733caf24d0bc01d3b895fb95e8fc212d0ed2883a2c7970664d6f83b), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xafbe530309fbaa81acd18565783015bcf53c7cde12ed30e46fce177ca76a7ba8), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x4acfb9b77c3b405b04bd948ff1758922c36b0d6771891e7ac5fd6b1c8fdf63f3), "metadata");
     }
 
     function state_FX_004() internal pure returns (RenderStateV1 memory s) {
@@ -75,8 +75,8 @@ contract Differential is Test {
     function test_FX_004() public view {
         RenderStateV1 memory s = state_FX_004();
         assertEq(r.stateHash(s), bytes32(0x6e1db89f3353d389cdb6d85e7d79f293253ff5c5c757525421826bc6653c59b2), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xe49c8bab413a59be3e1ccbf3752b1e88bbd81eb992b9470e02e836019fff98c6), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x9443464e96c9b990076bbc7ab18fc0c3f2fba283f0e3d2c09b1ed2f6483e6715), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x07b1547ea6f13dc5cff248e95f9bbb5ec3cd1a0c103871a3c03401215d46fd2c), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x95fb09ac0d3f035dcbd65125ab61dd21d434c8e1bdb1eb2cde375ce410046f3e), "metadata");
     }
 
     function state_FX_005() internal pure returns (RenderStateV1 memory s) {
@@ -87,8 +87,8 @@ contract Differential is Test {
     function test_FX_005() public view {
         RenderStateV1 memory s = state_FX_005();
         assertEq(r.stateHash(s), bytes32(0x453057e407858f1862ddce338e811a2632b3680360a0a574826957aad43a1b0b), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xaaae9f76cc76dc62ecf3806fcc7df9ca741564dd03f4b47fac5d882573bd3404), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x69ba335c2a63f75b4e96ac137ce00e97a8e7e9265508517affa21744a2e9b280), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x3d59883e3ee76ffb7002e69376a474f1903b8983cfe9fcbfff19b8ff86e22547), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x95ac7848795c53c4e77ceb7d9b2bb101be8a392f1ecbb634cb48facd79a71376), "metadata");
     }
 
     function state_FX_006() internal pure returns (RenderStateV1 memory s) {
@@ -99,8 +99,8 @@ contract Differential is Test {
     function test_FX_006() public view {
         RenderStateV1 memory s = state_FX_006();
         assertEq(r.stateHash(s), bytes32(0x656beb81a78eb2575a50a06776953a4259678712e0c7f0258a7e09c07a1260e9), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x46956a8be6b17e739474c472482e9bb1caaf527aff468d11d792851f80552e3c), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x3e6431fad476949f7e503c1692f1ecef4d0d5e1d8d2aab6cf0e6ae0552ee773f), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xcb03fcb085b78b503346f6b27d02a62bbfad39a77157f05c81c842236e67c578), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xbc4091e0279e20ce16bfbcdda0fad2b3e6dadda04164ebc075a05a0e0385f137), "metadata");
     }
 
     function state_FX_007() internal pure returns (RenderStateV1 memory s) {
@@ -111,9 +111,9 @@ contract Differential is Test {
     function test_FX_007() public view {
         RenderStateV1 memory s = state_FX_007();
         assertEq(r.stateHash(s), bytes32(0x9cb84a9ebe63057473412f190a745bdab1e887e7d0bdd0e9f6f2a9510ac9437b), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xc51c303cd0730a0296333cc39032c0a400ab085c3215c6c224f5804a7fc99bad), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xfb41055ed20ea31828c2a1bc8cb364fc4ed52f1d1fee76874c9ba9d9a1fad4c6), "metadata");
-        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x5af508e9a8518afb0b0617d2aa432b83512a1bc810ebf4b2b4a04754688362af), "banner");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xb8c6e5404d9084b914e6601c12e7ea0d5a6f7207215917ca8eaaca82d8ba4c6a), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xd1b6fd8643ed3b9bbaa511edbc83088cfd503a3a24814389948517b30adaae6a), "metadata");
+        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x6450b1e5f12666672a37024fbf351a4b951ca7b54e62a6af457b10be3bc20b3c), "banner");
     }
 
     function state_FX_008() internal pure returns (RenderStateV1 memory s) {
@@ -124,8 +124,8 @@ contract Differential is Test {
     function test_FX_008() public view {
         RenderStateV1 memory s = state_FX_008();
         assertEq(r.stateHash(s), bytes32(0x65f7c49ac4c585b6ed4e9c3e394f0aafcef4921f0d61133b50c2999bb73eac11), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x8f02a6725ef490ac0313d5cc2cff946c3afd239c09804685ba803ef5c881c81d), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xd519e613b769123a85daaa1df4f2b80b1ca4644d5784792bcf6d6a652575085e), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xc527516fb206e69d2d3b5b80c876ded73ecc0b0e08966576bb8112b975a6fcef), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x8d7ce48e68702290fc1c96955247e5c64ce0cf0233a33b9ae1a2dafa7a9ebd97), "metadata");
     }
 
     function state_FX_009() internal pure returns (RenderStateV1 memory s) {
@@ -139,9 +139,9 @@ contract Differential is Test {
     function test_FX_009() public view {
         RenderStateV1 memory s = state_FX_009();
         assertEq(r.stateHash(s), bytes32(0x28c76e634f013fac2ce1a51f08e73c8ccea2113256400575512af12117be37a6), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x98f982c378a2c0305e79915e8a1be735fea4a903f01d522966a52a77569238ec), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xa3a55c0d1d5c793d8dd4ebd8bd15951cf02e980fe441990f8d532fa5a502d8af), "metadata");
-        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x2801c9b171b98896ac7c976210cedc55f31f00334c708c0c1927cccb045a095c), "banner");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xbd875d49377fd5c87d87f27fafba5b6a2197e03e4f6dd3451014bbacfaf1549f), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xefd9e69b6541c01ab5915f19c9f9394e9a0eaa271e0976a84eb7d34b381a6b75), "metadata");
+        assertEq(keccak256(bytes(r.renderBanner(s))), bytes32(0x427f44ea921e33d2d170d2db08b1d40f1ed7de2480be0749af8ee4e887d54e4f), "banner");
     }
 
     function state_FX_010() internal pure returns (RenderStateV1 memory s) {
@@ -156,8 +156,8 @@ contract Differential is Test {
     function test_FX_010() public view {
         RenderStateV1 memory s = state_FX_010();
         assertEq(r.stateHash(s), bytes32(0x2f0b6ba156c0795c504fc47686ac3c52c251bc6f67a7a90fff44ecb6d7ec8b91), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x9ecebbeae0beae36a488ca4c338f2dddedfc9ce9e022cdd7c5f25f35604a59b2), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x6b6731201816bcea565d168aba3d0489006a8eee297e20f35160bbe303fab9ea), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x3602ebbc9bd9c2727f8541dc4505a6f9a8d6ad1a8b8be4fec05ec4ec3bcaccac), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x381742c527e3fa48a9d135bb8293174ee0a666a30f9fddbb5cf2fda3211adbea), "metadata");
     }
 
     function state_FX_011() internal pure returns (RenderStateV1 memory s) {
@@ -169,8 +169,8 @@ contract Differential is Test {
     function test_FX_011() public view {
         RenderStateV1 memory s = state_FX_011();
         assertEq(r.stateHash(s), bytes32(0xfeb121efc58df655e451d085f80bef3691984301f0defac9b74074fd0b0ac0de), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xcb9f8124f33d6ef74dd280cea06ba90a6aab0f4817a4c602e11eb3c3cd743ec8), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x1cdcf71127646a43d0d87ffd0f8023d9840db20d006854e84046eb09fa3e4a41), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x3760b328824fbad1661ed3601bdb7dc977795c0f6f1eda02440c5409ed49f28b), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x2cd5746ca42d4a423c32e3ba4a5ab983790e3af2b7c865742e820c4b7015e991), "metadata");
     }
 
     function state_FX_012() internal pure returns (RenderStateV1 memory s) {
@@ -182,8 +182,8 @@ contract Differential is Test {
     function test_FX_012() public view {
         RenderStateV1 memory s = state_FX_012();
         assertEq(r.stateHash(s), bytes32(0xdd6f5502106697553337bff7c998e9003d13fbf6279d9a2562d55c693b8e4c29), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x0943a8e9c97fbad1d124c5754aa36c09f25275e44461709a525c8c188f79ef29), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x5d46a0330d59d0000e2c50d8ffb88bff596778f39a483d4bab6a7fe9ade70d74), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x27a331cba65eadf87b6e95ed43c9684cebb72e8fb6d55fcb6e4cecb821170929), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x4e1cd7fe2f1c322f097a038062081777c67dbdd14c9e090a9d40a32c1ec8934a), "metadata");
     }
 
     function state_FX_013() internal pure returns (RenderStateV1 memory s) {
@@ -195,8 +195,8 @@ contract Differential is Test {
     function test_FX_013() public view {
         RenderStateV1 memory s = state_FX_013();
         assertEq(r.stateHash(s), bytes32(0xf2a095f99e8465ee92e7e9ab1d74ec9393002cf63e8c3c8c8d2cbd9d69045e8e), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x441ef2cbcadfa95d8519edce07fef1f38385534bfb6a15fd012ab3d03b4797aa), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xf0f99fa739acb8b84423da0026a5248fe6631e3145d8de951019472a6a5a29c6), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x3db52dc8cbf1271a0510d647cade4c1bb3f858d0e8b4723b7bf2f523178f1484), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xc06c5dd75935f4a3afef7cceb610ec912f23343122e6f9617a1cfc4dec6572ec), "metadata");
     }
 
     function state_FX_014() internal pure returns (RenderStateV1 memory s) {
@@ -272,8 +272,8 @@ contract Differential is Test {
     function test_FX_018() public view {
         RenderStateV1 memory s = state_FX_018();
         assertEq(r.stateHash(s), bytes32(0x707ca14d83b3383e7fc25170767bf18f22f8b5eab62183efbdc99c6137512f56), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xd23f31629900f45ee81161b8682a3d9d227a62e984fe1900f133780b0e68190d), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xfdd4e7b6a5a2675ae408698ccd5f543d9159606c9bdb64cd34f67c4e08f19f9b), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xd94e1c424b32588793645bf70b872d72b740850697cde5a5250af79bb067fda3), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xf344e723193ba2e518c3b41d3b021b1a353437576e908cb75a97187bed916c88), "metadata");
     }
 
     function state_FX_019() internal pure returns (RenderStateV1 memory s) {
@@ -285,8 +285,8 @@ contract Differential is Test {
     function test_FX_019() public view {
         RenderStateV1 memory s = state_FX_019();
         assertEq(r.stateHash(s), bytes32(0xcc8a2ca987e5fb423f94008d4df780cda2f2920ca7bc4d4d465ab1870fd7991e), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x3eb1a5731cbb20f0584903369949dbc0a3a2240ae5df6bfe8aa63fbe0aa32f3f), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x1faa972b66f1e61aeb247f3543316e67c1dbef802b3e926f96809dc8ba337766), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x797134b0d96b6614d1e404c1cdb40212742a4874103be3ed2ed5b2208417a2d2), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xfbfa40cc108ee9f7060cd188781a52c7a80e144d7fd3c5687edf7a2300b40494), "metadata");
     }
 
     function state_FX_020() internal pure returns (RenderStateV1 memory s) {
@@ -297,8 +297,8 @@ contract Differential is Test {
     function test_FX_020() public view {
         RenderStateV1 memory s = state_FX_020();
         assertEq(r.stateHash(s), bytes32(0xdbf5d48ae1e57bf243f931ed65ea2a05cfe3f097b92fce7b5886c2f439107102), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x0d564d9851883c1e67c81fa68030972b5f0160f03a44bc12c1be263f3ecc2aaf), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x31f7ad446b3a29f3ecae132d926ed47529be2f7c9b5818775f414963c44c69e3), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x65e0ffb197c42b0b3c10bdd933b0622e35ccbf442aafa6942738c8a95c68ead9), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xbff15b0f43a78dba8f7a82758dabc8ced0795236ac284c420dd6eff3383746f1), "metadata");
     }
 
     function state_FX_021() internal pure returns (RenderStateV1 memory s) {
@@ -310,8 +310,8 @@ contract Differential is Test {
     function test_FX_021() public view {
         RenderStateV1 memory s = state_FX_021();
         assertEq(r.stateHash(s), bytes32(0xc1d41de71f7fed5f574f2780060055f104f591166b3bc2a16f0867243b4916c7), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x1168c5dad044b96f8c82c3be78ef0dc57e822cf41333d037246474912911c821), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x2f9b59f47fc5aa3d352e75a38b6ff8e38e6b8bfa3bdfe8cd65bb4b72a9d320c1), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x16b7ace8cbe22d3185fede41b319392a6b25846f65c29267aaddb14dfa96638f), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x5d18792e90252d224153ee2bca931290624b55f0199dd58bd64b2f87436ad26f), "metadata");
     }
 
     function state_FX_022() internal pure returns (RenderStateV1 memory s) {
@@ -324,8 +324,8 @@ contract Differential is Test {
     function test_FX_022() public view {
         RenderStateV1 memory s = state_FX_022();
         assertEq(r.stateHash(s), bytes32(0xe96413dccc5910a02a53f7b7880b93915be44fc2cc1713b2a13bc6aeb3feb042), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xedecf18a394a464fdb62ac1f1ebf053e288b494b908219b5b1dfe76b9a703845), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x54dadfa6ee973306d31cb0d2b93c7c0fa30cb80bd6187c3f0ec05c8d1a629b34), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x2af79bee6166e1da0b27475dba453219826f92a3f3cf137ed46154351aaf8be3), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x9d8a5bf330b4ff9b5ddb8e31261668755946c168b9be6a7d4e58291999bb4698), "metadata");
     }
 
     function state_FX_023() internal pure returns (RenderStateV1 memory s) {
@@ -338,8 +338,8 @@ contract Differential is Test {
     function test_FX_023() public view {
         RenderStateV1 memory s = state_FX_023();
         assertEq(r.stateHash(s), bytes32(0xf890f9e762779b9b9d1dc9f2d149bee6cc90ab96993a3d31d29b9aeea39ac7ba), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xb6fff5a3478b7fa9f18a8465039c9da31303573653527d54587310e1ea27f28c), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xdb64c7d066e09ad5d71e0fb33fd9a49d001554700930a4e8b85b4074a404bf22), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x0f11f72a120e316b915b41b3ccffee55375cc4dd26b96e9a671a35a0e492e752), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x74383d4af2ed93dedc2ab054583c85d270e8c988dfb62f177639591475d68dcd), "metadata");
     }
 
     function state_FX_024() internal pure returns (RenderStateV1 memory s) {
@@ -351,8 +351,8 @@ contract Differential is Test {
     function test_FX_024() public view {
         RenderStateV1 memory s = state_FX_024();
         assertEq(r.stateHash(s), bytes32(0x47ee6f3bbc4e64645de6628803f31576a48b4ad907d6e6b374c0b7773ab65901), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xf8ec20a5851047c0e323a49f2b109f0ea343e707340a2eb3217218eeb70a2f38), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x706caa0d0b9585fa4e15d629bbc2b7726b7be337c598a0bbf0831ad708ccd947), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x719fbc68fdffd53a55c66403171a66115d07012cf04e1bf046f97eb64fbc600e), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x53de2050664a00a39b7f927faa50e6be6601e19e87ade584f6d84f82f3dc19c1), "metadata");
     }
 
     function state_FX_025() internal pure returns (RenderStateV1 memory s) {
@@ -367,8 +367,8 @@ contract Differential is Test {
     function test_FX_025() public view {
         RenderStateV1 memory s = state_FX_025();
         assertEq(r.stateHash(s), bytes32(0x23cd012c6fcea9b9cc4159fbadfaf5115ce5276a536618b8d084e88dfeb1f69b), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x4b17a8181a77b532f447c702a377f5dcb60be750e2363e283bcd18be9d0916e9), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xd9f02683d6c0309f1a09ab73050c82ab20caf6706bfde066d02fbea0765d4abf), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xc7221eb1ac595c6c204f2ac55ff20235715427653a0f46b48aa701e2281be955), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xe60e38898689581bd2a41c4ed408535008afa18edc1c020ac54769c7d29b3f13), "metadata");
     }
 
     function state_FX_026() internal pure returns (RenderStateV1 memory s) {
@@ -380,8 +380,8 @@ contract Differential is Test {
     function test_FX_026() public view {
         RenderStateV1 memory s = state_FX_026();
         assertEq(r.stateHash(s), bytes32(0xeb99c068fe4c3b4b8736cce3dfa39c183cebe0915dc58a71e0e2836e446c0954), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x011fe79ec7081859cb20f9b151a3c14e9e9e35b43f8039c6034255098a8fa72b), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x120fa44fa8ee110d6b06958b4d32e948e5efc624266ed644ae244c2b37e1ab72), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xb25b6e1f3c53b403e082daf115c4bdae81d5dd420ff77ee5c753ea753444505b), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xe083cee5d57f58f84a840d325a35f6e3466bb110de78021242b99a81b63ae3fa), "metadata");
     }
 
     function state_FX_027() internal pure returns (RenderStateV1 memory s) {
@@ -401,8 +401,8 @@ contract Differential is Test {
     function test_FX_027() public view {
         RenderStateV1 memory s = state_FX_027();
         assertEq(r.stateHash(s), bytes32(0x94a38a1be0c640af2ba0fb7f13c73975919a27de606875dc2a9c98d32320291a), "stateHash");
-        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0xcf0c1fb6538f12a51e29072a4f3b6dd9b5211fda095af0d510423dcc27f33000), "svg");
-        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0xf7afc22940c5ea97159bfd4b4eb6c505ae0c3f313d6f407582802cf2961cc6cb), "metadata");
+        assertEq(keccak256(bytes(r.renderSVG(s))), bytes32(0x249bb8dca02ea756ba9a4516987e691d4d82e406fde73e880a7ff0027d7e7e56), "svg");
+        assertEq(keccak256(bytes(r.renderMetadata(s))), bytes32(0x41f826646fa73cf7aa362d3437b1f0ec5720fcf0c92e84fe39dc4dc5d98b1cfa), "metadata");
     }
 
     function state_FX_028() internal pure returns (RenderStateV1 memory s) {
