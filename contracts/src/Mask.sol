@@ -126,7 +126,9 @@ library Mask {
     function drawTraits(Rng.R memory rng) internal pure returns (Traits memory t) {
         t.form = pick(rng, dyn16(wForm()));
         // anatomy per form (ranges keep continuous variety inside each silhouette)
-        t.cx = 44 + rng.rInt(13);
+        // cx pinned to dead center (circular-crop safe); draw consumed for trait parity
+        rng.rInt(13);
+        t.cx = 50;
         t.cy = 50 + rng.rInt(9);
         t.rw = 25 + rng.rInt(9);
         t.rh = 29 + rng.rInt(11);
@@ -146,7 +148,10 @@ library Mask {
         else if (t.form == 10) {
             int256 pv = 12 + rng.rInt(5);
             t.peak = rng.rInt(2) != 0 ? pv : -pv;
-            t.cx = rng.rInt(2) != 0 ? 38 + rng.rInt(5) : 52 + rng.rInt(5);
+            // TILTED leans via peak; placement centered, draws consumed
+            rng.rInt(2);
+            rng.rInt(5);
+            t.cx = 50;
         }
         else if (t.form == 11) { t.x2mode = 3; t.x2amp = 8 + rng.rInt(5); }
         else if (t.form == 12) { t.rw = 36 + rng.rInt(5); t.amp = 26 + rng.rInt(5); t.rh = 34 + rng.rInt(7); }
