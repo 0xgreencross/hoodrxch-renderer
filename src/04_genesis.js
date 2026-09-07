@@ -71,7 +71,9 @@ function drawTraits(rng){
   const t={};
   t.form=pick(rng,FORM_W);
   // anatomy per form (ranges keep continuous variety inside each silhouette)
-  t.cx=44+rng.int(13); t.cy=50+rng.int(9);
+  // cx pinned to dead center so the hood (and everything drawn around it) survives
+  // the circular PFP crop; the draw is still consumed to keep all other traits identical
+  rng.int(13); t.cx=50; t.cy=50+rng.int(9);
   t.rw=25+rng.int(9); t.rh=29+rng.int(11); t.amp=19+rng.int(7);
   t.peak=rng.int(9)-4; t.pamp=6+rng.int(4);
   t.x2mode=0; t.x2amp=0; t.x2dx=0;
@@ -86,7 +88,7 @@ function drawTraits(rng){
     case 7: t.amp=12+rng.int(4); t.cy=55+rng.int(4); t.rh=26+rng.int(7); break;// SUNKEN
     case 8: t.x2mode=1; t.x2amp=8+rng.int(5); t.x2dx=10+rng.int(5); break;     // TWIN PEAK
     case 9: t.x2mode=2; t.x2amp=10+rng.int(5); break;                          // HORNED
-    case 10: t.peak=(12+rng.int(5))*(rng.int(2)?1:-1); t.cx=rng.int(2)?38+rng.int(5):52+rng.int(5); break; // TILTED
+    case 10: t.peak=(12+rng.int(5))*(rng.int(2)?1:-1); if(rng.int(2)){rng.int(5);}else{rng.int(5);} t.cx=50; break; // TILTED (leans via peak; placement centered, draws consumed)
     case 11: t.x2mode=3; t.x2amp=8+rng.int(5); break;                          // CRATER
     case 12: t.rw=36+rng.int(5); t.amp=26+rng.int(5); t.rh=34+rng.int(7); break;// COLOSSUS
     case 13: t.rw=18+rng.int(4); t.pamp=14+rng.int(5); t.rh=38+rng.int(7); t.amp=16+rng.int(5); break; // NEEDLE
