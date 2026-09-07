@@ -408,6 +408,48 @@ function heightAt(t,noiseCols,x,y,noSock){
   const col=Math.max(0,Math.min(50,(x>>1)));
   return b+noiseCols[col];
 }
+// --- DECI-UNIT variants (conveyor animation pass) ------------------------
+// yd is y in deci-units (1 deci-unit = 1px at 1000-scale). Integer-only math,
+// exact generalizations: heightAtD(t,nc,x,y*10) === heightAt(t,nc,x,y).
+function floorDiv(a,b){ return Math.floor(a/b); }
+function rdiv(a,b){ return floorDiv(a+((b/2)|0),b); } // == Math.round(a/b) for integer a, even b
+function bump100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q=10000-d2;
+  return Math.trunc(A*q*q/1000000);
+}
+function bumpFlat100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q = d2<4200 ? 10000 : Math.trunc((10000-d2)*10000/5800);
+  return Math.trunc(A*q/100);
+}
+function heightAtD(t,noiseCols,x,yd){
+  let b=bumpFlat100D(x,yd,t.cx,t.cy*10,t.rw,t.rh,t.amp);
+  b+=bump100D(x,yd,t.cx+t.peak,(t.cy-t.rh+6)*10,14,16,t.pamp);
+  b+=bumpFlat100D(x,yd,t.cx+((t.peak/2)|0),(t.cy+18)*10,t.rw+5,14,(t.amp>>1));
+  b-=bump100D(x,yd,t.cx+((t.peak/3)|0),(t.cy+7)*10,4,6,t.nas);
+  if(t.x2mode===1){ b+=bump100D(x,yd,t.cx-t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); b+=bump100D(x,yd,t.cx+t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); }
+  else if(t.x2mode===2){ b+=bump100D(x,yd,t.cx-t.rw+4,(t.cy-t.rh+10)*10,5,12,t.x2amp); b+=bump100D(x,yd,t.cx+t.rw-4,(t.cy-t.rh+10)*10,5,12,t.x2amp); }
+  else if(t.x2mode===3){ b-=bump100D(x,yd,t.cx+((t.peak/2)|0),(t.cy-t.rh+8)*10,9,10,t.x2amp); }
+  if(yd>t.jawY*10){ const f=Math.max(0,1400-(yd-t.jawY*10)*10); b=Math.trunc(b*f/1400); }
+  if(b<-400) b=-400;
+  const col=Math.max(0,Math.min(50,(x>>1)));
+  return b+noiseCols[col];
+}
+function inSocketD(t,x,yvd,which){
+  const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
+  const nx=Math.trunc(((x-(t.cx+dx))*100)/(r+1)), ny=Math.trunc(((yvd-(t.cy+dy)*10)*10)/Math.max(2,r-1));
+  return nx*nx+ny*ny<10000;
+}
+// 32-bit hash for stationary field features (Solidity: uint32 wrapping math)
+function fhash(a,b){
+  let x=(Math.imul(a,2654435761)^Math.imul(b,97655331)^0x9e3779b9)>>>0;
+  x^=x>>>13; x=Math.imul(x,1274126177)>>>0; x^=x>>>16; return x>>>0;
+}
 // inside-socket test (for line gaps at the eyes)
 function inSocket(t,x,y,which){
   const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
@@ -605,7 +647,10 @@ function buildGenesis(sState){
   const mouthGapLo = t.mouth>0 ? mouthY-1 : 0;
   const mouthGapHi = t.mouth===11||t.mouth===13 ? mouthY+8 : (t.mouth===4 ? mouthY+2 : (t.mouth===14||t.mouth===15 ? mouthY+6 : mouthY+4));
   // --- BUILD EVERY LINE PATH (displaced, torn, spiked) ---
-  const linesD=[];
+  // Conveyor note: this legacy pass burns the exact rng stream of the original
+  // build (so every downstream trait stays blessed) and records the random
+  // break runs; animated styles convert them into stationary field holes.
+  const linesD=[]; const brkRuns=[];
   for(let li=0;li<lines.length;li++){
     const L=lines[li]; const baseY=L.y;
     if(li===flatLi){ linesD.push({d:'',maxH:0,baseY,w:L.w}); continue; } // drawn as the scar below
@@ -634,7 +679,7 @@ function buildGenesis(sState){
         else if(t.tear===3) p0=(xi<6||xi>27)?45:4;                          // RIPPED EDGE
         else if(t.tear===6) p0=Math.max(3,Math.trunc((92-baseY)*13/10));    // VAPOR
         else p0=t.tear===4?4:6;                                             // MOTH/SPLIT/CENSORED base
-        if(rng.int(1000)<p0){ breakLeft=1+rng.int(5); gap=true; } }
+        if(rng.int(1000)<p0){ breakLeft=1+rng.int(5); if(t.tear!==6&&brkRuns.length<200) brkRuns.push([li,xi,breakLeft+1,ypx]); gap=true; } }
       if(gap){ pen=false; continue; }
       const X=x*10;
       if(!pen){ d+='M'+X+' '+ypx; pen=true; }
@@ -659,22 +704,28 @@ function buildGenesis(sState){
   const crest6=new Set(figLines.slice(0,6));
   const whiteFig = tier>=6;
   const invert = t.pink===5; // INVERSION: the figure runs pink from genesis
-  // echo passes: genesis PINK trait styles, plus forced echo of figure lines at tier>=6
-  { const dx=(2+rng.int(3))*U, dy=(1+rng.int(2))*U;
+  // echo rng draws (shared by both field modes so the stream stays blessed)
+  const eDx=(2+rng.int(3))*U, eDy=(1+rng.int(2))*U;
+  const ePicks=[], e2Picks=[];
+  if(t.pink===1||t.pink===2||t.pink===3){
+    const k=t.pink===3?8+rng.int(3):(t.pink===2?4+rng.int(3):2+rng.int(2));
+    for(let i=0;i<k;i++) ePicks.push(rng.int(lines.length)); }
+  else if(t.pink===4){ const k=3+rng.int(2); // WHITE ECHO
+    for(let i=0;i<k;i++) e2Picks.push(rng.int(lines.length)); }
+  else if(t.pink===6){ // TRICHROME: pink pass + white counter-pass
+    let k=3+rng.int(2); for(let i=0;i<k;i++) ePicks.push(rng.int(lines.length));
+    k=2+rng.int(2); for(let i=0;i<k;i++) e2Picks.push(rng.int(lines.length)); }
+  // BARCODE / NO SIGNAL keep the blessed static field; everything else flows
+  const CONV = t.lineW<=6;
+  if(!CONV){
+    // --- legacy static field (echoes + grouped rows, exactly as blessed) ---
     let e='', e2='';
-    if(t.pink===1||t.pink===2||t.pink===3){
-      const k=t.pink===3?8+rng.int(3):(t.pink===2?4+rng.int(3):2+rng.int(2));
-      for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; } }
-    else if(t.pink===4){ const k=3+rng.int(2); // WHITE ECHO
-      for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e2+='<path d="'+linesD[li].d+'"/>'; } }
-    else if(t.pink===6){ // TRICHROME: pink pass + white counter-pass
-      let k=3+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>'; }
-      k=2+rng.int(2); for(let i=0;i<k;i++){ const li=rng.int(lines.length); if(linesD[li].d) e2+='<path d="'+linesD[li].d+'"/>'; } }
+    for(const li of ePicks) if(linesD[li].d) e+='<path d="'+linesD[li].d+'"/>';
+    for(const li of e2Picks) if(linesD[li].d) e2+='<path d="'+linesD[li].d+'"/>';
     if(tier>=6) for(const L of figLines.slice(0,8)) e+='<path d="'+L.d+'"/>';
-    if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+dx+' '+dy+')">'+e+'</g>';
-    if(e2) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'" transform="translate('+(-dx)+' '+dy+')">'+e2+'</g>'; }
-  // the signal field, grouped by (colour role, stroke width)
-  { const groups={};
+    if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+eDx+' '+eDy+')">'+e+'</g>';
+    if(e2) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'" transform="translate('+(-eDx)+' '+eDy+')">'+e2+'</g>';
+    const groups={};
     for(const L of linesD){ if(!L.d) continue;
       let col='A';
       if(isFig.has(L)){
@@ -697,7 +748,123 @@ function buildGenesis(sState){
         for(const d of g2) f+='<path d="'+d+'"/>';
         f+='</g>';
       }
-    } }
+    }
+  } else {
+    // === THE CONVEYOR (animation pass): the signal flows upward through a
+    // stationary hood envelope. One SMIL animate-d path per grid row (fixed
+    // "M + 33 l" structure, integer deci-unit keyframes, linear interpolation);
+    // last keyframe = the next row's first, so the loop wraps image-identical.
+    // Gaps live in the FIELD: stationary black covers + the blessed break runs.
+    const stepD = t.lineW===3?10 : t.lineW===4?40 : 20;    // row spacing in px
+    const cycD = t.lineW===6? stepD*2 : stepD;             // DUAL loops 2 rows (parity-safe wrap)
+    const NKC = cycD>>1;                                   // keyframe every 2px of travel
+    const durS = (cycD*75/1000)+'s';                       // 1.5s per 20px of travel
+    const topY=960;                                        // last blessed row position (y=96)
+    const rowW = (y0d)=> t.lineW===3?2 : t.lineW===4?5 : t.lineW===5?4 : t.lineW===6?(((y0d/20)%2)?6:2) : [3,4,6][t.lineW];
+    // standing disturbances anchored to fixed field positions
+    const spikeAtD=[]; for(const li in spikes){ if(lines[li]) for(const [sx,amp] of spikes[li]) spikeAtD.push([lines[li].y*10,sx,amp]); }
+    const pulseYd = pulseLi>=0&&lines[pulseLi] ? lines[pulseLi].y*10 : -9999;
+    // one keyframe of one row: geometry + peak height, all integer
+    const rowKey=(y0d,pD)=>{
+      const yd=y0d-pD; let d='',py=0,maxH=0;
+      for(let xi=0;xi<=33;xi++){
+        const x=xi*STEP;
+        const h=heightAtD(t,noiseCols,x,yd);
+        if(h>maxH)maxH=h;
+        let ypx=yd-rdiv(h,10);
+        for(const [syd,sx,amp] of spikeAtD) if(sx===xi){ const dd=Math.abs(yd-syd); if(dd<10) ypx+=rdiv(amp*(10-dd),10); }
+        if(pulseYd>-9000&&xi%6<3){ const dd=Math.abs(yd-pulseYd); if(dd<10) ypx-=rdiv(pulseAmp*(10-dd),10); }
+        if(quake){ const liE=floorDiv(yd-40+(stepD>>1),stepD); ypx+=quake[(((xi+liE*3)%13)+13)%13]; }
+        if(xi===0) d='M0 '+ypx; else d+='l30 '+(ypx-py);
+        py=ypx;
+      }
+      return [d,maxH];
+    };
+    // all rows × all keyframes
+    const rows=[]; for(let y0d=0;y0d<=1000+cycD;y0d+=stepD) rows.push(y0d);
+    const vals=rows.map(()=>[]), mh=rows.map(()=>[]);
+    for(let j=0;j<=NKC;j++){ const pD=j*2;
+      for(let ri=0;ri<rows.length;ri++){ const [d,m]=rowKey(rows[ri],pD); vals[ri].push(d); mh[ri].push(m); } }
+    // per-keyframe colour roles (position-keyed so the wrap stays image-identical)
+    const colK=rows.map(()=>[]);
+    for(let j=0;j<NKC;j++){
+      const figIdx=[]; for(let ri=0;ri<rows.length;ri++) if(rows[ri]>=40&&rows[ri]<=topY&&mh[ri][j]>800) figIdx.push(ri);
+      const crestSet=new Set(figIdx.slice(0,crestN)), crest6Set=new Set(figIdx.slice(0,6)), figSet=new Set(figIdx);
+      for(let ri=0;ri<rows.length;ri++){
+        let col='A';
+        if(figSet.has(ri)){
+          if(invert) col='P';
+          if(whiteFig) col='W';
+          else if(pinkFigAll) col='P';
+          else if(pinkFigUpper && rows[ri]-j*2<t.cy*10) col='P';
+          else if(pinkCrest6 && crest6Set.has(ri)) col='P';
+          if(!whiteFig && crestSet.has(ri)) col='W';
+        }
+        colK[ri].push(col);
+      }
+    }
+    // echo ghosts: burned-in static copies at the blessed slots
+    { let e='', e2='';
+      for(const li of ePicks) if(lines[li]) e+='<path d="'+rowKey(lines[li].y*10,0)[0]+'"/>';
+      for(const li of e2Picks) if(lines[li]) e2+='<path d="'+rowKey(lines[li].y*10,0)[0]+'"/>';
+      if(tier>=6){ let n=0; for(let ri=0;ri<rows.length&&n<8;ri++) if(rows[ri]>=40&&rows[ri]<=topY&&mh[ri][0]>800){ e+='<path d="'+vals[ri][0]+'"/>'; n++; } }
+      if(e) f+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+eDx+' '+eDy+')">'+e+'</g>';
+      if(e2) f+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'" transform="translate('+(-eDx)+' '+eDy+')">'+e2+'</g>'; }
+    // the flowing field
+    f+='<g fill="none">';
+    for(let ri=0;ri<rows.length;ri++){
+      const y0d=rows[ri];
+      const w=rowW(y0d);
+      const strokeOf=c=> c==='A'?ACID : c==='P'?PINK : WHITE;
+      const widthOf=c=> (c==='A'&&tier>=5) ? Math.max(2,w-1) : w;
+      const cols=colK[ri];
+      let varies=false; for(let j=1;j<NKC;j++) if(cols[j]!==cols[0]) varies=true;
+      let dash='';
+      if(t.lineW===5) dash=' stroke-dasharray="150 60" stroke-dashoffset="'+((y0d/10)%7)*30+'"';
+      else if(t.tear===6){ const y0=y0d/10; const p0v=Math.max(3,Math.trunc((92-y0)*13/10));
+        const g6=Math.min(45,rdiv(p0v*3*60,1000)); if(g6>2) dash=' stroke-dasharray="'+(60-g6)+' '+g6+'" stroke-dashoffset="'+(fhash(y0d,7)%60)+'"'; }
+      f+='<path stroke="'+strokeOf(cols[0])+'" stroke-width="'+widthOf(cols[0])+'"'+dash+' d="'+vals[ri][0]+'">';
+      f+='<animate attributeName="d" values="'+vals[ri].join(';')+'" dur="'+durS+'" calcMode="linear" repeatCount="indefinite"/>';
+      if(varies){
+        f+='<animate attributeName="stroke" values="'+cols.map(strokeOf).join(';')+'" dur="'+durS+'" calcMode="discrete" repeatCount="indefinite"/>';
+        let wv=false; for(let j=1;j<NKC;j++) if(widthOf(cols[j])!==widthOf(cols[0])) wv=true;
+        if(wv) f+='<animate attributeName="stroke-width" values="'+cols.map(widthOf).join(';')+'" dur="'+durS+'" calcMode="discrete" repeatCount="indefinite"/>';
+      }
+      f+='</path>';
+    }
+    f+='</g>';
+    // the blessed break runs as stationary holes (VAPOR dissolves via dasharray instead)
+    if(t.tear!==6){
+      for(const [bli,bxi,blen,bypx] of brkRuns){
+        const x0=Math.max(0,(bxi-1)*30);
+        f+='<rect x="'+x0+'" y="'+(bypx-6)+'" width="'+Math.min(1000-x0,(blen+2)*30)+'" height="12" fill="'+BLACK+'"/>';
+      }
+    }
+    // envelope gap covers: sockets, moth holes, split, censor — exact original
+    // gap condition replayed in sampling space, painted at its screen extent
+    { const gapC=(x,yd)=>{
+        const yvd=yd-10*rdiv(heightAtD(t,noiseCols,x,yd),100);
+        if(inSocketD(t,x,yvd,0)||inSocketD(t,x,yvd,1)) return true;
+        if(moth){ for(const [bx,by,r] of moth){ const ddx=x-bx, ddyd=yd-by*10; if(ddx*ddx*100+ddyd*ddyd<r*r*100) return true; } }
+        if(splitY>=0 && yd>=splitY*10 && yd<splitY*10+50) return true;
+        if(censor){ for(const [cx0,cy0,cw,ch] of censor){ if(x>=cx0&&x<cx0+cw&&yd>=cy0*10&&yd<(cy0+ch)*10) return true; } }
+        return false;
+      };
+      for(let xi=0;xi<=33;xi++){ const x=xi*STEP;
+        let runA=-1;
+        for(let yd=0;yd<=1022;yd+=2){
+          const g=yd<=1020&&gapC(x,yd);
+          if(g&&runA<0) runA=yd;
+          else if(!g&&runA>=0){
+            let sMin=100000,sMax=-100000;
+            for(let q=runA;q<yd;q+=2){ const sy=q-rdiv(heightAtD(t,noiseCols,x,q),10); if(sy<sMin)sMin=sy; if(sy>sMax)sMax=sy; }
+            f+='<rect x="'+(xi*30-16)+'" y="'+(sMin-7)+'" width="32" height="'+(sMax-sMin+14)+'" fill="'+BLACK+'"/>';
+            runA=-1;
+          }
+        }
+      }
+    }
+  }
   // FLATLINE SCAR: one perfect white line cutting through everything
   if(flatLi>=0) f+='<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="6"/>';
   // LIGHTNING: one jagged bolt across the field
