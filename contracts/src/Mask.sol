@@ -236,6 +236,82 @@ library Mask {
         return b + noiseCols[uint256(col)];
     }
 
+    // --- DECI-UNIT variants (conveyor animation pass) --------------------
+    // yd is y in deci-units (1 deci-unit = 1px). Exact generalizations:
+    // heightAtD(t, nc, x, y*10) == heightAt(t, nc, x, y).
+    function bump100D(int256 x, int256 yd, int256 cx, int256 cyd, int256 rw, int256 rh, int256 A)
+        internal
+        pure
+        returns (int256)
+    {
+        int256 nx = ((x - cx) * 100) / rw;
+        int256 ny = ((yd - cyd) * 10) / rh;
+        int256 d2 = nx * nx + ny * ny;
+        if (d2 >= 10000) return 0;
+        int256 q = 10000 - d2;
+        return (A * q * q) / 1000000;
+    }
+
+    function bumpFlat100D(int256 x, int256 yd, int256 cx, int256 cyd, int256 rw, int256 rh, int256 A)
+        internal
+        pure
+        returns (int256)
+    {
+        int256 nx = ((x - cx) * 100) / rw;
+        int256 ny = ((yd - cyd) * 10) / rh;
+        int256 d2 = nx * nx + ny * ny;
+        if (d2 >= 10000) return 0;
+        int256 q = d2 < 4200 ? int256(10000) : ((10000 - d2) * 10000) / 5800;
+        return (A * q) / 100;
+    }
+
+    function heightAtD(Traits memory t, int256[51] memory noiseCols, int256 x, int256 yd)
+        internal
+        pure
+        returns (int256)
+    {
+        int256 b = bumpFlat100D(x, yd, t.cx, t.cy * 10, t.rw, t.rh, t.amp);
+        b += bump100D(x, yd, t.cx + t.peak, (t.cy - t.rh + 6) * 10, 14, 16, t.pamp);
+        b += bumpFlat100D(x, yd, t.cx + t.peak / 2, (t.cy + 18) * 10, t.rw + 5, 14, t.amp >> 1);
+        b -= bump100D(x, yd, t.cx + t.peak / 3, (t.cy + 7) * 10, 4, 6, t.nas);
+        if (t.x2mode == 1) {
+            b += bump100D(x, yd, t.cx - t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
+            b += bump100D(x, yd, t.cx + t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
+        } else if (t.x2mode == 2) {
+            b += bump100D(x, yd, t.cx - t.rw + 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
+            b += bump100D(x, yd, t.cx + t.rw - 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
+        } else if (t.x2mode == 3) {
+            b -= bump100D(x, yd, t.cx + t.peak / 2, (t.cy - t.rh + 8) * 10, 9, 10, t.x2amp);
+        }
+        if (yd > t.jawY * 10) {
+            int256 f = Num.max(0, 1400 - (yd - t.jawY * 10) * 10);
+            b = (b * f) / 1400;
+        }
+        if (b < -400) b = -400;
+        int256 col = Num.max(0, Num.min(50, x >> 1));
+        return b + noiseCols[uint256(col)];
+    }
+
+    function inSocketD(Traits memory t, int256 x, int256 yvd, uint256 which) internal pure returns (bool) {
+        int256 dx = which == 1 ? t.sRdx : t.sLdx;
+        int256 dy = which == 1 ? t.sRdy : t.sLdy;
+        int256 r = which == 1 ? t.sRr : t.sLr;
+        int256 nx = ((x - (t.cx + dx)) * 100) / (r + 1);
+        int256 ny = ((yvd - (t.cy + dy) * 10) * 10) / Num.max(2, r - 1);
+        return nx * nx + ny * ny < 10000;
+    }
+
+    /// 32-bit hash for stationary field features (mirrors JS fhash / Math.imul)
+    function fhash(uint32 a, uint32 b) internal pure returns (uint32) {
+        unchecked {
+            uint32 x = (a * 2654435761) ^ (b * 97655331) ^ 0x9e3779b9;
+            x ^= x >> 13;
+            x = x * 1274126177;
+            x ^= x >> 16;
+            return x;
+        }
+    }
+
     /// inside-socket test (line gaps at the eyes)
     function inSocket(Traits memory t, int256 x, int256 y, uint256 which) internal pure returns (bool) {
         int256 dx = which == 1 ? t.sRdx : t.sLdx;

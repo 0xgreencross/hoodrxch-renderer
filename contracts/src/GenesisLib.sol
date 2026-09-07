@@ -302,6 +302,8 @@ library GenesisLib {
         int256 splitY;
         int256[4][3] censor;
         bool hasCensor;
+        int256[4][200] brkRuns; // li, xi, len, ypx — blessed random-break runs (conveyor holes)
+        uint256 nBrk;
     }
 
     function build(RenderStateV1 memory s) public pure returns (T.Gen memory g) {
@@ -514,6 +516,10 @@ library GenesisLib {
                     }
                     if (c.rng.rInt(1000) < p0) {
                         breakLeft = 1 + c.rng.rInt(5);
+                        if (c.t.tear != 6 && pre.nBrk < 200) {
+                            pre.brkRuns[pre.nBrk] = [int256(li), xi, breakLeft + 1, ypx];
+                            pre.nBrk++;
+                        }
                         gap = true;
                     }
                 }
@@ -567,7 +573,7 @@ library GenesisLib {
     }
 
     function buildFigure(Ctx memory c, RenderStateV1 memory s, Pre memory pre) internal pure returns (string memory) {
-        Buf.B memory f = Buf.init(48000);
+        Buf.B memory f = Buf.init(400000); // conveyor keyframes are the bulk (DUAL WEIGHT peaks ~360KB)
         // white specks
         {
             Buf.B memory d = Buf.init(1200);
@@ -583,64 +589,37 @@ library GenesisLib {
         figRank(c, figIdx);
         uint256 crestN = c.tier >= 5 ? 4 : c.tier >= 4 ? 2 : c.tier >= 3 ? 1 : 0;
         bool invert = c.t.pink == 5;
-        // echo passes
-        {
-            int256 dx = (2 + c.rng.rInt(3)) * 10;
-            int256 dy = (1 + c.rng.rInt(2)) * 10;
-            Buf.B memory e = Buf.init(26000);
-            Buf.B memory e2 = Buf.init(12000);
-            if (c.t.pink == 1 || c.t.pink == 2 || c.t.pink == 3) {
-                int256 k = c.t.pink == 3 ? 8 + c.rng.rInt(3) : (c.t.pink == 2 ? 4 + c.rng.rInt(3) : 2 + c.rng.rInt(2));
-                for (int256 i = 0; i < k; i++) {
-                    uint256 li = uint256(c.rng.rInt(c.lines.length));
-                    if (bytes(c.lineD[li]).length > 0) e.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
-                }
-            } else if (c.t.pink == 4) {
-                int256 k = 3 + c.rng.rInt(2);
-                for (int256 i = 0; i < k; i++) {
-                    uint256 li = uint256(c.rng.rInt(c.lines.length));
-                    if (bytes(c.lineD[li]).length > 0) e2.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
-                }
-            } else if (c.t.pink == 6) {
-                int256 k = 3 + c.rng.rInt(2);
-                for (int256 i = 0; i < k; i++) {
-                    uint256 li = uint256(c.rng.rInt(c.lines.length));
-                    if (bytes(c.lineD[li]).length > 0) e.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
-                }
-                k = 2 + c.rng.rInt(2);
-                for (int256 i = 0; i < k; i++) {
-                    uint256 li = uint256(c.rng.rInt(c.lines.length));
-                    if (bytes(c.lineD[li]).length > 0) e2.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
-                }
-            }
-            if (c.tier >= 6) {
-                for (uint256 li = 0; li < c.lines.length; li++) {
-                    if (figIdx[li] >= 0 && figIdx[li] < 8) e.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
-                }
-            }
-            if (e.len > 0) {
-                f.app(
-                    abi.encodePacked(
-                        '<g fill="none" stroke="', T.PINK, '" stroke-width="', Num.itoa(swOf(c)),
-                        '" transform="translate(', Num.itoa(dx), " ", Num.itoa(dy), ')">'
-                    )
-                );
-                f.app(e.fin());
-                f.app(bytes("</g>"));
-            }
-            if (e2.len > 0) {
-                f.app(
-                    abi.encodePacked(
-                        '<g fill="none" stroke="', T.WHITE, '" stroke-width="', Num.itoa(swOf(c)),
-                        '" transform="translate(', Num.itoa(-dx), " ", Num.itoa(dy), ')">'
-                    )
-                );
-                f.app(e2.fin());
-                f.app(bytes("</g>"));
-            }
+        // echo rng draws (shared by both field modes so the stream stays blessed)
+        Conv memory cv;
+        cv.eDx = (2 + c.rng.rInt(3)) * 10;
+        cv.eDy = (1 + c.rng.rInt(2)) * 10;
+        if (c.t.pink == 1 || c.t.pink == 2 || c.t.pink == 3) {
+            int256 k = c.t.pink == 3 ? 8 + c.rng.rInt(3) : (c.t.pink == 2 ? 4 + c.rng.rInt(3) : 2 + c.rng.rInt(2));
+            for (int256 i = 0; i < k; i++) cv.ePicks[cv.nE++] = uint256(c.rng.rInt(c.lines.length));
+        } else if (c.t.pink == 4) {
+            int256 k = 3 + c.rng.rInt(2);
+            for (int256 i = 0; i < k; i++) cv.e2Picks[cv.nE2++] = uint256(c.rng.rInt(c.lines.length));
+        } else if (c.t.pink == 6) {
+            int256 k = 3 + c.rng.rInt(2);
+            for (int256 i = 0; i < k; i++) cv.ePicks[cv.nE++] = uint256(c.rng.rInt(c.lines.length));
+            k = 2 + c.rng.rInt(2);
+            for (int256 i = 0; i < k; i++) cv.e2Picks[cv.nE2++] = uint256(c.rng.rInt(c.lines.length));
         }
-        // the signal field, grouped by (colour role, stroke width)
-        fieldGroups(c, f, figIdx, crestN, invert);
+        cv.crestN = crestN;
+        cv.invert = invert;
+        if (c.t.lineW <= 6) {
+            // === THE CONVEYOR: the signal flows upward through a stationary
+            // hood envelope (see JS reference for the full architecture notes)
+            cv.stepD = c.t.lineW == 3 ? int256(10) : c.t.lineW == 4 ? int256(40) : int256(20);
+            cv.cycD = c.t.lineW == 6 ? cv.stepD * 2 : cv.stepD;
+            cv.NKC = uint256(cv.cycD / 2);
+            cv.durS = cv.cycD == 10 ? "0.75s" : cv.cycD == 40 ? "3s" : "1.5s";
+            conveyorField(c, f, pre, cv);
+        } else {
+            legacyEchoes(c, f, figIdx, cv);
+            // the signal field, grouped by (colour role, stroke width)
+            fieldGroups(c, f, figIdx, crestN, invert);
+        }
         // FLATLINE SCAR
         if (c.flatLi >= 0) {
             f.app(
@@ -676,6 +655,354 @@ library GenesisLib {
         // eyes + treatments + records + marks + halo
         eyesAndRest(c, s, f);
         return f.fin();
+    }
+
+    // === CONVEYOR (animation pass) =========================================
+
+    struct Conv {
+        int256 stepD;       // row spacing in px
+        int256 cycD;        // travel per loop in px (DUAL loops 2 rows)
+        uint256 NKC;        // keyframe intervals (one per 2px of travel)
+        string durS;
+        int256 eDx;
+        int256 eDy;
+        uint256 nE;
+        uint256 nE2;
+        uint256[12] ePicks;
+        uint256[12] e2Picks;
+        uint256 crestN;
+        bool invert;
+        uint256 nRows;
+    }
+
+    /// standing disturbances: spikes/pulse swell as a line passes their anchor
+    function convDisturb(Ctx memory c, Pre memory pre, int256 stepD, int256 yd, int256 xi)
+        internal
+        pure
+        returns (int256 addv)
+    {
+        for (uint256 k = 0; k < pre.nSpikes; k++) {
+            if (pre.spikes[k][1] == xi) {
+                int256 syd = c.lines[uint256(pre.spikes[k][0])].y * 10;
+                int256 dd = yd > syd ? yd - syd : syd - yd;
+                if (dd < 10) addv += Num.jsRound(pre.spikes[k][2] * (10 - dd), 10);
+            }
+        }
+        if (pre.pulseLi >= 0 && xi % 6 < 3) {
+            int256 pyd = c.lines[uint256(pre.pulseLi)].y * 10;
+            int256 dd = yd > pyd ? yd - pyd : pyd - yd;
+            if (dd < 10) addv -= Num.jsRound(pre.pulseAmp * (10 - dd), 10);
+        }
+        if (pre.hasQuake) {
+            int256 liE = Num.floorDiv(yd - 40 + stepD / 2, stepD);
+            addv += pre.quake[uint256((((xi + liE * 3) % 13) + 13) % 13)];
+        }
+    }
+
+    /// one keyframe of one row: fixed "M + 33 l" structure, integer deci-units
+    function convRowKey(Ctx memory c, Pre memory pre, int256 stepD, int256 y0d, int256 pD)
+        internal
+        pure
+        returns (string memory, int256 maxH)
+    {
+        int256 yd = y0d - pD;
+        Buf.B memory b = Buf.init(640);
+        int256 py = 0;
+        for (int256 xi = 0; xi <= 33; xi++) {
+            int256 h = Mask.heightAtD(c.t, c.noise, xi * 3, yd);
+            if (h > maxH) maxH = h;
+            int256 ypx = yd - Num.jsRound(h, 10) + convDisturb(c, pre, stepD, yd, xi);
+            if (xi == 0) b.app(abi.encodePacked("M0 ", Num.itoa(ypx)));
+            else b.app(abi.encodePacked("l30 ", Num.itoa(ypx - py)));
+            py = ypx;
+        }
+        return (b.fin(), maxH);
+    }
+
+    /// position-keyed colour roles per keyframe (wrap stays image-identical)
+    function convColors(Ctx memory c, Conv memory cv, int256[] memory mh, uint8[] memory colK) internal pure {
+        bool whiteFig = c.tier >= 6;
+        bool pinkFigAll = c.tier >= 4;
+        bool pinkFigUpper = c.tier == 3;
+        bool pinkCrest6 = c.tier == 2;
+        for (uint256 j = 0; j < cv.NKC; j++) {
+            uint256 rank = 0;
+            for (uint256 ri = 0; ri < cv.nRows; ri++) {
+                int256 y0d = int256(ri) * cv.stepD;
+                bool fig = y0d >= 40 && y0d <= 960 && mh[ri * (cv.NKC + 1) + j] > 800;
+                uint8 col = 0;
+                if (fig) {
+                    if (cv.invert) col = 1;
+                    if (whiteFig) col = 2;
+                    else if (pinkFigAll) col = 1;
+                    else if (pinkFigUpper && y0d - int256(j) * 2 < c.t.cy * 10) col = 1;
+                    else if (pinkCrest6 && rank < 6) col = 1;
+                    if (!whiteFig && rank < cv.crestN) col = 2;
+                    rank++;
+                }
+                colK[ri * cv.NKC + j] = col;
+            }
+        }
+    }
+
+    /// echo ghosts: burned-in static copies at the blessed slots
+    function convEchoes(Ctx memory c, Buf.B memory f, Conv memory cv, string[] memory ds, int256[] memory mh)
+        internal
+        pure
+    {
+        Buf.B memory e = Buf.init(26000);
+        Buf.B memory e2 = Buf.init(12000);
+        for (uint256 i = 0; i < cv.nE; i++) {
+            uint256 ri = uint256(c.lines[cv.ePicks[i]].y * 10 / cv.stepD);
+            e.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
+        }
+        for (uint256 i = 0; i < cv.nE2; i++) {
+            uint256 ri = uint256(c.lines[cv.e2Picks[i]].y * 10 / cv.stepD);
+            e2.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
+        }
+        if (c.tier >= 6) {
+            uint256 n = 0;
+            for (uint256 ri = 0; ri < cv.nRows && n < 8; ri++) {
+                int256 y0d = int256(ri) * cv.stepD;
+                if (y0d >= 40 && y0d <= 960 && mh[ri * (cv.NKC + 1)] > 800) {
+                    e.app(abi.encodePacked('<path d="', ds[ri * (cv.NKC + 1)], '"/>'));
+                    n++;
+                }
+            }
+        }
+        if (e.len > 0) {
+            f.app(
+                abi.encodePacked(
+                    '<g fill="none" stroke="', T.PINK, '" stroke-width="', Num.itoa(swOf(c)),
+                    '" transform="translate(', Num.itoa(cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                )
+            );
+            f.app(e.fin());
+            f.app(bytes("</g>"));
+        }
+        if (e2.len > 0) {
+            f.app(
+                abi.encodePacked(
+                    '<g fill="none" stroke="', T.WHITE, '" stroke-width="', Num.itoa(swOf(c)),
+                    '" transform="translate(', Num.itoa(-cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                )
+            );
+            f.app(e2.fin());
+            f.app(bytes("</g>"));
+        }
+    }
+
+    function rowWOf(Ctx memory c, int256 y0d) internal pure returns (int256) {
+        int256 lw = c.t.lineW;
+        if (lw == 3) return 2;
+        if (lw == 4) return 5;
+        if (lw == 5) return 4;
+        if (lw == 6) return ((y0d / 20) % 2) != 0 ? int256(6) : int256(2);
+        return lw == 0 ? int256(3) : lw == 1 ? int256(4) : int256(6);
+    }
+
+    function strokeOfCol(uint8 col) internal pure returns (string memory) {
+        return col == 0 ? T.ACID : col == 1 ? T.PINK : T.WHITE;
+    }
+
+    function widthOfCol(Ctx memory c, uint8 col, int256 w) internal pure returns (int256) {
+        return (col == 0 && c.tier >= 5) ? Num.max(2, w - 1) : w;
+    }
+
+    function convDash(Ctx memory c, int256 y0d) internal pure returns (bytes memory) {
+        if (c.t.lineW == 5) {
+            return abi.encodePacked(
+                ' stroke-dasharray="150 60" stroke-dashoffset="', Num.itoa(((y0d / 10) % 7) * 30), '"'
+            );
+        }
+        if (c.t.tear == 6) {
+            int256 y0 = y0d / 10;
+            int256 p0v = Num.max(3, ((92 - y0) * 13) / 10);
+            int256 g6 = Num.min(45, Num.jsRound(p0v * 3 * 60, 1000));
+            if (g6 > 2) {
+                return abi.encodePacked(
+                    ' stroke-dasharray="', Num.itoa(60 - g6), " ", Num.itoa(g6),
+                    '" stroke-dashoffset="', Num.itoa(int256(uint256(Mask.fhash(uint32(uint256(y0d)), 7) % 60))), '"'
+                );
+            }
+        }
+        return "";
+    }
+
+    function convEmitRow(Ctx memory c, Buf.B memory f, Conv memory cv, string[] memory ds, uint8[] memory colK, uint256 ri)
+        internal
+        pure
+    {
+        int256 y0d = int256(ri) * cv.stepD;
+        int256 w = rowWOf(c, y0d);
+        uint8 c0 = colK[ri * cv.NKC];
+        bool varies = false;
+        for (uint256 j = 1; j < cv.NKC; j++) {
+            if (colK[ri * cv.NKC + j] != c0) varies = true;
+        }
+        f.app(
+            abi.encodePacked(
+                '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, c0, w)), '"',
+                convDash(c, y0d), ' d="', ds[ri * (cv.NKC + 1)], '">'
+            )
+        );
+        f.app(bytes('<animate attributeName="d" values="'));
+        for (uint256 j = 0; j <= cv.NKC; j++) {
+            if (j > 0) f.app(bytes(";"));
+            f.app(ds[ri * (cv.NKC + 1) + j]);
+        }
+        f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite"/>'));
+        if (varies) {
+            f.app(bytes('<animate attributeName="stroke" values="'));
+            for (uint256 j = 0; j < cv.NKC; j++) {
+                if (j > 0) f.app(bytes(";"));
+                f.app(strokeOfCol(colK[ri * cv.NKC + j]));
+            }
+            f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+            bool wv = false;
+            for (uint256 j = 1; j < cv.NKC; j++) {
+                if (widthOfCol(c, colK[ri * cv.NKC + j], w) != widthOfCol(c, c0, w)) wv = true;
+            }
+            if (wv) {
+                f.app(bytes('<animate attributeName="stroke-width" values="'));
+                for (uint256 j = 0; j < cv.NKC; j++) {
+                    if (j > 0) f.app(bytes(";"));
+                    f.app(Num.itoa(widthOfCol(c, colK[ri * cv.NKC + j], w)));
+                }
+                f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+            }
+        }
+        f.app(bytes("</path>"));
+    }
+
+    /// the blessed break runs as stationary field holes (VAPOR dissolves via dasharray)
+    function convHoles(Ctx memory c, Buf.B memory f, Pre memory pre) internal pure {
+        if (c.t.tear == 6) return;
+        for (uint256 i = 0; i < pre.nBrk; i++) {
+            int256 x0 = (pre.brkRuns[i][1] - 1) * 30;
+            if (x0 < 0) x0 = 0;
+            int256 wR = (pre.brkRuns[i][2] + 2) * 30;
+            if (wR > 1000 - x0) wR = 1000 - x0;
+            f.app(
+                abi.encodePacked(
+                    '<rect x="', Num.itoa(x0), '" y="', Num.itoa(pre.brkRuns[i][3] - 6),
+                    '" width="', Num.itoa(wR), '" height="12" fill="', T.BLACK, '"/>'
+                )
+            );
+        }
+    }
+
+    function convGapC(Ctx memory c, Pre memory pre, int256 x, int256 yd) internal pure returns (bool) {
+        int256 yvd = yd - 10 * Num.jsRound(Mask.heightAtD(c.t, c.noise, x, yd), 100);
+        if (Mask.inSocketD(c.t, x, yvd, 0) || Mask.inSocketD(c.t, x, yvd, 1)) return true;
+        for (uint256 m = 0; m < pre.nMoth; m++) {
+            int256 ddx = x - pre.moth[m][0];
+            int256 ddyd = yd - pre.moth[m][1] * 10;
+            if (ddx * ddx * 100 + ddyd * ddyd < pre.moth[m][2] * pre.moth[m][2] * 100) return true;
+        }
+        if (pre.splitY >= 0 && yd >= pre.splitY * 10 && yd < pre.splitY * 10 + 50) return true;
+        if (pre.hasCensor) {
+            for (uint256 m = 0; m < 3; m++) {
+                if (
+                    x >= pre.censor[m][0] && x < pre.censor[m][0] + pre.censor[m][2]
+                        && yd >= pre.censor[m][1] * 10 && yd < (pre.censor[m][1] + pre.censor[m][3]) * 10
+                ) return true;
+            }
+        }
+        return false;
+    }
+
+    /// envelope gap covers: exact original gap condition replayed in sampling
+    /// space, painted black at its screen extent (chunky 3u columns)
+    function convCovers(Ctx memory c, Buf.B memory f, Pre memory pre) internal pure {
+        for (int256 xi = 0; xi <= 33; xi++) {
+            int256 x = xi * 3;
+            int256 runA = -1;
+            for (int256 yd = 0; yd <= 1022; yd += 2) {
+                bool g = yd <= 1020 && convGapC(c, pre, x, yd);
+                if (g && runA < 0) runA = yd;
+                else if (!g && runA >= 0) {
+                    int256 sMin = 100000;
+                    int256 sMax = -100000;
+                    for (int256 q = runA; q < yd; q += 2) {
+                        int256 sy = q - Num.jsRound(Mask.heightAtD(c.t, c.noise, x, q), 10);
+                        if (sy < sMin) sMin = sy;
+                        if (sy > sMax) sMax = sy;
+                    }
+                    f.app(
+                        abi.encodePacked(
+                            '<rect x="', Num.itoa(xi * 30 - 16), '" y="', Num.itoa(sMin - 7),
+                            '" width="32" height="', Num.itoa(sMax - sMin + 14), '" fill="', T.BLACK, '"/>'
+                        )
+                    );
+                    runA = -1;
+                }
+            }
+        }
+    }
+
+    function conveyorField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
+        cv.nRows = uint256((1000 + cv.cycD) / cv.stepD) + 1;
+        int256[] memory mh = new int256[](cv.nRows * (cv.NKC + 1));
+        string[] memory ds = new string[](cv.nRows * (cv.NKC + 1));
+        for (uint256 ri = 0; ri < cv.nRows; ri++) {
+            for (uint256 j = 0; j <= cv.NKC; j++) {
+                (string memory d, int256 m) = convRowKey(c, pre, cv.stepD, int256(ri) * cv.stepD, int256(j) * 2);
+                ds[ri * (cv.NKC + 1) + j] = d;
+                mh[ri * (cv.NKC + 1) + j] = m;
+            }
+        }
+        uint8[] memory colK = new uint8[](cv.nRows * cv.NKC);
+        convColors(c, cv, mh, colK);
+        convEchoes(c, f, cv, ds, mh);
+        f.app(bytes('<g fill="none">'));
+        for (uint256 ri = 0; ri < cv.nRows; ri++) {
+            convEmitRow(c, f, cv, ds, colK, ri);
+        }
+        f.app(bytes("</g>"));
+        convHoles(c, f, pre);
+        convCovers(c, f, pre);
+    }
+
+    /// legacy echo emission (BARCODE / NO SIGNAL static field)
+    function legacyEchoes(Ctx memory c, Buf.B memory f, int256[] memory figIdx, Conv memory cv) internal pure {
+        Buf.B memory e = Buf.init(26000);
+        Buf.B memory e2 = Buf.init(12000);
+        for (uint256 i = 0; i < cv.nE; i++) {
+            if (bytes(c.lineD[cv.ePicks[i]]).length > 0) {
+                e.app(abi.encodePacked('<path d="', c.lineD[cv.ePicks[i]], '"/>'));
+            }
+        }
+        for (uint256 i = 0; i < cv.nE2; i++) {
+            if (bytes(c.lineD[cv.e2Picks[i]]).length > 0) {
+                e2.app(abi.encodePacked('<path d="', c.lineD[cv.e2Picks[i]], '"/>'));
+            }
+        }
+        if (c.tier >= 6) {
+            for (uint256 li = 0; li < c.lines.length; li++) {
+                if (figIdx[li] >= 0 && figIdx[li] < 8) e.app(abi.encodePacked('<path d="', c.lineD[li], '"/>'));
+            }
+        }
+        if (e.len > 0) {
+            f.app(
+                abi.encodePacked(
+                    '<g fill="none" stroke="', T.PINK, '" stroke-width="', Num.itoa(swOf(c)),
+                    '" transform="translate(', Num.itoa(cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                )
+            );
+            f.app(e.fin());
+            f.app(bytes("</g>"));
+        }
+        if (e2.len > 0) {
+            f.app(
+                abi.encodePacked(
+                    '<g fill="none" stroke="', T.WHITE, '" stroke-width="', Num.itoa(swOf(c)),
+                    '" transform="translate(', Num.itoa(-cv.eDx), " ", Num.itoa(cv.eDy), ')">'
+                )
+            );
+            f.app(e2.fin());
+            f.app(bytes("</g>"));
+        }
     }
 
     function fieldGroups(Ctx memory c, Buf.B memory f, int256[] memory figIdx, uint256 crestN, bool invert)
