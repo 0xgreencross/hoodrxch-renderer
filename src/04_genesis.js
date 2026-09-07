@@ -143,6 +143,48 @@ function heightAt(t,noiseCols,x,y,noSock){
   const col=Math.max(0,Math.min(50,(x>>1)));
   return b+noiseCols[col];
 }
+// --- DECI-UNIT variants (conveyor animation pass) ------------------------
+// yd is y in deci-units (1 deci-unit = 1px at 1000-scale). Integer-only math,
+// exact generalizations: heightAtD(t,nc,x,y*10) === heightAt(t,nc,x,y).
+function floorDiv(a,b){ return Math.floor(a/b); }
+function rdiv(a,b){ return floorDiv(a+((b/2)|0),b); } // == Math.round(a/b) for integer a, even b
+function bump100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q=10000-d2;
+  return Math.trunc(A*q*q/1000000);
+}
+function bumpFlat100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q = d2<4200 ? 10000 : Math.trunc((10000-d2)*10000/5800);
+  return Math.trunc(A*q/100);
+}
+function heightAtD(t,noiseCols,x,yd){
+  let b=bumpFlat100D(x,yd,t.cx,t.cy*10,t.rw,t.rh,t.amp);
+  b+=bump100D(x,yd,t.cx+t.peak,(t.cy-t.rh+6)*10,14,16,t.pamp);
+  b+=bumpFlat100D(x,yd,t.cx+((t.peak/2)|0),(t.cy+18)*10,t.rw+5,14,(t.amp>>1));
+  b-=bump100D(x,yd,t.cx+((t.peak/3)|0),(t.cy+7)*10,4,6,t.nas);
+  if(t.x2mode===1){ b+=bump100D(x,yd,t.cx-t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); b+=bump100D(x,yd,t.cx+t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); }
+  else if(t.x2mode===2){ b+=bump100D(x,yd,t.cx-t.rw+4,(t.cy-t.rh+10)*10,5,12,t.x2amp); b+=bump100D(x,yd,t.cx+t.rw-4,(t.cy-t.rh+10)*10,5,12,t.x2amp); }
+  else if(t.x2mode===3){ b-=bump100D(x,yd,t.cx+((t.peak/2)|0),(t.cy-t.rh+8)*10,9,10,t.x2amp); }
+  if(yd>t.jawY*10){ const f=Math.max(0,1400-(yd-t.jawY*10)*10); b=Math.trunc(b*f/1400); }
+  if(b<-400) b=-400;
+  const col=Math.max(0,Math.min(50,(x>>1)));
+  return b+noiseCols[col];
+}
+function inSocketD(t,x,yvd,which){
+  const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
+  const nx=Math.trunc(((x-(t.cx+dx))*100)/(r+1)), ny=Math.trunc(((yvd-(t.cy+dy)*10)*10)/Math.max(2,r-1));
+  return nx*nx+ny*ny<10000;
+}
+// 32-bit hash for stationary field features (Solidity: uint32 wrapping math)
+function fhash(a,b){
+  let x=(Math.imul(a,2654435761)^Math.imul(b,97655331)^0x9e3779b9)>>>0;
+  x^=x>>>13; x=Math.imul(x,1274126177)>>>0; x^=x>>>16; return x>>>0;
+}
 // inside-socket test (for line gaps at the eyes)
 function inSocket(t,x,y,which){
   const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
