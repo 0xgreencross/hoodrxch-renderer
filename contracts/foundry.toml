@@ -1,8 +1,11 @@
 [profile.default]
 src = "src"
+solc = "/usr/local/bin/solc"
 out = "out"
 libs = ["lib"]
 optimizer = true
 via_ir = true
 optimizer_runs = 1
 fs_permissions = [{ access = "read-write", path = "./" }]
+
+gas_limit = "18446744073709551615"
