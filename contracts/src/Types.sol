@@ -25,5 +25,6 @@ library T {
         Slc[] slices;
         Rng.R rng;
         int256[3][2] eyeScreen; // [x, y, r] per eye, unit coords
+        uint256 introSeq; // construction-intro succession count consumed by the figure
     }
 }

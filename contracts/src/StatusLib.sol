@@ -187,11 +187,16 @@ library StatusLib {
             body.app(abi.encodePacked('<path d="M0 540h1000" fill="none" stroke="', T.RED, '" stroke-width="5"/>'));
         } else {
             body.app(abi.encodePacked('<path d="M0 540h1000" fill="none" stroke="', T.WHITE, '" stroke-width="5"/>'));
+            // the residual heartbeat: each pass, the flatline itself rises into
+            // the complex — a traveling black cover erases the static line under
+            // the beat so the zigzag replaces it — then melts back flat.
             body.app(
                 abi.encodePacked(
-                    '<g transform="translate(520 0)"><path d="M-174 540h20l10 -18 10 18h25l12 -75 12 150 12 -75h25l14 -26 14 26h20" fill="none" stroke="',
+                    '<g transform="translate(520 0)"><rect x="-348" y="533" width="348" height="14" fill="',
+                    T.BLACK,
+                    '"/><path d="M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40" fill="none" stroke="',
                     T.WHITE,
-                    '" stroke-width="5"/><animateTransform attributeName="transform" type="translate" values="0 0;1174 0" dur="2.8s" repeatCount="indefinite"/></g>'
+                    '" stroke-width="5"><animate attributeName="d" values="M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40" keyTimes="0;0.3;0.5;0.7;1" dur="2.8s" repeatCount="indefinite"/></path><animateTransform attributeName="transform" type="translate" values="0 0;1348 0" dur="2.8s" repeatCount="indefinite"/></g>'
                 )
             );
         }

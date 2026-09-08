@@ -126,10 +126,11 @@ library Mask {
     function drawTraits(Rng.R memory rng) internal pure returns (Traits memory t) {
         t.form = pick(rng, dyn16(wForm()));
         // anatomy per form (ranges keep continuous variety inside each silhouette)
-        // cx pinned to dead center (circular-crop safe); draw consumed for trait parity
+        // cx AND cy pinned to dead center (circular-crop safe); draws consumed for trait parity
         rng.rInt(13);
         t.cx = 50;
-        t.cy = 50 + rng.rInt(9);
+        rng.rInt(9);
+        t.cy = 52;
         t.rw = 25 + rng.rInt(9);
         t.rh = 29 + rng.rInt(11);
         t.amp = 19 + rng.rInt(7);
@@ -142,7 +143,7 @@ library Mask {
         else if (t.form == 4) { t.amp = 14 + rng.rInt(4); t.rw = 27 + rng.rInt(8); }
         else if (t.form == 5) { t.rh = 38 + rng.rInt(7); t.rw = 24 + rng.rInt(7); t.amp = 20 + rng.rInt(7); }
         else if (t.form == 6) { t.rw = 20 + rng.rInt(5); t.pamp = 12 + rng.rInt(5); t.rh = 34 + rng.rInt(9); }
-        else if (t.form == 7) { t.amp = 12 + rng.rInt(4); t.cy = 55 + rng.rInt(4); t.rh = 26 + rng.rInt(7); }
+        else if (t.form == 7) { t.amp = 12 + rng.rInt(4); rng.rInt(4); t.rh = 26 + rng.rInt(7); } // SUNKEN: squatness via amp/rh; cy stays centered
         else if (t.form == 8) { t.x2mode = 1; t.x2amp = 8 + rng.rInt(5); t.x2dx = 10 + rng.rInt(5); }
         else if (t.form == 9) { t.x2mode = 2; t.x2amp = 10 + rng.rInt(5); }
         else if (t.form == 10) {
@@ -156,7 +157,7 @@ library Mask {
         else if (t.form == 11) { t.x2mode = 3; t.x2amp = 8 + rng.rInt(5); }
         else if (t.form == 12) { t.rw = 36 + rng.rInt(5); t.amp = 26 + rng.rInt(5); t.rh = 34 + rng.rInt(7); }
         else if (t.form == 13) { t.rw = 18 + rng.rInt(4); t.pamp = 14 + rng.rInt(5); t.rh = 38 + rng.rInt(7); t.amp = 16 + rng.rInt(5); }
-        else if (t.form == 14) { t.cy = 44 + rng.rInt(3); t.rh = 40 + rng.rInt(5); }
+        else if (t.form == 14) { rng.rInt(3); t.rh = 40 + rng.rInt(5); } // WRAITH TALL: height via rh; cy stays centered
         else if (t.form == 15) { t.amp = 10 + rng.rInt(4); }
         t.jawY = t.cy + 22 + rng.rInt(8);
         t.sLdx = -(8 + rng.rInt(6));

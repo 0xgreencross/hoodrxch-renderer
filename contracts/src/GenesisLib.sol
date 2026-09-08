@@ -8,6 +8,7 @@ import {Rng} from "./Rng.sol";
 import {Geom} from "./Geom.sol";
 import {Mask} from "./Mask.sol";
 import {T} from "./Types.sol";
+import {Intro} from "./Intro.sol";
 
 /// @notice buildGenesis — the SIGNAL WRAITH figure, Trait Engine V2.
 /// Mirrors src/05_render.js buildGenesis() with identical RNG draw order and
@@ -249,7 +250,9 @@ library GenesisLib {
         return ""; // 24 ALL SEEING handled at drawEyes level
     }
 
-    function drawEyes(Ctx memory c, string memory fill, int256 ox, int256 oy) internal pure returns (string memory) {
+    /// the eyes ignite on independent left/right rhythms: every glyph and
+    /// treatment routes into a per-side collector (2 = spans both sockets)
+    function drawEyes(Ctx memory c, Buf.B[3] memory parts, string memory fill, int256 ox, int256 oy) internal pure {
         if (c.t.eyes == 3) {
             int256 lx = c.eyePos[0][0];
             int256 ly = c.eyePos[0][1];
@@ -263,28 +266,28 @@ library GenesisLib {
             p[1] = Geom.Pt(rx2 + rr2, vy);
             p[2] = Geom.Pt(rx2 + rr2, vy + 5);
             p[3] = Geom.Pt(lx - lr, vy + 7);
-            return Geom.poly(Geom.offsetPts(p, ox, oy), fill);
+            parts[2].app(Geom.poly(Geom.offsetPts(p, ox, oy), fill));
+            return;
         }
         if (c.t.eyes == 24) { // ALL SEEING
-            bytes memory e;
             for (uint256 i = 0; i < 2; i++) {
-                e = abi.encodePacked(e, octRing(c.eyeScr[i][0] + ox, c.eyeScr[i][1] + oy, c.eyeScr[i][2] - 1, 9, fill));
+                parts[uint256(c.eyeScr[i][3])].app(
+                    octRing(c.eyeScr[i][0] + ox, c.eyeScr[i][1] + oy, c.eyeScr[i][2] - 1, 9, fill)
+                );
             }
             int256 mx = (c.eyeScr[0][0] + c.eyeScr[1][0]) / 2;
             int256 ty = Num.min(c.eyeScr[0][1], c.eyeScr[1][1]) - c.t.eyeR - 7;
-            e = abi.encodePacked(e, Geom.xmark(mx + ox, ty + oy, c.t.eyeR + 2, 3, fill, c.rng));
-            return string(e);
+            parts[2].app(Geom.xmark(mx + ox, ty + oy, c.t.eyeR + 2, 3, fill, c.rng));
+            return;
         }
-        bytes memory out;
         for (uint256 i = 0; i < 2; i++) {
             int256 ex = c.eyePos[i][0];
             int256 ey2 = c.eyePos[i][1];
             int256 r = c.eyePos[i][2];
             uint256 side = uint256(c.eyePos[i][3]);
             int256 disp = Num.jsRound(Mask.heightAt(c.t, c.noise, ex, ey2), 100);
-            out = abi.encodePacked(out, eyeGlyph(c.t.eyes, side, ex + ox, ey2 - disp / 3 + 2 + oy, r, fill, c.rng));
+            parts[side].app(eyeGlyph(c.t.eyes, side, ex + ox, ey2 - disp / 3 + 2 + oy, r, fill, c.rng));
         }
-        return string(out);
     }
 
     // --- the build ----------------------------------------------------------
@@ -332,7 +335,7 @@ library GenesisLib {
         c.mouthY = c.t.cy + 13 + c.rng.rInt(3);
         buildLinePaths(c, pre);
         c.tier = tierForKills(s.kills);
-        g.figure = buildFigure(c, s, pre);
+        (g.figure, g.introSeq) = buildFigure(c, s, pre);
         g.t = c.t;
         g.rng = c.rng;
         g.slices = mkSlices(c, s);
@@ -572,9 +575,27 @@ library GenesisLib {
         return Num.max(3, Num.min(6, c.lines[0].w));
     }
 
-    function buildFigure(Ctx memory c, RenderStateV1 memory s, Pre memory pre) internal pure returns (string memory) {
-        Buf.B memory f = Buf.init(400000); // conveyor keyframes are the bulk (DUAL WEIGHT peaks ~360KB)
-        // white specks
+    /// CONSTRUCTION INTRO schedule: populate/extrude end at 1s, eyes ignite,
+    /// the mouth lands at 1.42s, then everything else in 0.25s succession —
+    /// absent elements are skipped so the rhythm never waits on nothing.
+    /// All times in centiseconds; 0 = element absent.
+    struct Sched {
+        int256 tSigil;
+        int256 tBlock;
+        int256 tSpecks;
+        int256 tRecs;
+        int256 tEcho;
+        int256 tHalo;
+        int256 tFlat;
+        int256 tLight;
+        int256 tHeart;
+        uint256 seq;
+    }
+
+    function buildFigure(Ctx memory c, RenderStateV1 memory s, Pre memory pre) internal pure returns (string memory, uint256 introSeq) {
+        Buf.B memory f = Buf.init(1300000); // intro keyframes dominate (DENSE peaks far above the old 400KB)
+        // white specks (captured; revealed on the intro schedule)
+        string memory specksSvg;
         {
             Buf.B memory d = Buf.init(1200);
             int256 n = 12 + c.rng.rInt(16);
@@ -583,7 +604,7 @@ library GenesisLib {
                 int256 y = c.rng.rInt(100);
                 d.app(abi.encodePacked("M", Num.itoa(x * 10), " ", Num.itoa(y * 10), "h10v10h-10z"));
             }
-            f.app(abi.encodePacked('<path d="', d.fin(), '" fill="', T.WHITE, '"/>'));
+            specksSvg = string(abi.encodePacked('<path d="', d.fin(), '" fill="', T.WHITE, '"/>'));
         }
         int256[] memory figIdx = new int256[](c.lines.length);
         figRank(c, figIdx);
@@ -607,11 +628,26 @@ library GenesisLib {
         }
         cv.crestN = crestN;
         cv.invert = invert;
+        // the reveal schedule (times skip absent elements; base 1.42s = tMouth)
+        Sched memory sc;
+        {
+            int256 tM = 142;
+            sc.tSigil = tM + 25 * int256(++sc.seq);
+            sc.tBlock = tM + 25 * int256(++sc.seq);
+            sc.tSpecks = tM + 25 * int256(++sc.seq);
+            if (s.kills > 0 || s.forcedPurges > 0 || s.savesReceived > 0 || s.deaths > 0) sc.tRecs = tM + 25 * int256(++sc.seq);
+            if (cv.nE > 0 || cv.nE2 > 0 || c.tier >= 6) sc.tEcho = tM + 25 * int256(++sc.seq);
+            if (c.tier > 0) sc.tHalo = tM + 25 * int256(++sc.seq);
+            if (c.flatLi >= 0) sc.tFlat = tM + 25 * int256(++sc.seq);
+            if (pre.lightning) sc.tLight = tM + 25 * int256(++sc.seq);
+            if (c.t.pink == 7) sc.tHeart = tM + 25 * int256(++sc.seq);
+        }
+        f.app(Intro.reveal(specksSvg, sc.tSpecks));
         // === THE CONVEYOR: every LINES style flows. BARCODE breathes its
         // widths through a standing slot pattern; NO SIGNAL runs a slow sky
         // band plus a fast signal band clipped to the hood silhouette.
         if (c.t.lineW == 8) {
-            noSignalField(c, f, pre, cv);
+            noSignalField(c, f, pre, cv, sc.tEcho);
         } else {
             cv.stepD = c.t.lineW == 3 ? int256(10) : c.t.lineW == 4 ? int256(40) : int256(20);
             cv.cycD = c.t.lineW == 6 ? cv.stepD * 2 : cv.stepD;
@@ -619,14 +655,27 @@ library GenesisLib {
             cv.durS = cv.cycD == 10 ? "0.75s" : cv.cycD == 40 ? "3s" : "1.5s";
             cv.colours = true;
             cv.bcW = c.t.lineW == 7;
-            conveyorField(c, f, pre, cv);
+            cv.introP = cv.cycD == 10 ? int256(20) : cv.cycD; // DENSE rushes two whole cycles
+            conveyorField(c, f, pre, cv, sc.tEcho);
+        }
+        // holes + covers reveal with the extrusion's completion (introEnd = 1s)
+        {
+            Buf.B memory hc = Buf.init(60000);
+            convHoles(c, hc, pre);
+            convCovers(c, hc, pre);
+            f.app(Intro.reveal(hc.fin(), 100));
         }
         // FLATLINE SCAR
         if (c.flatLi >= 0) {
             f.app(
-                abi.encodePacked(
-                    '<path d="M0 ', Num.itoa(c.lines[uint256(c.flatLi)].y * 10),
-                    'h1000" fill="none" stroke="', T.WHITE, '" stroke-width="6"/>'
+                Intro.reveal(
+                    string(
+                        abi.encodePacked(
+                            '<path d="M0 ', Num.itoa(c.lines[uint256(c.flatLi)].y * 10),
+                            'h1000" fill="none" stroke="', T.WHITE, '" stroke-width="6"/>'
+                        )
+                    ),
+                    sc.tFlat
                 )
             );
         }
@@ -639,23 +688,37 @@ library GenesisLib {
                 d.app(abi.encodePacked("L", Num.itoa(x * 10), " ", Num.itoa(ny * 10)));
             }
             string memory dd = d.fin();
-            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>'));
-            f.app(abi.encodePacked('<path d="', dd, '" fill="none" stroke="', T.WHITE, '" stroke-width="3"/>'));
+            f.app(
+                Intro.reveal(
+                    string(
+                        abi.encodePacked(
+                            '<path d="', dd, '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>',
+                            '<path d="', dd, '" fill="none" stroke="', T.WHITE, '" stroke-width="3"/>'
+                        )
+                    ),
+                    sc.tLight
+                )
+            );
         }
         // HEARTBEAT
         if (c.t.pink == 7) {
             int256 hy = (20 + c.rng.rInt(60)) * 10;
             int256 bx = (10 + c.rng.rInt(60)) * 10;
             f.app(
-                abi.encodePacked(
-                    '<path d="M0 ', Num.itoa(hy), "h", Num.itoa(bx), "l15 -70 15 140 15 -70h",
-                    Num.itoa(1000 - bx - 45), '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>'
+                Intro.reveal(
+                    string(
+                        abi.encodePacked(
+                            '<path d="M0 ', Num.itoa(hy), "h", Num.itoa(bx), "l15 -70 15 140 15 -70h",
+                            Num.itoa(1000 - bx - 45), '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>'
+                        )
+                    ),
+                    sc.tHeart
                 )
             );
         }
         // eyes + treatments + records + marks + halo
-        eyesAndRest(c, s, f);
-        return f.fin();
+        eyesAndRest(c, s, f, sc);
+        return (f.fin(), sc.seq);
     }
 
     // === CONVEYOR (animation pass) =========================================
@@ -677,6 +740,7 @@ library GenesisLib {
         int256 y0Start;     // first grid row (NO SIGNAL sky band starts at -20)
         bool colours;       // apply the kill-tier/pink ladder (sky band: no)
         bool bcW;           // BARCODE: widths breathe through the standing slot pattern
+        int256 introP;      // CONSTRUCTION INTRO: total travel over the 1s intro (nCyc*cycD)
     }
 
     /// standing disturbances: spikes/pulse swell as a line passes their anchor
@@ -703,11 +767,18 @@ library GenesisLib {
         }
     }
 
-    /// one keyframe of one row: fixed "M + 33 l" structure, integer deci-units
-    function convRowKey(Ctx memory c, Pre memory pre, int256 stepD, int256 y0d, int256 pD)
+    /// one keyframe of one row: fixed "M + 33 l" structure, integer deci-units.
+    /// num/den drive the INTRO EXTRUSION (0,0 = the eternal loop): every
+    /// column rises together from the flat, each at a speed inversely
+    /// proportional to its distance from the spine — u = T*80/(|x-cx|+30),
+    /// integer-smoothstepped, so the spine completes first (height) and the
+    /// flanks settle progressively later (width) with no traveling front.
+    /// wantL additionally returns the integer arc length (isqrt segment sums)
+    /// used to centre-anchor dash phase while the hood lengthens the path.
+    function convRowKey(Ctx memory c, Pre memory pre, int256 stepD, int256 y0d, int256 pD, int256 num, int256 den, bool wantL)
         internal
         pure
-        returns (string memory, int256 maxH)
+        returns (string memory, int256 maxH, int256 L)
     {
         int256 yd = y0d - pD;
         Buf.B memory b = Buf.init(640);
@@ -716,11 +787,24 @@ library GenesisLib {
             int256 h = Mask.heightAtD(c.t, c.noise, xi * 3, yd);
             if (h > maxH) maxH = h;
             int256 ypx = yd - Num.jsRound(h, 10) + convDisturb(c, pre, stepD, yd, xi);
+            if (den != 0) {
+                int256 dxc = xi * 3 - c.t.cx;
+                if (dxc < 0) dxc = -dxc;
+                int256 a = num * 80;
+                int256 bb = den * (dxc + 30);
+                if (a < bb) {
+                    int256 E = Num.jsRound(30 * a * a * (3 * bb - 2 * a), bb * bb * bb);
+                    ypx = yd + Num.jsRound((ypx - yd) * E, 30);
+                }
+            }
             if (xi == 0) b.app(abi.encodePacked("M0 ", Num.itoa(ypx)));
-            else b.app(abi.encodePacked("l30 ", Num.itoa(ypx - py)));
+            else {
+                b.app(abi.encodePacked("l30 ", Num.itoa(ypx - py)));
+                if (wantL) L += Num.isqrt(900 + (ypx - py) * (ypx - py));
+            }
             py = ypx;
         }
-        return (b.fin(), maxH);
+        return (b.fin(), maxH, L);
     }
 
     /// position-keyed colour roles per keyframe (wrap stays image-identical)
@@ -823,10 +907,33 @@ library GenesisLib {
         return (col == 0 && c.tier >= 5 && !cv.bcW) ? Num.max(2, w - 1) : w;
     }
 
-    function convDash(Ctx memory c, int256 y0d) internal pure returns (bytes memory) {
+    /// DASH PHASE MUST TRAVEL WITH THE CONTENT (architectural fix): dashFv is
+    /// the offset a row wears during loop cycle `cyc` — a function of content
+    /// identity F(y0d + cycD*cyc), periodic over 7 cycles. A static
+    /// screen-keyed offset snaps at every cycle wrap.
+    function dashHas(Ctx memory c, int256 y0d) internal pure returns (bool) {
+        if (c.t.lineW == 5) return true;
+        if (c.t.tear == 6) {
+            int256 p0v = Num.max(3, ((92 - y0d / 10) * 13) / 10);
+            return Num.min(45, Num.jsRound(p0v * 3 * 60, 1000)) > 2;
+        }
+        return false;
+    }
+
+    function dashFv(Ctx memory c, Conv memory cv, int256 y0d, int256 cyc) internal pure returns (int256) {
+        if (c.t.lineW == 5) {
+            return (((((y0d + cv.cycD * cyc) / 10) % 7) + 7) % 7) * 30;
+        }
+        int256 m = cv.cycD / cv.stepD;
+        int256 P7 = 7 * m;
+        int256 cls = (((Num.floorDiv(y0d, cv.stepD) + m * cyc) % P7) + P7) % P7;
+        return int256(uint256(Mask.fhash(uint32(uint256(cls)), 13) % 60));
+    }
+
+    function convDash(Ctx memory c, Conv memory cv, int256 y0d) internal pure returns (bytes memory) {
         if (c.t.lineW == 5) {
             return abi.encodePacked(
-                ' stroke-dasharray="150 60" stroke-dashoffset="', Num.itoa(((y0d / 10) % 7) * 30), '"'
+                ' stroke-dasharray="150 60" stroke-dashoffset="', Num.itoa(dashFv(c, cv, y0d, 0)), '"'
             );
         }
         if (c.t.tear == 6) {
@@ -836,14 +943,140 @@ library GenesisLib {
             if (g6 > 2) {
                 return abi.encodePacked(
                     ' stroke-dasharray="', Num.itoa(60 - g6), " ", Num.itoa(g6),
-                    '" stroke-dashoffset="', Num.itoa(int256(uint256(Mask.fhash(uint32(uint256(y0d)), 7) % 60))), '"'
+                    '" stroke-dashoffset="', Num.itoa(dashFv(c, cv, y0d, 0)), '"'
                 );
             }
         }
         return "";
     }
 
-    function convEmitRow(Ctx memory c, Buf.B memory f, Conv memory cv, string[] memory ds, uint8[] memory colK, uint256 ri)
+    /// CONSTRUCTION INTRO, one row: populate as a flat flowing line (bottom-up
+    /// display stagger), then the variable-speed extrusion over the back half
+    /// — ending exactly on the loop's frame 0. Dash rows also carry their
+    /// centre-anchored intro phase; BARCODE rows morph into the standing air
+    /// slot they rise toward. All one-shot; base attrs are the finished art.
+    function convIntroRow(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv, uint8 c0, uint256 ri, bool hasDash)
+        internal
+        pure
+    {
+        int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
+        int256 P = cv.introP;
+        int256 half = P / 2;
+        int256 den = P - half;
+        int256 st2 = cv.cycD % 4 == 0 ? int256(4) : int256(2);
+        int256 stE = cv.cycD % 4 == 0 ? int256(2) : int256(1);
+        int256 nCycE = P / cv.cycD;
+        // sample points: populate at st2, back half at 2-4x density (stE) so
+        // the widening reads as continuous motion, plus interior cycle-wrap
+        // duplicates (image-identical d jumps at duplicated keyTimes)
+        int256[] memory pts;
+        {
+            uint256 np = uint256((half + st2 - 1) / st2) + 1 + uint256((P - half) / stE);
+            pts = new int256[](np);
+            uint256 ip = 0;
+            for (int256 p = 0; p < half; p += st2) pts[ip++] = p;
+            pts[ip++] = half;
+            for (int256 p = half + stE; p < P; p += stE) pts[ip++] = p;
+            pts[ip++] = P;
+        }
+        uint256 nEnt = pts.length + uint256(nCycE - 1);
+        string[] memory kts = new string[](nEnt);
+        int256[] memory sl = new int256[](nEnt);
+        int256[] memory ll = new int256[](nEnt);
+        f.app(bytes('<animate attributeName="d" values="'));
+        {
+            uint256 idx = 0;
+            for (uint256 ip = 0; ip < pts.length; ip++) {
+                int256 p = pts[ip];
+                int256 num = p > half ? p - half : int256(0);
+                if (p > 0 && p < P && p % cv.cycD == 0) {
+                    (string memory d1,, int256 L1) = convRowKey(c, pre, cv.stepD, y0d, cv.cycD, num, den, hasDash);
+                    if (idx > 0) f.app(bytes(";"));
+                    f.app(d1);
+                    kts[idx] = Intro.kt4(p, P);
+                    sl[idx] = p / cv.cycD;
+                    ll[idx] = L1;
+                    idx++;
+                    (string memory d2,, int256 L2) = convRowKey(c, pre, cv.stepD, y0d, 0, num, den, hasDash);
+                    f.app(bytes(";"));
+                    f.app(d2);
+                    kts[idx] = Intro.kt4(p, P);
+                    sl[idx] = p / cv.cycD + 1;
+                    ll[idx] = L2;
+                    idx++;
+                } else {
+                    (string memory d,, int256 L) =
+                        convRowKey(c, pre, cv.stepD, y0d, p == P ? cv.cycD : p % cv.cycD, num, den, hasDash);
+                    if (idx > 0) f.app(bytes(";"));
+                    f.app(d);
+                    kts[idx] = Intro.kt4(p, P);
+                    int256 sv = p == 0 ? int256(1) : (p + cv.cycD - 1) / cv.cycD;
+                    if (sv < 1) sv = 1;
+                    if (sv > nCycE) sv = nCycE;
+                    sl[idx] = sv;
+                    ll[idx] = L;
+                    idx++;
+                }
+            }
+        }
+        f.app(bytes('" keyTimes="'));
+        for (uint256 k2 = 0; k2 < nEnt; k2++) {
+            if (k2 > 0) f.app(bytes(";"));
+            f.app(kts[k2]);
+        }
+        f.app(bytes('" dur="1s" calcMode="linear" repeatCount="1"/>'));
+        // bottom-up populate stagger (rows appear over the first 0.5s)
+        {
+            int256 k3 = int256(cv.nRows) - 1 - int256(ri);
+            if (25 * k3 > int256(cv.nRows)) {
+                f.app(
+                    abi.encodePacked(
+                        '<animate attributeName="display" values="none;inline" calcMode="discrete" dur="',
+                        Intro.secs(Num.jsRound(100 * k3, int256(cv.nRows))), '" repeatCount="1"/>'
+                    )
+                );
+            }
+        }
+        // the colour pop: all lines extrude acid, roles land at introEnd
+        if (c0 != 0) {
+            f.app(
+                abi.encodePacked(
+                    '<animate attributeName="stroke" values="', T.ACID, ";", strokeOfCol(c0),
+                    '" calcMode="discrete" dur="2s" repeatCount="1"/>'
+                )
+            );
+        }
+        // intro dash phase: per-segment loop-handoff hold + centre-anchor term
+        if (hasDash) {
+            int256 Lf = ll[nEnt - 1];
+            f.app(bytes('<animate attributeName="stroke-dashoffset" values="'));
+            for (uint256 k2 = 0; k2 < nEnt; k2++) {
+                if (k2 > 0) f.app(bytes(";"));
+                f.app(Num.itoa(dashFv(c, cv, y0d, sl[k2] - nCycE - 1) + Num.jsRound(Lf - ll[k2], 2)));
+            }
+            f.app(bytes('" keyTimes="'));
+            for (uint256 k2 = 0; k2 < nEnt; k2++) {
+                if (k2 > 0) f.app(bytes(";"));
+                f.app(kts[k2]);
+            }
+            f.app(bytes('" calcMode="linear" dur="1s" repeatCount="1"/>'));
+        }
+        // BARCODE: morph into the standing air-slot width the line rises toward
+        if (cv.bcW) {
+            int256 w1b = bcSlotW(c, y0d);
+            int256 w2c = bcSlotW(c, y0d - cv.cycD);
+            if (w2c != w1b) {
+                f.app(
+                    abi.encodePacked(
+                        '<animate attributeName="stroke-width" values="', Num.itoa(w1b), ";", Num.itoa(w2c),
+                        '" calcMode="linear" dur="1s" repeatCount="1"/>'
+                    )
+                );
+            }
+        }
+    }
+
+    function convEmitRow(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv, string[] memory ds, uint8[] memory colK, uint256 ri)
         internal
         pure
     {
@@ -854,18 +1087,35 @@ library GenesisLib {
         for (uint256 j = 1; j < cv.NKC; j++) {
             if (colK[ri * cv.NKC + j] != c0) varies = true;
         }
+        bool hasDash = dashHas(c, y0d);
         f.app(
             abi.encodePacked(
                 '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, cv, c0, w)), '"',
-                convDash(c, y0d), ' d="', ds[ri * (cv.NKC + 1)], '">'
+                convDash(c, cv, y0d), ' d="', ds[ri * (cv.NKC + 1)], '">'
             )
         );
+        convIntroRow(c, f, pre, cv, c0, ri, hasDash);
         f.app(bytes('<animate attributeName="d" values="'));
         for (uint256 j = 0; j <= cv.NKC; j++) {
             if (j > 0) f.app(bytes(";"));
             f.app(ds[ri * (cv.NKC + 1) + j]);
         }
-        f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite"/>'));
+        f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite" begin="1s"/>'));
+        if (hasDash) {
+            // the loop dash phase travels with the content: 7 values, one per
+            // cycle, aligned to the loop clock (pattern period 7 cycles)
+            f.app(bytes('<animate attributeName="stroke-dashoffset" values="'));
+            for (int256 cyc = 0; cyc < 7; cyc++) {
+                if (cyc > 0) f.app(bytes(";"));
+                f.app(Num.itoa(dashFv(c, cv, y0d, cyc)));
+            }
+            f.app(
+                abi.encodePacked(
+                    '" dur="', Intro.secs(cv.cycD * 105 / 2),
+                    '" calcMode="discrete" repeatCount="indefinite" begin="1s"/>'
+                )
+            );
+        }
         if (cv.bcW) {
             // BARCODE breathes: linear width morph toward the slot above (wrap-exact)
             int256 w2b = bcSlotW(c, y0d - cv.cycD);
@@ -873,7 +1123,7 @@ library GenesisLib {
                 f.app(
                     abi.encodePacked(
                         '<animate attributeName="stroke-width" values="', Num.itoa(w), ";", Num.itoa(w2b),
-                        '" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite"/>'
+                        '" dur="', cv.durS, '" calcMode="linear" repeatCount="indefinite" begin="1s"/>'
                     )
                 );
             }
@@ -884,7 +1134,7 @@ library GenesisLib {
                 if (j > 0) f.app(bytes(";"));
                 f.app(strokeOfCol(colK[ri * cv.NKC + j]));
             }
-            f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+            f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite" begin="1s"/>'));
             if (!cv.bcW) {
                 bool wv = false;
                 for (uint256 j = 1; j < cv.NKC; j++) {
@@ -896,7 +1146,7 @@ library GenesisLib {
                         if (j > 0) f.app(bytes(";"));
                         f.app(Num.itoa(widthOfCol(c, cv, colK[ri * cv.NKC + j], w)));
                     }
-                    f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite"/>'));
+                    f.app(abi.encodePacked('" dur="', cv.durS, '" calcMode="discrete" repeatCount="indefinite" begin="1s"/>'));
                 }
             }
         }
@@ -978,33 +1228,35 @@ library GenesisLib {
         ds = new string[](cv.nRows * (cv.NKC + 1));
         for (uint256 ri = 0; ri < cv.nRows; ri++) {
             for (uint256 j = 0; j <= cv.NKC; j++) {
-                (string memory d, int256 m) =
-                    convRowKey(c, pre, cv.stepD, cv.y0Start + int256(ri) * cv.stepD, int256(j) * 2);
+                (string memory d, int256 m,) =
+                    convRowKey(c, pre, cv.stepD, cv.y0Start + int256(ri) * cv.stepD, int256(j) * 2, 0, 0, false);
                 ds[ri * (cv.NKC + 1) + j] = d;
                 mh[ri * (cv.NKC + 1) + j] = m;
             }
         }
     }
 
-    function conveyorField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
+    function conveyorField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv, int256 tEcho) internal pure {
         cv.nRows = uint256((1000 + cv.cycD) / cv.stepD) + 1;
         (string[] memory ds, int256[] memory mh) = bandData(c, pre, cv);
         uint8[] memory colK = new uint8[](cv.nRows * cv.NKC);
         convColors(c, cv, mh, colK);
-        convEchoes(c, f, cv, ds, mh);
+        {
+            Buf.B memory ec = Buf.init(40000);
+            convEchoes(c, ec, cv, ds, mh);
+            f.app(Intro.reveal(ec.fin(), tEcho));
+        }
         f.app(bytes('<g fill="none">'));
         for (uint256 ri = 0; ri < cv.nRows; ri++) {
-            convEmitRow(c, f, cv, ds, colK, ri);
+            convEmitRow(c, f, pre, cv, ds, colK, ri);
         }
         f.app(bytes("</g>"));
-        convHoles(c, f, pre);
-        convCovers(c, f, pre);
     }
 
     /// NO SIGNAL: the wraith is the only thing carrying signal — a sparse sky
     /// band drifts at 1/3 speed while the figure band flows inside a
     /// stationary clip of the hood silhouette
-    function noSignalField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv) internal pure {
+    function noSignalField(Ctx memory c, Buf.B memory f, Pre memory pre, Conv memory cv, int256 tEcho) internal pure {
         Conv memory sky;
         sky.stepD = 60;
         sky.cycD = 60;
@@ -1012,6 +1264,7 @@ library GenesisLib {
         sky.durS = "4.5s";
         sky.y0Start = -20;
         sky.nRows = 19;
+        sky.introP = 60;
         (string[] memory dsS, int256[] memory mhS) = bandData(c, pre, sky);
         Conv memory fg;
         fg.stepD = 20;
@@ -1022,9 +1275,11 @@ library GenesisLib {
         fg.colours = true;
         fg.crestN = cv.crestN;
         fg.invert = cv.invert;
+        fg.introP = 20;
         (string[] memory dsF, int256[] memory mhF) = bandData(c, pre, fg);
         // echo ghosts: sky slots route to the sky band, figure slots to the fig band
         {
+            Buf.B memory ec = Buf.init(40000);
             Buf.B memory e = Buf.init(26000);
             Buf.B memory e2 = Buf.init(12000);
             for (uint256 i = 0; i < cv.nE; i++) {
@@ -1048,32 +1303,33 @@ library GenesisLib {
                 }
             }
             if (e.len > 0) {
-                f.app(
+                ec.app(
                     abi.encodePacked(
                         '<g fill="none" stroke="', T.PINK, '" stroke-width="', Num.itoa(swOf(c)),
                         '" transform="translate(', Num.itoa(cv.eDx), " ", Num.itoa(cv.eDy), ')">'
                     )
                 );
-                f.app(e.fin());
-                f.app(bytes("</g>"));
+                ec.app(e.fin());
+                ec.app(bytes("</g>"));
             }
             if (e2.len > 0) {
-                f.app(
+                ec.app(
                     abi.encodePacked(
                         '<g fill="none" stroke="', T.WHITE, '" stroke-width="', Num.itoa(swOf(c)),
                         '" transform="translate(', Num.itoa(-cv.eDx), " ", Num.itoa(cv.eDy), ')">'
                     )
                 );
-                f.app(e2.fin());
-                f.app(bytes("</g>"));
+                ec.app(e2.fin());
+                ec.app(bytes("</g>"));
             }
+            f.app(Intro.reveal(ec.fin(), tEcho));
         }
         // sky band (all acid)
         {
             uint8[] memory colS = new uint8[](sky.nRows * sky.NKC);
             f.app(bytes('<g fill="none">'));
             for (uint256 ri = 0; ri < sky.nRows; ri++) {
-                convEmitRow(c, f, sky, dsS, colS, ri);
+                convEmitRow(c, f, pre, sky, dsS, colS, ri);
             }
             f.app(bytes("</g>"));
         }
@@ -1110,12 +1366,10 @@ library GenesisLib {
             convColors(c, fg, mhF, colF);
             f.app(bytes('<g fill="none" clip-path="url(#nsg)">'));
             for (uint256 ri = 0; ri < fg.nRows; ri++) {
-                convEmitRow(c, f, fg, dsF, colF, ri);
+                convEmitRow(c, f, pre, fg, dsF, colF, ri);
             }
             f.app(bytes("</g>"));
         }
-        convHoles(c, f, pre);
-        convCovers(c, f, pre);
     }
 
     /// legacy echo emission (BARCODE / NO SIGNAL static field)
@@ -1208,7 +1462,7 @@ library GenesisLib {
         }
     }
 
-    function eyesAndRest(Ctx memory c, RenderStateV1 memory s, Buf.B memory f) internal pure {
+    function eyesAndRest(Ctx memory c, RenderStateV1 memory s, Buf.B memory f, Sched memory sc) internal pure {
         // eye positions
         {
             int256 rB = c.t.eyeR;
@@ -1228,12 +1482,17 @@ library GenesisLib {
             int256 base = c.t.treat;
             if (base <= 4) c.t.treat = c.tier >= 4 ? int256(4) : (c.tier >= 2 ? Num.max(1, base) : base);
         }
+        // left / right / spans-both collectors — the eyes ignite independently
+        Buf.B[3] memory parts;
+        parts[0] = Buf.init(24000);
+        parts[1] = Buf.init(24000);
+        parts[2] = Buf.init(24000);
         string memory mainFill = T.ACID;
         if (c.t.treat == 1 || c.t.treat == 4) {
-            f.app(drawEyes(c, T.PINK, 3, 2));
-            f.app(drawEyes(c, T.ACID, -2, -2));
+            drawEyes(c, parts, T.PINK, 3, 2);
+            drawEyes(c, parts, T.ACID, -2, -2);
         } else if (c.t.treat == 2 || (c.t.mosh > 0 && c.t.treat == 0)) {
-            f.app(drawEyes(c, T.PINK, 2, 2));
+            drawEyes(c, parts, T.PINK, 2, 2);
         }
         if (c.t.treat == 3 || c.t.treat == 4) {
             for (uint256 i = 0; i < 2; i++) {
@@ -1257,7 +1516,7 @@ library GenesisLib {
                     oct[5] = Geom.Pt(ex + q, cyp + q);
                     oct[6] = Geom.Pt(ex, cyp + rr);
                     oct[7] = Geom.Pt(ex - q, cyp + q);
-                    f.app(
+                    parts[uint256(c.eyePos[i][3])].app(
                         abi.encodePacked(
                             '<path d="', Geom.pathD(oct), '" fill="none" stroke="', k == 1 ? T.ACID : T.PINK,
                             '" stroke-width="5"/>'
@@ -1275,40 +1534,45 @@ library GenesisLib {
                 int256 y = Num.min(c.eyeScr[0][1], c.eyeScr[1][1]) - 8 + c.rng.rInt(16);
                 d.app(abi.encodePacked("M", Num.itoa(x * 10), " ", Num.itoa(y * 10), "h10v10h-10z"));
             }
-            f.app(abi.encodePacked('<path d="', d.fin(), '" fill="', T.WHITE, '"/>'));
+            parts[2].app(abi.encodePacked('<path d="', d.fin(), '" fill="', T.WHITE, '"/>'));
         } else if (c.t.treat == 6) { // CROSS FLARE
             for (uint256 i = 0; i < 2; i++) {
                 int256 ex = c.eyeScr[i][0];
                 int256 cyp = c.eyeScr[i][1];
                 int256 r = c.eyeScr[i][2];
-                f.app(Geom.rect(ex - 1, cyp - r - 8, 2, 6, T.ACID));
-                f.app(Geom.rect(ex - 1, cyp + r + 2, 2, 6, T.ACID));
-                f.app(Geom.rect(ex - r - 8, cyp - 1, 6, 2, T.ACID));
-                f.app(Geom.rect(ex + r + 2, cyp - 1, 6, 2, T.ACID));
-                f.app(Geom.rect(ex - 1, cyp - r - 10, 2, 2, T.PINK));
-                f.app(Geom.rect(ex - 1, cyp + r + 8, 2, 2, T.PINK));
+                Buf.B memory ps = parts[uint256(c.eyeScr[i][3])];
+                ps.app(Geom.rect(ex - 1, cyp - r - 8, 2, 6, T.ACID));
+                ps.app(Geom.rect(ex - 1, cyp + r + 2, 2, 6, T.ACID));
+                ps.app(Geom.rect(ex - r - 8, cyp - 1, 6, 2, T.ACID));
+                ps.app(Geom.rect(ex + r + 2, cyp - 1, 6, 2, T.ACID));
+                ps.app(Geom.rect(ex - 1, cyp - r - 10, 2, 2, T.PINK));
+                ps.app(Geom.rect(ex - 1, cyp + r + 8, 2, 2, T.PINK));
             }
         } else if (c.t.treat == 7) { // HALO EYES
             for (uint256 i = 0; i < 2; i++) {
-                f.app(octRing(c.eyeScr[i][0], c.eyeScr[i][1], c.eyeScr[i][2] + 5, 5, T.WHITE));
+                parts[uint256(c.eyeScr[i][3])].app(
+                    octRing(c.eyeScr[i][0], c.eyeScr[i][1], c.eyeScr[i][2] + 5, 5, T.WHITE)
+                );
             }
         } else if (c.t.treat == 8) { // SMEAR TRAIL
-            f.app(drawEyes(c, T.PINK, 8, 0));
-            f.app(drawEyes(c, T.WHITE, 4, 0));
+            drawEyes(c, parts, T.PINK, 8, 0);
+            drawEyes(c, parts, T.WHITE, 4, 0);
         } else if (c.t.treat == 9) { // INVERTED
             for (uint256 i = 0; i < 2; i++) {
                 int256 r = c.eyeScr[i][2];
-                f.app(Geom.rect(c.eyeScr[i][0] - r - 3, c.eyeScr[i][1] - r + 1, 2 * r + 6, 2 * r - 1, T.ACID));
+                parts[uint256(c.eyeScr[i][3])].app(
+                    Geom.rect(c.eyeScr[i][0] - r - 3, c.eyeScr[i][1] - r + 1, 2 * r + 6, 2 * r - 1, T.ACID)
+                );
             }
             mainFill = T.BLACK;
         } else if (c.t.treat == 10) { // PRISM
-            f.app(drawEyes(c, T.PINK, 4, 3));
-            f.app(drawEyes(c, T.WHITE, -4, -3));
+            drawEyes(c, parts, T.PINK, 4, 3);
+            drawEyes(c, parts, T.WHITE, -4, -3);
         } else if (c.t.treat == 11) { // GOD RAYS
             for (uint256 i = 0; i < 2; i++) {
                 int256 ex = c.eyeScr[i][0];
                 int256 cyp = c.eyeScr[i][1];
-                f.app(
+                parts[uint256(c.eyeScr[i][3])].app(
                     abi.encodePacked(
                         '<path d="M', Num.itoa(ex * 10), " ", Num.itoa(cyp * 10), "L0 0M", Num.itoa(ex * 10), " ",
                         Num.itoa(cyp * 10), "L1000 0M", Num.itoa(ex * 10), " ", Num.itoa(cyp * 10), "L",
@@ -1318,8 +1582,11 @@ library GenesisLib {
                 );
             }
         }
-        f.app(drawEyes(c, mainFill, 0, 0));
-        // kill notches
+        drawEyes(c, parts, mainFill, 0, 0);
+        f.app(Intro.flickL(string(abi.encodePacked(parts[0].fin(), parts[2].fin()))));
+        f.app(Intro.flickR(parts[1].fin()));
+        // battle records join the succession after the mouth
+        Buf.B memory rc = Buf.init(8000);
         if (s.kills > 0) {
             uint256 n = s.kills < 9 ? s.kills : 9;
             int256 lx = c.eyePos[0][0];
@@ -1327,22 +1594,22 @@ library GenesisLib {
             int256 disp = Num.jsRound(Mask.heightAt(c.t, c.noise, lx, ly), 100);
             int256 ny2 = ly - disp / 3 - c.t.eyeR - 5;
             for (uint256 i = 0; i < n; i++) {
-                f.app(Geom.rect(lx - c.t.eyeR + int256(i) * 3, ny2, 2, 3, T.PINK));
+                rc.app(Geom.rect(lx - c.t.eyeR + int256(i) * 3, ny2, 2, 3, T.PINK));
             }
         }
         if (s.forcedPurges > 0) {
             uint256 n = s.forcedPurges < 10 ? s.forcedPurges : 10;
-            for (uint256 i = 0; i < n; i++) f.app(Geom.rect(8 + int256(i) * 4, 95, 2, 3, T.WHITE));
+            for (uint256 i = 0; i < n; i++) rc.app(Geom.rect(8 + int256(i) * 4, 95, 2, 3, T.WHITE));
         }
         if (s.savesReceived > 0) {
             uint256 n = s.savesReceived < 5 ? s.savesReceived : 5;
-            for (uint256 i = 0; i < n; i++) f.app(Geom.xmark(8 + int256(i) * 6, 88, 2, 1, T.PINK, c.rng));
+            for (uint256 i = 0; i < n; i++) rc.app(Geom.xmark(8 + int256(i) * 6, 88, 2, 1, T.PINK, c.rng));
         }
         if (s.deaths > 0) {
             Rng.R memory drng = Rng.init(damageSeed(s.genesisHash, s.tokenId, s.deaths));
             for (uint256 k2 = 0; k2 < s.deaths; k2++) {
                 int256 sy2 = c.t.cy - 14 + drng.rInt(26);
-                f.app(
+                rc.app(
                     abi.encodePacked(
                         '<path d="M', Num.itoa((c.t.cx - c.t.rw + 2) * 10), " ", Num.itoa(sy2 * 10), "l",
                         Num.itoa((c.t.rw - 4 + drng.rInt(8)) * 10), " ", Num.itoa((drng.rInt(5) - 2) * 10),
@@ -1351,10 +1618,157 @@ library GenesisLib {
                 );
             }
         }
-        mouthMarks(c, f);
-        f.app(Mask.sigilSVG(s.wardId, 20, 20, T.ACID));
-        f.app(Mask.blockMarkSVG(s.blockId, 80, 80, c.rng, T.ACID));
-        if (c.tier > 0) haloInto(f, c);
+        f.app(Intro.reveal(rc.fin(), sc.tRecs));
+        // the mouth materializes by its own motif once the eyes burn steady
+        {
+            Buf.B memory mo = Buf.init(8000);
+            mouthMarks(c, mo);
+            f.app(glitchReveal(c, mo.fin()));
+        }
+        f.app(Intro.reveal(Mask.sigilSVG(s.wardId, 20, 20, T.ACID), sc.tSigil));
+        f.app(Intro.reveal(Mask.blockMarkSVG(s.blockId, 80, 80, c.rng, T.ACID), sc.tBlock));
+        if (c.tier > 0) {
+            Buf.B memory hb = Buf.init(20000);
+            haloInto(hb, c);
+            f.app(Intro.reveal(hb.fin(), sc.tHalo));
+        }
+    }
+
+    // === MOUTH MATERIALIZATION (per-motif glitch effects at tMouth=1.42s) ===
+
+    function gAn(bytes memory attr, bytes memory vals, bytes memory kts, bytes memory mode, bytes memory dur2)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(
+            '<animate attributeName="', attr, '" values="', vals, '"', kts, ' calcMode="', mode,
+            '" begin="1.42s" dur="', dur2, '" repeatCount="1"/>'
+        );
+    }
+
+    function gTr(string memory content, bytes memory vals, bytes memory kts, bytes memory mode, bytes memory dur2)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(
+            '<g><animateTransform attributeName="transform" type="translate" values="', vals, '"', kts,
+            ' calcMode="', mode, '" begin="1.42s" dur="', dur2, '" repeatCount="1"/>', content, "</g>"
+        );
+    }
+
+    function gClip(string memory content, bytes memory anims, int256 gx, int256 gy, int256 gw)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(
+            '<clipPath id="mgc"><rect x="', Num.itoa(gx), '" y="', Num.itoa(gy), '" width="', Num.itoa(gw),
+            '" height="320">', anims, '</rect></clipPath><g clip-path="url(#mgc)">', content, "</g>"
+        );
+    }
+
+    function gSc(string memory content, int256 px, int256 py, bytes memory vals, bytes memory dur2)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(
+            '<g transform="translate(', Num.itoa(px), " ", Num.itoa(py),
+            ')"><g><animateTransform attributeName="transform" type="scale" values="', vals,
+            '" calcMode="linear" begin="1.42s" dur="', dur2, '" repeatCount="1"/><g transform="translate(',
+            Num.itoa(-px), " ", Num.itoa(-py), ')">', content, "</g></g></g>"
+        );
+    }
+
+    /// each mouth archetype gets its own reveal effect, tailored to the motif
+    /// of the mouth itself — cuts are slashed open, the zipper zips, the wire
+    /// twangs, the scream erupts, the drip falls. Ghost doubles (glitch family
+    /// only) are intro-only. Base attrs always stay the finished art.
+    function glitchReveal(Ctx memory c, string memory content) internal pure returns (string memory) {
+        if (bytes(content).length == 0) return content;
+        int256 mid = c.t.mouth;
+        // mouth bounding geometry in px
+        int256 dispM = Num.jsRound(Mask.heightAt(c.t, c.noise, c.t.cx, c.mouthY), 100);
+        int256 my = c.mouthY - dispM / 3 + 2;
+        int256 gx = (c.t.cx - c.mw - 2) * 10;
+        int256 gy = (my - 9) * 10;
+        int256 gw = (2 * c.mw + 4) * 10;
+        int256 gpy = (my + 3) * 10;
+        bytes memory inner;
+        bytes memory ghosts;
+        if (mid == 1) { // GASH — a blade slashes the cut open, right to left
+            inner = gClip(
+                content,
+                abi.encodePacked(
+                    gAn("x", abi.encodePacked(Num.itoa(gx + gw), ";", Num.itoa(gx)), "", "linear", "0.1s"),
+                    gAn("width", abi.encodePacked("0;", Num.itoa(gw)), "", "linear", "0.1s")
+                ),
+                gx, gy, gw
+            );
+        } else if (mid == 2) { // GRIN — the jaw chatters
+            inner = gTr(content, "0 -14;0 12;0 -10;0 8;0 -6;0 4;0 0", "", "discrete", "0.15s");
+        } else if (mid == 3) { // SEWN — stitched shut one X at a time
+            inner = gClip(
+                content,
+                gAn(
+                    "width",
+                    abi.encodePacked(
+                        "0;", Num.itoa(Num.jsRound(gw, 3)), ";", Num.itoa(Num.jsRound(gw * 2, 3)), ";", Num.itoa(gw)
+                    ),
+                    "", "discrete", "0.18s"
+                ),
+                gx, gy, gw
+            );
+        } else if (mid == 4) { // WIRE — snaps taut and twangs
+            inner = gTr(content, "0 -10;0 8;0 -6;0 4;0 -2;0 1;0 0", "", "linear", "0.15s");
+        } else if (mid == 5) { // STITCHED GRIN — needle passes, then one clack
+            inner = abi.encodePacked(
+                '<g><animateTransform attributeName="transform" type="translate" values="0 -6;0 4;0 0" calcMode="discrete" begin="1.53s" dur="0.06s" repeatCount="1"/>',
+                gClip(
+                    content,
+                    gAn(
+                        "width",
+                        abi.encodePacked(
+                            "0;", Num.itoa(Num.jsRound(gw, 4)), ";", Num.itoa(Num.jsRound(gw, 2)), ";",
+                            Num.itoa(Num.jsRound(gw * 3, 4)), ";", Num.itoa(gw)
+                        ),
+                        "", "discrete", "0.11s"
+                    ),
+                    gx, gy, gw
+                ),
+                "</g>"
+            );
+        } else if (mid == 6) { // DOUBLE GASH — acid cut lands, then the pink one
+            inner = gClip(content, gAn("height", "0;120;320", "", "discrete", "0.14s"), gx, gy, gw);
+        } else if (mid == 7) { // SIDE SMIRK — slides in sideways, sly overshoot
+            inner = gTr(content, "90 -8;-8 2;0 0", ' keyTimes="0;0.7;1"', "linear", "0.2s");
+        } else if (mid == 8) { // ZIPPER — zips shut in one steady pull
+            inner = gClip(content, gAn("width", abi.encodePacked("0;", Num.itoa(gw)), "", "linear", "0.22s"), gx, gy, gw);
+        } else if (mid == 9) { // SNARL — violent lunge, a ghost at its heels
+            inner = gTr(content, "-46 -18;38 14;-30 -10;26 8;-14 -4;8 2;0 0", "", "discrete", "0.15s");
+            ghosts = bytes(Intro.ghost(content, -40, -16));
+        } else if (mid == 10) { // DRIP — falls from above and bounces to rest
+            inner = gTr(content, "0 -90;0 0;0 -16;0 0;0 -5;0 0", ' keyTimes="0;0.35;0.55;0.75;0.9;1"', "linear", "0.2s");
+        } else if (mid == 11) { // SCREAM — erupts vertically out of the baseline
+            inner = gSc(content, 0, gpy, "1 0;1 1.5;1 0.7;1 1.2;1 1", "0.18s");
+        } else if (mid == 12) { // FANGS — chomp-chomp: bites down twice
+            inner = gTr(content, "0 -90;0 0;0 -34;0 0;0 0", ' keyTimes="0;0.3;0.55;0.8;1"', "linear", "0.16s");
+        } else if (mid == 13) { // HOWL — the ring resonates outward, rings back
+            inner = gSc(content, c.t.cx * 10, gpy, "0.2 0.2;1.35 1.35;0.85 0.85;1.1 1.1;1 1", "0.2s");
+        } else if (mid == 14) { // MUZZLE — clamps up from below, shudders tight
+            inner = gTr(content, "0 90;0 0;0 10;0 0;0 4;0 0", ' keyTimes="0;0.3;0.5;0.7;0.85;1"', "linear", "0.16s");
+        } else { // 15 GLITCH MOUTH — maximal signal tear + double stutter ghosts
+            inner = gTr(content, "-80 0;64 -10;-52 12;44 -8;-28 6;14 -3;0 0", "", "discrete", "0.15s");
+            ghosts = abi.encodePacked(Intro.ghost(content, -64, 8), Intro.ghost(content, 52, -8));
+        }
+        return string(
+            abi.encodePacked(
+                '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="2.84s" repeatCount="1"/>',
+                inner, "</g>", ghosts
+            )
+        );
     }
 
     function mouthMarks(Ctx memory c, Buf.B memory f) internal pure {

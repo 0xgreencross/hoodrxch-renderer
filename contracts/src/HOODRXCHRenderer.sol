@@ -10,6 +10,7 @@ import {Mask} from "./Mask.sol";
 import {T} from "./Types.sol";
 import {GenesisLib} from "./GenesisLib.sol";
 import {StatusLib} from "./StatusLib.sol";
+import {Intro} from "./Intro.sol";
 import {MetaLib} from "./MetaLib.sol";
 import {BannerLib} from "./BannerLib.sol";
 import {Glyphs} from "./Glyphs.sol";
@@ -203,16 +204,28 @@ contract HOODRXCHRenderer {
                 body.app(Geom.slice(ci + 1, sl.y, sl.h, sl.dx, T.BLACK));
             }
         }
-        if (status == 1) body.app(StatusLib.markedOverlay(g));
-        else if (status == 4) body.app(StatusLib.witsecOverlay(g));
-        else if (status == 6) body.app(StatusLib.layLowOverlay(g));
-        else if (status == 5) body.app(StatusLib.buyerOverlay(g));
-        else if (status == 7) body.app(StatusLib.hunterOverlay(g));
-        body.app(StatusLib.sealHud(s));
-        body.app(StatusLib.seasonChips(s, used));
-        body.app(StatusLib.territoryHud(s));
-        if (s.displayMode == 1) body.app(StatusLib.statsBand(s, used));
-        body.app(StatusLib.flickerSVG(s));
+        // construction intro: the body layers join the 0.25s succession,
+        // continuing the figure's sequence (base = tMouth = 1.42s)
+        uint256 seq = g.introSeq;
+        if (status == 1) body.app(Intro.reveal(StatusLib.markedOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 4) body.app(Intro.reveal(StatusLib.witsecOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 6) body.app(Intro.reveal(StatusLib.layLowOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 5) body.app(Intro.reveal(StatusLib.buyerOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 7) body.app(Intro.reveal(StatusLib.hunterOverlay(g), 142 + 25 * int256(++seq)));
+        body.app(Intro.reveal(StatusLib.sealHud(s), 142 + 25 * int256(++seq)));
+        {
+            string memory c1 = StatusLib.seasonChips(s, used);
+            if (bytes(c1).length > 0) body.app(Intro.reveal(c1, 142 + 25 * int256(++seq)));
+        }
+        {
+            string memory c2 = StatusLib.territoryHud(s);
+            if (bytes(c2).length > 0) body.app(Intro.reveal(c2, 142 + 25 * int256(++seq)));
+        }
+        if (s.displayMode == 1) body.app(Intro.reveal(StatusLib.statsBand(s, used), 142 + 25 * int256(++seq)));
+        {
+            string memory c3 = StatusLib.flickerSVG(s);
+            if (bytes(c3).length > 0) body.app(Intro.reveal(c3, 142 + 25 * int256(++seq)));
+        }
         return (
             string(
                 abi.encodePacked(

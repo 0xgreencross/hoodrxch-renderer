@@ -46,6 +46,19 @@ library Num {
         return a / b;
     }
 
+    /// integer sqrt (Babylonian, floor) — mirrors the JS isqrt used for path
+    /// arc lengths (dash centre-anchoring); identical for all n >= 0
+    function isqrt(int256 n) internal pure returns (int256) {
+        if (n < 2) return n;
+        int256 x = n;
+        int256 y = (n + 1) / 2;
+        while (y < x) {
+            x = y;
+            y = (y + n / y) / 2;
+        }
+        return x;
+    }
+
     function min(int256 a, int256 b) internal pure returns (int256) {
         return a < b ? a : b;
     }
