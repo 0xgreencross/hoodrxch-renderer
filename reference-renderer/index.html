@@ -61,6 +61,7 @@ a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;te
   <button data-tab="evo">Evolution</button>
   <button data-tab="fx">Fixtures</button>
   <button data-tab="banner">Banner</button>
+  <button data-tab="curate">Curate</button>
   <span style="margin-left:auto;color:var(--mute)" id="ver"></span>
 </header>
 
@@ -74,6 +75,7 @@ a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;te
 <div id="evo" class="tab"><h2 style="color:var(--mute)">KILLS 0 / 1 / 10 / 25 / 50 / 75 / 100</h2><div class="evo" id="evoKills"></div><h2 style="color:var(--mute)">DEATH 1 → EXHUMED → DEATH 2 → EXHUMED → DEATH 3</h2><div class="evo" id="evoDeaths"></div><h2 style="color:var(--mute)">STATUS OVERLAYS</h2><div class="evo" id="evoStatus"></div></div>
 <div id="fx" class="tab"><a class="btn" id="exportFx" href="#">Export fixtures.json</a><div id="fxSummary"></div><div class="fx" id="fxGrid"></div></div>
 <div id="banner" class="tab"><div class="bannerwrap" id="bannerOut"></div></div>
+<div id="curate" class="tab"><div id="curateUI"></div></div>
 
 <script>
 'use strict';
@@ -331,10 +333,16 @@ function pick(rng,W){
   return W.length-1;
 }
 
+// CURATE MODE (workbench-only, never set onchain): force any trait value while
+// still burning the exact blessed rng stream — every pick is drawn as normal,
+// only the resulting value is replaced, so anatomy params/downstream draws stay
+// coherent and deterministic. TRAIT_OV=null → byte-identical to production.
+var TRAIT_OV=null;
+function ovv(k,v){ return (TRAIT_OV&&TRAIT_OV[k]!=null)?TRAIT_OV[k]:v; }
 // traits: form-driven anatomy + weighted buckets
 function drawTraits(rng){
   const t={};
-  t.form=pick(rng,FORM_W);
+  t.form=ovv('form',pick(rng,FORM_W));
   // anatomy per form (ranges keep continuous variety inside each silhouette)
   // cx pinned to dead center so the hood (and everything drawn around it) survives
   // the circular PFP crop; the draw is still consumed to keep all other traits identical
@@ -367,15 +375,15 @@ function drawTraits(rng){
   t.sRdx=  7+rng.int(6);  t.sRdy=-(3+rng.int(7)); t.sRr=6+rng.int(5); t.sRd=13+rng.int(9);
   t.nas = 4+rng.int(4);
   // field + surface buckets
-  t.lineW=pick(rng,LINE_W);
-  t.tear=pick(rng,TEAR_W);
-  t.spike=pick(rng,SPIKE_W);
-  t.eyes=pick(rng,EYE_W);
+  t.lineW=ovv('lineW',pick(rng,LINE_W));
+  t.tear=ovv('tear',pick(rng,TEAR_W));
+  t.spike=ovv('spike',pick(rng,SPIKE_W));
+  t.eyes=ovv('eyes',pick(rng,EYE_W));
   t.eyeR=6+rng.int(3);
-  t.treat=pick(rng,TREAT_W);
-  t.mouth=pick(rng,MOUTH_W);
-  t.pink=pick(rng,PINK_W);
-  t.mosh=pick(rng,MOSH_W);
+  t.treat=ovv('treat',pick(rng,TREAT_W));
+  t.mouth=ovv('mouth',pick(rng,MOUTH_W));
+  t.pink=ovv('pink',pick(rng,PINK_W));
+  t.mosh=ovv('mosh',pick(rng,MOSH_W));
   return t;
 }
 // heightfield in centi-units. x,y in units. Integer math only.
@@ -1729,6 +1737,141 @@ function drawBanner(){
     h+='<div style="margin-bottom:14px"><div style="color:var(--mute);font-size:10px;margin-bottom:4px">'+labels[i]+' · '+new Blob([svg]).size+' bytes</div><img style="width:100%;max-width:1500px;display:block" src="data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))+'"></div>'; }
   document.getElementById('bannerOut').innerHTML=h;
 }
+// ---------------------------------------------------------------------------
+// CURATE — trait compatibility curation. Bypasses the seed system (TRAIT_OV
+// forces trait values while burning the blessed rng stream) and guides a
+// pairwise sweep of every trait-value pair. Verdicts autosave to localStorage
+// and export as JSON so the rules can be implemented in the trait engine.
+// Philosophy: everything is compatible until banned — hunt the bans, then
+// "ALLOW REST OF AXIS PAIR" to close each axis pair fast.
+// ---------------------------------------------------------------------------
+const CUR_AXES=[
+ ['form',FORM_NAMES],['lineW',LINE_NAMES],['tear',TEAR_NAMES],['spike',SPIKE_NAMES],
+ ['eyes',EYE_NAMES],['treat',TREAT_NAMES],['mouth',MOUTH_NAMES],['pink',PINKAMT_NAMES],['mosh',MOSH_NAMES]];
+const CUR_KEY='hoodrxch_curation_v1';
+let CUR={version:1,verdicts:{}};
+try{ const raw=localStorage.getItem(CUR_KEY); if(raw) CUR=JSON.parse(raw); }catch(e){}
+let curPairIdx=0, curReroll=0, curFree=false, curFreeOv={};
+const CUR_QUEUE=[]; // [axisIdxA, axisIdxB] for all axis pairs
+for(let i=0;i<CUR_AXES.length;i++) for(let j=i+1;j<CUR_AXES.length;j++) CUR_QUEUE.push([i,j]);
+function curKey(ai,va,bi,vb){ return CUR_AXES[ai][0]+':'+va+'|'+CUR_AXES[bi][0]+':'+vb; }
+function curPairsOf(q){ const [ai,bi]=CUR_QUEUE[q]; const out=[];
+  for(let a=0;a<CUR_AXES[ai][1].length;a++) for(let b=0;b<CUR_AXES[bi][1].length;b++) out.push([ai,a,bi,b]);
+  return out; }
+function curTotals(){ let total=0,done=0;
+  for(let q=0;q<CUR_QUEUE.length;q++){ const ps=curPairsOf(q); total+=ps.length;
+    for(const [ai,a,bi,b] of ps) if(CUR.verdicts[curKey(ai,a,bi,b)]) done++; }
+  return [done,total]; }
+function curNextUndone(from){
+  for(let s2=0;s2<CUR_QUEUE.length;s2++){ const q=(from+s2)%CUR_QUEUE.length;
+    for(const [ai,a,bi,b] of curPairsOf(q)) if(!CUR.verdicts[curKey(ai,a,bi,b)]) return [q,ai,a,bi,b]; }
+  return null; }
+let curCur=null; // [q, ai, va, bi, vb]
+function curSave(){ try{ localStorage.setItem(CUR_KEY,JSON.stringify(CUR)); }catch(e){} }
+function curRenderOv(ov,seedId){ TRAIT_OV=ov; try{ return renderSVG(defaultState(seedId)); } finally{ TRAIT_OV=null; } }
+function curSeeds(){ const base=(curCur?curCur[0]*131+curCur[2]*17+curCur[4]*7:0)+curReroll*97;
+  return [1+(base*53%666),1+((base*53+167)%666),1+((base*53+331)%666),1+((base*53+499)%666)]; }
+function curVerdict(v){
+  if(curFree) return;
+  if(!curCur) return;
+  const [q,ai,va,bi,vb]=curCur;
+  const k=curKey(ai,va,bi,vb);
+  const rec={v,seed:curSeeds()[0]};
+  if(v==='warn'){ const note=prompt('Condition / note for this combo:'); if(note===null) return; rec.note=note; }
+  CUR.verdicts[k]=rec; curSave();
+  const nxt=curNextUndone(q); curCur=nxt?[nxt[0],nxt[1],nxt[2],nxt[3],nxt[4]]:null; curReroll=0;
+  drawCurate();
+}
+function curBulkAllow(){
+  if(curFree||!curCur) return;
+  const q=curCur[0]; let n=0;
+  for(const [ai,a,bi,b] of curPairsOf(q)){ const k=curKey(ai,a,bi,b);
+    if(!CUR.verdicts[k]){ CUR.verdicts[k]={v:'ok',bulk:1}; n++; } }
+  curSave();
+  const nxt=curNextUndone(q+1); curCur=nxt?[nxt[0],nxt[1],nxt[2],nxt[3],nxt[4]]:null; curReroll=0;
+  drawCurate();
+}
+function curJump(q){ const nxt=curNextUndone(q); curCur=nxt?[nxt[0],nxt[1],nxt[2],nxt[3],nxt[4]]:null; curReroll=0; drawCurate(); }
+function drawCurate(){
+  const el=document.getElementById('curateUI');
+  if(!curCur&&!curFree){ const nxt=curNextUndone(curPairIdx); if(nxt) curCur=[nxt[0],nxt[1],nxt[2],nxt[3],nxt[4]]; }
+  const [done,total]=curTotals();
+  let h='<div class="row" style="flex-wrap:wrap;gap:8px;align-items:center">';
+  h+='<button id="curModeG" '+(curFree?'':'class="on" ')+'style="'+(curFree?'':'background:var(--acid);color:#000')+'">GUIDED SWEEP</button>';
+  h+='<button id="curModeF" '+(curFree?'style="background:var(--acid);color:#000"':'')+'>FREE COMPOSE</button>';
+  h+='<span style="color:var(--mute)">progress '+done+' / '+total+' pairs ('+(total?(done*100/total).toFixed(1):0)+'%)</span>';
+  h+='<a class="btn" id="curExport" href="#">Export rules JSON</a>';
+  h+='<label class="btn" style="cursor:pointer">Import<input type="file" id="curImport" style="display:none"></label>';
+  h+='<button id="curWipe">Wipe all</button></div>';
+  if(curFree){
+    h+='<div class="row" style="flex-wrap:wrap;gap:6px;margin-top:8px">';
+    for(let i=0;i<CUR_AXES.length;i++){ const [k,names]=CUR_AXES[i];
+      h+='<label style="display:flex;flex-direction:column;font-size:10px;color:var(--mute)">'+k
+        +'<select data-cf="'+k+'"><option value="">— natural —</option>'
+        +names.map((n,vi)=>'<option value="'+vi+'"'+(curFreeOv[k]===vi?' selected':'')+'>'+vi+' '+n+'</option>').join('')+'</select></label>'; }
+    h+='<label style="display:flex;flex-direction:column;font-size:10px;color:var(--mute)">seed token<input type="number" id="curFreeSeed" min="1" max="666" value="'+(curFreeOv.__seed||94)+'" style="width:70px"></label>';
+    h+='</div><div id="curFreeOut" style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap"></div>';
+    el.innerHTML=h;
+    const ov={}; for(const [k] of CUR_AXES) if(curFreeOv[k]!=null) ov[k]=curFreeOv[k];
+    const seed=curFreeOv.__seed||94;
+    const svg=curRenderOv(ov,seed);
+    TRAIT_OV=ov; let tn; try{ tn=traitNames(defaultState(seed)); } finally{ TRAIT_OV=null; }
+    document.getElementById('curFreeOut').innerHTML=svgTag(svg,420)+svgTag(svg,300,'circ')
+      +'<pre style="font-size:10px">'+JSON.stringify(tn,null,1)+'</pre>';
+  } else if(curCur){
+    const [q,ai,va,bi,vb]=curCur; const [axA,namesA]=CUR_AXES[ai]; const [axB,namesB]=CUR_AXES[bi];
+    const ps=curPairsOf(q); let qd=0; for(const [xai,a,xbi,b] of ps) if(CUR.verdicts[curKey(xai,a,xbi,b)]) qd++;
+    h+='<div style="margin-top:10px;font-size:15px;color:var(--acid)">'+axA.toUpperCase()+' <b>'+namesA[va]+'</b> × '+axB.toUpperCase()+' <b>'+namesB[vb]+'</b></div>';
+    h+='<div style="color:var(--mute);font-size:11px;margin:2px 0 8px">axis pair '+(q+1)+'/'+CUR_QUEUE.length+' — '+qd+'/'+ps.length+' judged in this pair · 4 seeds shown, only the pinned pair is forced</div>';
+    h+='<div class="row" style="gap:8px;flex-wrap:wrap">'
+      +'<button id="curOk" style="background:var(--acid);color:#000">ALLOW (A)</button>'
+      +'<button id="curBan" style="background:#FF2A2A;color:#fff">NEVER MIX (X)</button>'
+      +'<button id="curWarn">FLAG+NOTE (W)</button>'
+      +'<button id="curReroll">REROLL SEEDS (R)</button>'
+      +'<button id="curBulk">ALLOW REST OF AXIS PAIR (Z)</button>'
+      +'<select id="curJumpSel">'+CUR_QUEUE.map((p,i)=>'<option value="'+i+'"'+(i===q?' selected':'')+'>'+CUR_AXES[p[0]][0]+' × '+CUR_AXES[p[1]][0]+'</option>').join('')+'</select>'
+      +'</div>';
+    h+='<div id="curGrid" style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap"></div>';
+    el.innerHTML=h;
+    const ov={}; ov[axA]=va; ov[axB]=vb;
+    let gh='';
+    for(const sd of curSeeds()){ const svg=curRenderOv(ov,sd); gh+='<div>'+svgTag(svg,230)+'<div style="color:var(--mute);font-size:10px;text-align:center">seed #'+sd+'</div></div>'; }
+    document.getElementById('curGrid').innerHTML=gh;
+  } else {
+    h+='<div style="margin-top:14px;color:var(--acid);font-size:15px">EVERY PAIR CURATED. Export the rules JSON and hand it over.</div>';
+    el.innerHTML=h;
+  }
+  // wire events
+  const on=(id,fn)=>{ const b=document.getElementById(id); if(b) b.addEventListener('click',fn); };
+  on('curModeG',()=>{ curFree=false; drawCurate(); });
+  on('curModeF',()=>{ curFree=true; drawCurate(); });
+  on('curOk',()=>curVerdict('ok')); on('curBan',()=>curVerdict('ban')); on('curWarn',()=>curVerdict('warn'));
+  on('curReroll',()=>{ curReroll++; drawCurate(); });
+  on('curBulk',curBulkAllow);
+  on('curWipe',()=>{ if(confirm('Wipe ALL curation verdicts?')){ CUR={version:1,verdicts:{}}; curSave(); curCur=null; drawCurate(); } });
+  const js=document.getElementById('curJumpSel'); if(js) js.addEventListener('change',e=>curJump(Number(e.target.value)));
+  const ex=document.getElementById('curExport'); if(ex) ex.addEventListener('click',e=>{
+    const blob=JSON.stringify(Object.assign({},CUR,{exported:new Date().toISOString(),axes:CUR_AXES.map(a=>[a[0],a[1].length])}),null,1);
+    e.target.href='data:application/json;base64,'+btoa(unescape(encodeURIComponent(blob)));
+    e.target.download='hoodrxch_trait_rules.json'; });
+  const im=document.getElementById('curImport'); if(im) im.addEventListener('change',e=>{
+    const f=e.target.files[0]; if(!f) return; const rd=new FileReader();
+    rd.onload=()=>{ try{ const j=JSON.parse(rd.result); if(j.verdicts){ CUR=j; curSave(); curCur=null; drawCurate(); } }catch(err){ alert('bad JSON'); } };
+    rd.readAsText(f); });
+  const co=el.querySelectorAll('[data-cf]'); co.forEach(sel=>sel.addEventListener('change',e=>{
+    const k=e.target.dataset.cf; const v=e.target.value; if(v==='') delete curFreeOv[k]; else curFreeOv[k]=Number(v); drawCurate(); }));
+  const fsd=document.getElementById('curFreeSeed'); if(fsd) fsd.addEventListener('change',e=>{ curFreeOv.__seed=Math.max(1,Math.min(666,Number(e.target.value)||94)); drawCurate(); });
+}
+document.addEventListener('keydown',e=>{
+  const tab=document.getElementById('curate'); if(!tab||!tab.classList.contains('on')||curFree) return;
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='a'||e.key==='A') curVerdict('ok');
+  else if(e.key==='x'||e.key==='X') curVerdict('ban');
+  else if(e.key==='w'||e.key==='W') curVerdict('warn');
+  else if(e.key==='r'||e.key==='R'){ curReroll++; drawCurate(); }
+  else if(e.key==='z'||e.key==='Z') curBulkAllow();
+});
+document.querySelector('header button[data-tab="curate"]').addEventListener('click',()=>{ drawCurate(); });
 document.getElementById('ver').textContent='renderer v'+RENDERER_VERSION+' · schema v'+SCHEMA_VERSION;
 buildControls(); refresh();
 </script>
