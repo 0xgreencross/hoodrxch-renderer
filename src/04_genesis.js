@@ -66,10 +66,16 @@ function pick(rng,W){
   return W.length-1;
 }
 
+// CURATE MODE (workbench-only, never set onchain): force any trait value while
+// still burning the exact blessed rng stream — every pick is drawn as normal,
+// only the resulting value is replaced, so anatomy params/downstream draws stay
+// coherent and deterministic. TRAIT_OV=null → byte-identical to production.
+var TRAIT_OV=null;
+function ovv(k,v){ return (TRAIT_OV&&TRAIT_OV[k]!=null)?TRAIT_OV[k]:v; }
 // traits: form-driven anatomy + weighted buckets
 function drawTraits(rng){
   const t={};
-  t.form=pick(rng,FORM_W);
+  t.form=ovv('form',pick(rng,FORM_W));
   // anatomy per form (ranges keep continuous variety inside each silhouette)
   // cx pinned to dead center so the hood (and everything drawn around it) survives
   // the circular PFP crop; the draw is still consumed to keep all other traits identical
@@ -102,15 +108,15 @@ function drawTraits(rng){
   t.sRdx=  7+rng.int(6);  t.sRdy=-(3+rng.int(7)); t.sRr=6+rng.int(5); t.sRd=13+rng.int(9);
   t.nas = 4+rng.int(4);
   // field + surface buckets
-  t.lineW=pick(rng,LINE_W);
-  t.tear=pick(rng,TEAR_W);
-  t.spike=pick(rng,SPIKE_W);
-  t.eyes=pick(rng,EYE_W);
+  t.lineW=ovv('lineW',pick(rng,LINE_W));
+  t.tear=ovv('tear',pick(rng,TEAR_W));
+  t.spike=ovv('spike',pick(rng,SPIKE_W));
+  t.eyes=ovv('eyes',pick(rng,EYE_W));
   t.eyeR=6+rng.int(3);
-  t.treat=pick(rng,TREAT_W);
-  t.mouth=pick(rng,MOUTH_W);
-  t.pink=pick(rng,PINK_W);
-  t.mosh=pick(rng,MOSH_W);
+  t.treat=ovv('treat',pick(rng,TREAT_W));
+  t.mouth=ovv('mouth',pick(rng,MOUTH_W));
+  t.pink=ovv('pink',pick(rng,PINK_W));
+  t.mosh=ovv('mosh',pick(rng,MOSH_W));
   return t;
 }
 // heightfield in centi-units. x,y in units. Integer math only.

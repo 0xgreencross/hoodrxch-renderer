@@ -61,6 +61,7 @@ a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;te
   <button data-tab="evo">Evolution</button>
   <button data-tab="fx">Fixtures</button>
   <button data-tab="banner">Banner</button>
+  <button data-tab="curate">Curate</button>
   <span style="margin-left:auto;color:var(--mute)" id="ver"></span>
 </header>
 
@@ -74,6 +75,7 @@ a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;te
 <div id="evo" class="tab"><h2 style="color:var(--mute)">KILLS 0 / 1 / 10 / 25 / 50 / 75 / 100</h2><div class="evo" id="evoKills"></div><h2 style="color:var(--mute)">DEATH 1 → EXHUMED → DEATH 2 → EXHUMED → DEATH 3</h2><div class="evo" id="evoDeaths"></div><h2 style="color:var(--mute)">STATUS OVERLAYS</h2><div class="evo" id="evoStatus"></div></div>
 <div id="fx" class="tab"><a class="btn" id="exportFx" href="#">Export fixtures.json</a><div id="fxSummary"></div><div class="fx" id="fxGrid"></div></div>
 <div id="banner" class="tab"><div class="bannerwrap" id="bannerOut"></div></div>
+<div id="curate" class="tab"><div id="curateUI"></div></div>
 
 <script>
 'use strict';
