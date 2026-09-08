@@ -73,7 +73,8 @@ function drawTraits(rng){
   // anatomy per form (ranges keep continuous variety inside each silhouette)
   // cx pinned to dead center so the hood (and everything drawn around it) survives
   // the circular PFP crop; the draw is still consumed to keep all other traits identical
-  rng.int(13); t.cx=50; t.cy=50+rng.int(9);
+  // cx AND cy pinned to dead center (circular-crop safe); draws consumed for trait parity
+  rng.int(13); t.cx=50; rng.int(9); t.cy=52;
   t.rw=25+rng.int(9); t.rh=29+rng.int(11); t.amp=19+rng.int(7);
   t.peak=rng.int(9)-4; t.pamp=6+rng.int(4);
   t.x2mode=0; t.x2amp=0; t.x2dx=0;
@@ -85,14 +86,14 @@ function drawTraits(rng){
     case 4: t.amp=14+rng.int(4); t.rw=27+rng.int(8); break;                    // HOLLOW
     case 5: t.rh=38+rng.int(7); t.rw=24+rng.int(7); t.amp=20+rng.int(7); break;// TOWERING
     case 6: t.rw=20+rng.int(5); t.pamp=12+rng.int(5); t.rh=34+rng.int(9); break;// SPIRE
-    case 7: t.amp=12+rng.int(4); t.cy=55+rng.int(4); t.rh=26+rng.int(7); break;// SUNKEN
+    case 7: t.amp=12+rng.int(4); rng.int(4); t.rh=26+rng.int(7); break;       // SUNKEN (squatness via amp/rh; cy stays centered)
     case 8: t.x2mode=1; t.x2amp=8+rng.int(5); t.x2dx=10+rng.int(5); break;     // TWIN PEAK
     case 9: t.x2mode=2; t.x2amp=10+rng.int(5); break;                          // HORNED
     case 10: t.peak=(12+rng.int(5))*(rng.int(2)?1:-1); if(rng.int(2)){rng.int(5);}else{rng.int(5);} t.cx=50; break; // TILTED (leans via peak; placement centered, draws consumed)
     case 11: t.x2mode=3; t.x2amp=8+rng.int(5); break;                          // CRATER
     case 12: t.rw=36+rng.int(5); t.amp=26+rng.int(5); t.rh=34+rng.int(7); break;// COLOSSUS
     case 13: t.rw=18+rng.int(4); t.pamp=14+rng.int(5); t.rh=38+rng.int(7); t.amp=16+rng.int(5); break; // NEEDLE
-    case 14: t.cy=44+rng.int(3); t.rh=40+rng.int(5); break;                    // WRAITH TALL
+    case 14: rng.int(3); t.rh=40+rng.int(5); break;                            // WRAITH TALL (height via rh; cy stays centered)
     case 15: t.amp=10+rng.int(4); break;                                       // PHANTOM
   }
   t.jawY=t.cy+22+rng.int(8);
@@ -147,7 +148,7 @@ function heightAt(t,noiseCols,x,y,noSock){
 // yd is y in deci-units (1 deci-unit = 1px at 1000-scale). Integer-only math,
 // exact generalizations: heightAtD(t,nc,x,y*10) === heightAt(t,nc,x,y).
 function floorDiv(a,b){ return Math.floor(a/b); }
-function rdiv(a,b){ return floorDiv(a+((b/2)|0),b); } // == Math.round(a/b) for integer a, even b
+function rdiv(a,b){ return floorDiv(a+Math.floor(b/2),b); } // == Math.round(a/b) for integer a; exact for large b (no 32-bit wrap)
 function bump100D(x,yd,cx,cyd,rw,rh,A){
   const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
   const d2=nx*nx+ny*ny;

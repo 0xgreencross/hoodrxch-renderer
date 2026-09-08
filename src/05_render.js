@@ -127,6 +127,81 @@ function eyeGlyph(st,side,cx,cy,r,fill,rng){
   return e;
 }
 // ---------------------------------------------------------------------------
+// --- CONSTRUCTION INTRO (draft): reveal helpers ----------------------------
+// Every base attribute stays the finished art; reveals hide-then-show via
+// one-shot discrete display animates, so non-SMIL renderers see the final PFP.
+function T2(x){ return (Math.round(x*100)/100)+'s'; }
+function kt4(x){ return (Math.round(x*10000)/10000)+''; }
+function reveal(content,tSec){
+  if(!content||!tSec||tSec<=0.01) return content;
+  return '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tSec)+'" repeatCount="1"/>'+content+'</g>';
+}
+// cyberpunk ignition rhythms — the eyes sputter on independent phases,
+// pulses 20-40ms, both solid by +0.37s
+const FLICK_L=[0,0.03,0.05,0.08,0.10,0.13,0.15,0.19,0.21,0.24,0.26,0.30,0.36];
+const FLICK_R=[0.02,0.04,0.07,0.09,0.12,0.16,0.18,0.22,0.25,0.28,0.31,0.33,0.37];
+function revealFlicker(content,tSec,offs){
+  if(!content) return content;
+  const d2=tSec+offs[offs.length-1]+0.05;
+  const kt=[0]; for(const o of offs) kt.push((tSec+o)/d2);
+  const vals=['none']; for(let i=0;i<offs.length;i++) vals.push(i%2?'none':'inline');
+  return '<g><animate attributeName="display" values="'+vals.join(';')+'" keyTimes="'+kt.map(kt4).join(';')+'" calcMode="discrete" dur="'+T2(d2)+'" repeatCount="1"/>'+content+'</g>';
+}
+// mouth materialization: each mouth archetype gets its own reveal effect,
+// tailored to the motif of the mouth itself — a cut is slashed open, a zipper
+// zips shut, a wire twangs, a scream erupts from the baseline, a drip falls.
+// Base attrs always stay the finished art (static fallback rule); one-shot
+// animates run only at tSec. Ghost doubles (glitch family only) are intro-only.
+// geo: mouth bounding geometry in px {x,y,w,cx,py}.
+function glitchReveal(content,tSec,mid,geo){
+  if(!content||!tSec||tSec<=0.01) return content;
+  const b=T2(tSec);
+  const an=(attr,vals,dur2,mode,kts)=>'<animate attributeName="'+attr+'" values="'+vals+'"'+(kts?' keyTimes="'+kts+'"':'')+' calcMode="'+mode+'" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/>';
+  const tr=(vals,dur2,mode,kts)=>'<g><animateTransform attributeName="transform" type="translate" values="'+vals+'"'+(kts?' keyTimes="'+kts+'"':'')+' calcMode="'+mode+'" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/>'+content+'</g>';
+  const clip=(anims,inner2)=>'<clipPath id="mgc"><rect x="'+geo.x+'" y="'+geo.y+'" width="'+geo.w+'" height="320">'+anims+'</rect></clipPath><g clip-path="url(#mgc)">'+(inner2||content)+'</g>';
+  const sc=(px,py,vals,dur2)=>'<g transform="translate('+px+' '+py+')"><g><animateTransform attributeName="transform" type="scale" values="'+vals+'" calcMode="linear" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/><g transform="translate('+(-px)+' '+(-py)+')">'+content+'</g></g></g>';
+  const gh=(dx,dy,gdur)=>{ const D=tSec+gdur; return '<g display="none"><animate attributeName="display" values="none;inline;none;inline;none" keyTimes="'
+    +[0,(tSec+0.015)/D,(tSec+0.04)/D,(tSec+0.075)/D,(tSec+0.11)/D].map(kt4).join(';')
+    +'" calcMode="discrete" dur="'+T2(D)+'" repeatCount="1"/><g transform="translate('+dx+' '+dy+')">'+content+'</g></g>'; };
+  const w3=Math.round(geo.w/3), w23=Math.round(geo.w*2/3), w4=Math.round(geo.w/4), w2=Math.round(geo.w/2), w34=Math.round(geo.w*3/4);
+  let inner='', ghosts='';
+  switch(mid){
+    case 1:  // GASH — a blade slashes the cut open, right to left, one stroke
+      inner=clip(an('x',(geo.x+geo.w)+';'+geo.x,0.1,'linear')+an('width','0;'+geo.w,0.1,'linear')); break;
+    case 2:  // GRIN — the jaw chatters, teeth clacking up and down
+      inner=tr('0 -14;0 12;0 -10;0 8;0 -6;0 4;0 0',0.15,'discrete'); break;
+    case 3:  // SEWN — stitched shut one X at a time, needle steps left to right
+      inner=clip(an('width','0;'+w3+';'+w23+';'+geo.w,0.18,'discrete')); break;
+    case 4:  // WIRE — snaps taut and twangs like a plucked string
+      inner=tr('0 -10;0 8;0 -6;0 4;0 -2;0 1;0 0',0.15,'linear'); break;
+    case 5:  // STITCHED GRIN — quick needle passes, then the teeth clack once
+      inner='<g><animateTransform attributeName="transform" type="translate" values="0 -6;0 4;0 0" calcMode="discrete" begin="'+T2(tSec+0.11)+'" dur="0.06s" repeatCount="1"/>'
+        +clip(an('width','0;'+w4+';'+w2+';'+w34+';'+geo.w,0.11,'discrete'))+'</g>'; break;
+    case 6:  // DOUBLE GASH — two cuts: the acid slash lands, then the pink one under it
+      inner=clip(an('height','0;120;320',0.14,'discrete')); break;
+    case 7:  // SIDE SMIRK — slides in sideways, sly, with a small overshoot
+      inner=tr('90 -8;-8 2;0 0',0.2,'linear','0;0.7;1'); break;
+    case 8:  // ZIPPER — zips shut in one steady pull, left to right
+      inner=clip(an('width','0;'+geo.w,0.22,'linear')); break;
+    case 9:  // SNARL — lunges in with violent hops, a ghost snapping at its heels
+      inner=tr('-46 -18;38 14;-30 -10;26 8;-14 -4;8 2;0 0',0.15,'discrete');
+      ghosts=gh(-40,-16,0.15); break;
+    case 10: // DRIP — falls from above and bounces to rest, like a drop landing
+      inner=tr('0 -90;0 0;0 -16;0 0;0 -5;0 0',0.2,'linear','0;0.35;0.55;0.75;0.9;1'); break;
+    case 11: // SCREAM — erupts vertically out of the baseline, overshoots, settles
+      inner=sc(0,geo.py,'1 0;1 1.5;1 0.7;1 1.2;1 1',0.18); break;
+    case 12: // FANGS — chomp-chomp: bites down hard from above, twice
+      inner=tr('0 -90;0 0;0 -34;0 0;0 0',0.16,'linear','0;0.3;0.55;0.8;1'); break;
+    case 13: // HOWL — the ring resonates outward: swells past size, rings back
+      inner=sc(geo.cx,geo.py,'0.2 0.2;1.35 1.35;0.85 0.85;1.1 1.1;1 1',0.2); break;
+    case 14: // MUZZLE — clamps up from below and shudders tight
+      inner=tr('0 90;0 0;0 10;0 0;0 4;0 0',0.16,'linear','0;0.3;0.5;0.7;0.85;1'); break;
+    default: // 15 GLITCH MOUTH — maximal signal tear: hops + double stutter ghosts
+      inner=tr('-80 0;64 -10;-52 12;44 -8;-28 6;14 -3;0 0',0.15,'discrete');
+      ghosts=gh(-64,8,0.15)+gh(52,-8,0.15); break;
+  }
+  return '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tSec)+'" repeatCount="1"/>'+inner+'</g>'+ghosts;
+}
 // Genesis figure. Returns {defs, figure, traits, hoodPts}
 // ---------------------------------------------------------------------------
 function buildGenesis(sState){
@@ -215,8 +290,9 @@ function buildGenesis(sState){
   const sw=Math.max(3,Math.min(6,lines[0].w)); // reference width for echoes/marks
   let defs='';
   let f='';
-  // white specks, faint
-  { let d=''; const n=12+rng.int(16); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // white specks, faint (captured; revealed on the intro schedule)
+  let specksSvg='';
+  { let d=''; const n=12+rng.int(16); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } specksSvg='<path d="'+d+'" fill="'+WHITE+'"/>'; }
   // --- KILL-TIER COLOUR LADDER (handoff §9.3): the figure's own signal
   // changes colour as kills accumulate. acid → pink → white, role-shifted.
   const tier=tierForKills(sState.kills);
@@ -239,6 +315,21 @@ function buildGenesis(sState){
   else if(t.pink===6){ // TRICHROME: pink pass + white counter-pass
     let k=3+rng.int(2); for(let i=0;i<k;i++) ePicks.push(rng.int(lines.length));
     k=2+rng.int(2); for(let i=0;i<k;i++) e2Picks.push(rng.int(lines.length)); }
+  // --- CONSTRUCTION INTRO (draft): the reveal schedule ---------------------
+  // populate (flat, flowing) -> extrude -> eyes/mouth flicker -> everything
+  // else in 0.25s succession. Times skip absent elements.
+  const introEnd = 1.0; // populate 0.5s + extrude 0.5s, every band rushes whole cycles
+  const tEyes=introEnd;
+  const tMouth=introEnd+0.42; // only once the eyes burn steady does the mouth appear
+  let __seq=0; const __nextT=()=>tMouth+0.25*(++__seq);
+  const tSigil=__nextT(), tBlock=__nextT(), tSpecks=__nextT();
+  const tRecs=(sState.kills>0||sState.forcedPurges>0||sState.savesReceived>0||sState.deaths>0)?__nextT():0;
+  const tEcho=(ePicks.length||e2Picks.length||tier>=6)?__nextT():0;
+  const tHalo=tier>0?__nextT():0;
+  const tFlat=flatLi>=0?__nextT():0;
+  const tLight=lightning?__nextT():0;
+  const tHeart=t.pink===7?__nextT():0;
+  f+=reveal(specksSvg,tSpecks);
   // === THE CONVEYOR (animation pass): every LINES style flows =============
   // Standard styles: one band. BARCODE: widths live in the AIR — a standing
   // slot pattern the lines breathe through (2-key linear stroke-width morph,
@@ -247,8 +338,11 @@ function buildGenesis(sState){
   {
     const spikeAtD=[]; for(const li in spikes){ if(lines[li]) for(const [sx,amp] of spikes[li]) spikeAtD.push([lines[li].y*10,sx,amp]); }
     const pulseYd = pulseLi>=0&&lines[pulseLi] ? lines[pulseLi].y*10 : -9999;
-    const rowD=(y0d,pD,stepD)=>{
-      const yd=y0d-pD; let d='',py=0,maxH=0;
+    // integer sqrt (Babylonian, floor) — deterministic, Solidity-portable;
+    // used for exact path arc length so dash phase can be centre-anchored
+    const isqrt=(n)=>{ if(n<2) return n; let ix=n, iy=Math.floor((n+1)/2); while(iy<ix){ ix=iy; iy=Math.floor((iy+Math.floor(n/iy))/2); } return ix; };
+    const rowD=(y0d,pD,stepD,num,den)=>{
+      const yd=y0d-pD; let d='',py=0,maxH=0,L=0;
       for(let xi=0;xi<=33;xi++){
         const x=xi*STEP;
         const h=heightAtD(t,noiseCols,x,yd);
@@ -257,10 +351,28 @@ function buildGenesis(sState){
         for(const [syd,sx,amp] of spikeAtD) if(sx===xi){ const dd=Math.abs(yd-syd); if(dd<10) ypx+=rdiv(amp*(10-dd),10); }
         if(pulseYd>-9000&&xi%6<3){ const dd=Math.abs(yd-pulseYd); if(dd<10) ypx-=rdiv(pulseAmp*(10-dd),10); }
         if(quake){ const liE=floorDiv(yd-40+(stepD>>1),stepD); ypx+=quake[(((xi+liE*3)%13)+13)%13]; }
-        if(xi===0) d='M0 '+ypx; else d+='l30 '+(ypx-py);
+        // INTRO EXTRUSION — 3D SPECTRUM ANALYZER: the hood is not inflated by
+        // bending whole lines (that reads as material pulled in from the
+        // sides); it is extruded column by column from its own center spine.
+        // EXTRUSION — VARIABLE-SPEED COLUMNS, NO TRAVELING FRONT. A moving
+        // wavefront can only advance in keyframe-sized steps (linear d
+        // interpolation freezes its edge between samples), which reads as
+        // chunked widening. Instead every column starts rising TOGETHER at
+        // the extrusion's start, each at a speed inversely proportional to
+        // its distance from the spine: u = T*80/(|x-cx|+30), eased by an
+        // integer smoothstep. The spine completes first (height), the flanks
+        // settle progressively later (width), nothing is ever at rest beside
+        // something moving — so there is no edge to see stepping — and the
+        // zero-slope smoothstep ending makes each column's arrival seamless.
+        // Farthest column (dxc=50) reaches u=1 exactly at introEnd.
+        if(den){ const dxc=Math.abs(x-t.cx);
+          const a=num*80, b=den*(dxc+30);
+          if(a<b){ const E=rdiv(30*a*a*(3*b-2*a),b*b*b);
+            ypx=yd+rdiv((ypx-yd)*E,30); } }
+        if(xi===0) d='M0 '+ypx; else { d+='l30 '+(ypx-py); L+=isqrt(900+(ypx-py)*(ypx-py)); }
         py=ypx;
       }
-      return [d,maxH];
+      return [d,maxH,L];
     };
     const strokeOf=c2=> c2==='A'?ACID : c2==='P'?PINK : WHITE;
     // one flowing band: keyframes + position-keyed colours + animate-d emission
@@ -296,19 +408,84 @@ function buildGenesis(sState){
         const widthOf=c2=> (c2==='A'&&tier>=5&&!o.bcW) ? Math.max(2,w-1) : w;
         const cols=colK[ri];
         let varies=false; for(let j=1;j<NKC;j++) if(cols[j]!==cols[0]) varies=true;
-        let dash='';
-        if(t.lineW===5) dash=' stroke-dasharray="150 60" stroke-dashoffset="'+((y0d/10)%7)*30+'"';
-        else if(t.tear===6){ const y0=y0d/10; const p0v=Math.max(3,Math.trunc((92-y0)*13/10));
-          const g6=Math.min(45,rdiv(p0v*3*60,1000)); if(g6>2) dash=' stroke-dasharray="'+(60-g6)+' '+g6+'" stroke-dashoffset="'+(fhash(y0d,7)%60)+'"'; }
+        // DASH PHASE MUST TRAVEL WITH THE CONTENT: a static screen-keyed
+        // dashoffset snaps at every cycle wrap (the line handing off to the
+        // band above suddenly wears that band's phase). So the offset is a
+        // function of content identity — sampled per cycle c as F(y0d+cycD*c),
+        // periodic over 7 cycles — and animated discretely, one value per
+        // cycle, aligned to the loop clock. Frame 0 stays the static attr.
+        const bg=o.intro?' begin="'+o.intro.durS+'"':'';
+        let dash='', dashAnim='', dashF=null;
+        if(t.lineW===5){
+          dashF=(c)=>(((((y0d+o.cycD*c)/10)%7)+7)%7)*30;
+          dash=' stroke-dasharray="150 60" stroke-dashoffset="'+dashF(0)+'"';
+        } else if(t.tear===6){ const y0=y0d/10; const p0v=Math.max(3,Math.trunc((92-y0)*13/10));
+          const g6=Math.min(45,rdiv(p0v*3*60,1000));
+          if(g6>2){
+            const m=o.cycD/o.stepD, P7=7*m;
+            dashF=(c)=>fhash((((floorDiv(y0d,o.stepD)+m*c)%P7)+P7)%P7,13)%60;
+            dash=' stroke-dasharray="'+(60-g6)+' '+g6+'" stroke-dashoffset="'+dashF(0)+'"';
+          } }
+        if(dashF){ const vs=[]; for(let c=0;c<7;c++) vs.push(dashF(c));
+          dashAnim='<animate attributeName="stroke-dashoffset" values="'+vs.join(';')+'" dur="'+T2(o.cycD*7*75/1000)+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>'; }
         out+='<path stroke="'+strokeOf(cols[0])+'" stroke-width="'+widthOf(cols[0])+'"'+dash+' d="'+vals[ri][0]+'">';
-        out+='<animate attributeName="d" values="'+vals[ri].join(';')+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"/>';
+        if(o.intro){
+          // construction: populate as a flat flowing line, then extrude the
+          // envelope over the back half — ends exactly on the loop's frame 0
+          const P=o.intro.P, half=P>>1, den=P-half, st2=(o.cycD%4===0)?4:2, nCycE=P/o.cycD;
+          // WIDENING MUST FLOW: the front position is only seen at keyframes,
+          // so a coarsely sampled extrusion widens the hood in synchronized
+          // chunks ("wide, then wider"). The back half is sampled at 2-4×
+          // the populate density so each column's rise spans several
+          // keyframes and the spread reads as continuous motion.
+          const stE=(o.cycD%4===0)?2:1;
+          const pts=[];
+          for(let p=0;p<half;p+=st2) pts.push(p);
+          pts.push(half);
+          for(let p=half+stE;p<P;p+=stE) pts.push(p);
+          pts.push(P);
+          const vlist=[], tlist=[], slist=[], llist=[];
+          for(const p of pts){
+            const num=Math.max(0,p-half);
+            if(p>0&&p<P&&p%o.cycD===0){
+              const r1=rowD(y0d,o.cycD,o.stepD,num,den); vlist.push(r1[0]); tlist.push(p/P); slist.push(p/o.cycD); llist.push(r1[2]);
+              const r2=rowD(y0d,0,o.stepD,num,den); vlist.push(r2[0]); tlist.push(p/P); slist.push(p/o.cycD+1); llist.push(r2[2]);
+            } else {
+              const r=rowD(y0d,(p===P?o.cycD:p%o.cycD),o.stepD,num,den); vlist.push(r[0]); tlist.push(p/P);
+              slist.push(Math.min(nCycE,Math.max(1,Math.ceil(p/o.cycD)))); llist.push(r[2]);
+            }
+          }
+          out+='<animate attributeName="d" values="'+vlist.join(';')+'" keyTimes="'+tlist.map(kt4).join(';')+'" dur="'+o.intro.durS+'" calcMode="linear" repeatCount="1"/>';
+          const tp=(o.intro.endSec/2)*((rows.length-1-ri)/rows.length);
+          if(tp>0.02) out+='<animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tp)+'" repeatCount="1"/>';
+          if(cols[0]!=='A') out+='<animate attributeName="stroke" values="'+ACID+';'+strokeOf(cols[0])+'" calcMode="discrete" dur="'+T2(2*o.intro.endSec)+'" repeatCount="1"/>';
+          // intro→loop continuity: during the intro each rising line already
+          // wears the dash phase it must hand to the loop's cycle-0 painter
+          // (segment s of nCycE holds the c=s-nCycE-1 value), and a BARCODE
+          // line morphs into the standing air-slot width it is rising toward —
+          // both animates end exactly at introEnd, reverting to base attrs
+          // that equal the loop's own starting values. No snap at 1s.
+          // Dash phase during the intro: the per-segment hold hands the loop's
+          // cycle-0 painter its exact phase (as before), PLUS a centre-anchor
+          // term rdiv(Lfull-L(p),2): as the hood lengthens the path, dashes
+          // no longer stream in from the right — the pattern stays pinned at
+          // the path's midpoint and the growth spills symmetrically to both
+          // sides. The term is 0 at introEnd, so the 1s handoff stays exact.
+          if(dashF){ const Lf=llist[llist.length-1];
+            const ov=[]; for(let k2=0;k2<vlist.length;k2++) ov.push(dashF(slist[k2]-nCycE-1)+rdiv(Lf-llist[k2],2));
+            out+='<animate attributeName="stroke-dashoffset" values="'+ov.join(';')+'" keyTimes="'+tlist.map(kt4).join(';')+'" calcMode="linear" dur="'+o.intro.durS+'" repeatCount="1"/>'; }
+          if(o.bcW){ const w1b=o.bcW(y0d), w2c=o.bcW(y0d-o.cycD);
+            if(w2c!==w1b) out+='<animate attributeName="stroke-width" values="'+w1b+';'+w2c+'" calcMode="linear" dur="'+o.intro.durS+'" repeatCount="1"/>'; }
+        }
+        out+='<animate attributeName="d" values="'+vals[ri].join(';')+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"'+bg+'/>';
+        out+=dashAnim;
         if(o.bcW){ const w1=o.bcW(y0d), w2b=o.bcW(y0d-o.cycD);
-          if(w2b!==w1) out+='<animate attributeName="stroke-width" values="'+w1+';'+w2b+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"/>'; }
+          if(w2b!==w1) out+='<animate attributeName="stroke-width" values="'+w1+';'+w2b+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"'+bg+'/>'; }
         if(varies){
-          out+='<animate attributeName="stroke" values="'+cols.map(strokeOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"/>';
+          out+='<animate attributeName="stroke" values="'+cols.map(strokeOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>';
           if(!o.bcW){
             let wv=false; for(let j=1;j<NKC;j++) if(widthOf(cols[j])!==widthOf(cols[0])) wv=true;
-            if(wv) out+='<animate attributeName="stroke-width" values="'+cols.map(widthOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"/>';
+            if(wv) out+='<animate attributeName="stroke-width" values="'+cols.map(widthOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>';
           }
         }
         out+='</path>';
@@ -331,9 +508,9 @@ function buildGenesis(sState){
     if(t.lineW===8){
       // NO SIGNAL: the wraith is the only thing carrying signal — sparse sky
       // drifts slowly, the figure band flows fast inside the hood clip
-      const skyB=emitBand({stepD:60,cycD:60,y0Start:-20,nRows:19,durS:durOf(60),wOf:()=>3,colours:false,bcW:null});
-      const figB=emitBand({stepD:20,cycD:20,y0Start:0,nRows:52,durS:durOf(20),wOf:()=>3,colours:true,bcW:null});
-      f+=ghostGroups(li=> li<16 ? skyB.d0[li+1] : figB.d0[li-14], figB);
+      const skyB=emitBand({stepD:60,cycD:60,y0Start:-20,nRows:19,durS:durOf(60),wOf:()=>3,colours:false,bcW:null,intro:{P:60,endSec:1.0,durS:'1s'}});
+      const figB=emitBand({stepD:20,cycD:20,y0Start:0,nRows:52,durS:durOf(20),wOf:()=>3,colours:true,bcW:null,intro:{P:20,endSec:1.0,durS:'1s'}});
+      f+=reveal(ghostGroups(li=> li<16 ? skyB.d0[li+1] : figB.d0[li-14], figB),tEcho);
       f+='<g fill="none">'+skyB.svg+'</g>';
       let clip='<clipPath id="nsg">';
       for(let xi=0;xi<=33;xi++){ const x=xi*STEP; let runA=-1;
@@ -361,10 +538,12 @@ function buildGenesis(sState){
         return [2,4,7][fhash(y0d+1000,11)%3];
       };
       const wOf=(y0d)=> t.lineW===3?2 : t.lineW===4?5 : t.lineW===5?4 : t.lineW===6?(((y0d/20)%2)?6:2) : t.lineW===7?bcSlotW(y0d) : [3,4,6][t.lineW];
-      const B=emitBand({stepD,cycD,y0Start:0,nRows,durS:durOf(cycD),wOf,colours:true,bcW: t.lineW===7?bcSlotW:null});
-      f+=ghostGroups(li=> B.d0[lines[li].y*10/stepD], B);
+      const nCyc=cycD===10?2:1;
+      const B=emitBand({stepD,cycD,y0Start:0,nRows,durS:durOf(cycD),wOf,colours:true,bcW: t.lineW===7?bcSlotW:null,intro:{P:nCyc*cycD,endSec:1.0,durS:'1s'}});
+      f+=reveal(ghostGroups(li=> B.d0[lines[li].y*10/stepD], B),tEcho);
       f+='<g fill="none">'+B.svg+'</g>';
     }
+    const fHC0=f.length; // holes+covers reveal with the extrusion's completion
     // the blessed break runs as stationary holes (VAPOR dissolves via dasharray)
     if(t.tear!==6){
       for(const [bli,bxi,blen,bypx] of brkRuns){
@@ -395,74 +574,78 @@ function buildGenesis(sState){
         }
       }
     }
+    f=f.slice(0,fHC0)+reveal(f.slice(fHC0),introEnd);
   }
   // FLATLINE SCAR: one perfect white line cutting through everything
-  if(flatLi>=0) f+='<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="6"/>';
+  if(flatLi>=0) f+=reveal('<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="6"/>',tFlat);
   // LIGHTNING: one jagged bolt across the field
   if(lightning){ let d='M0 '+((20+rng.int(60))*U); let ly=0;
     for(let x=8;x<=100;x+=8){ const ny=(10+rng.int(80)); d+='L'+(x*U)+' '+(ny*U); ly=ny; }
-    f+='<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'
-     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="3"/>'; }
+    f+=reveal('<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'
+     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="3"/>',tLight); }
   // HEARTBEAT: a single pink pulse line — the signal refuses to die
   if(t.pink===7){ const hy=(20+rng.int(60))*U; const bx=(10+rng.int(60))*U;
-    f+='<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'; }
+    f+=reveal('<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>',tHeart); }
   // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
+  // Left / right / spans-both collectors: the eyes ignite on independent rhythms.
   const rB=t.eyeR;
   const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
   const glyph=(st,side,cx,cy,r,fill)=>eyeGlyph(st,side,cx,cy,r,fill,rng);
   // screen-space eye centres (used by several treatments)
   const eyeScr=eyePos.map(([ex,ey2,r,side])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r,side]; });
+  const eyeParts=['','',''];
   const drawEyes=(fill,ox,oy)=>{
-    let e='';
     if(t.eyes===3){ // continuous visor: one blade across both sockets
       const [lx,ly,lr]=eyePos[0], [rx2,ry2,rr2]=eyePos[1];
       const dispL=Math.round(heightAt(t,noiseCols,lx,ly,true)/100);
       const vy=ly-((dispL/3)|0)+2;
-      e+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
-      return e; }
+      eyeParts[2]+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
+      return; }
     if(t.eyes===24){ // ALL SEEING: hollow sockets + the third eye above
-      for(const [ex,cyp,r] of eyeScr) e+=octRing(ex+ox,cyp+oy,r-1,9,fill);
+      for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=octRing(ex+ox,cyp+oy,r-1,9,fill);
       const mx=((eyeScr[0][0]+eyeScr[1][0])/2)|0;
       const ty=Math.min(eyeScr[0][1],eyeScr[1][1])-t.eyeR-7;
-      e+=xmark(mx+ox,ty+oy,t.eyeR+2,3,fill,rng);
-      return e; }
+      eyeParts[2]+=xmark(mx+ox,ty+oy,t.eyeR+2,3,fill,rng);
+      return; }
     for(const [ex,ey2,r,side] of eyePos){
       const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100);
-      e+=glyph(t.eyes,side,ex+ox,ey2-((disp/3)|0)+2+oy,r,fill);
+      eyeParts[side]+=glyph(t.eyes,side,ex+ox,ey2-((disp/3)|0)+2+oy,r,fill);
     }
-    return e;
   };
   // treatments (trait, escalated by kill tier: 10+ at least ECHO GLOW, 50+ FULL
   // SIGNAL — special treatments 5+ are never overridden by the ladder)
   { const base=t.treat; if(base<=4) t.treat = tier>=4 ? 4 : (tier>=2 ? Math.max(1,base) : base); }
   let mainFill=ACID;
-  if(t.treat===1||t.treat===4){ f+=drawEyes(PINK,3,2); f+=drawEyes(ACID,-2,-2); }
-  else if(t.treat===2||(t.mosh>0&&t.treat===0)) f+=drawEyes(PINK,2,2);
+  if(t.treat===1||t.treat===4){ drawEyes(PINK,3,2); drawEyes(ACID,-2,-2); }
+  else if(t.treat===2||(t.mosh>0&&t.treat===0)) drawEyes(PINK,2,2);
   if(t.treat===3||t.treat===4){ // ripple rings: the field reacting to the stare
     for(const [ex,ey2,r,side] of eyePos){
       if(t.eyes===6&&side) continue; if(t.eyes===7) continue;
       const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); const cyp=ey2-((disp/3)|0)+2;
       for(let k=1;k<=(t.treat===4?1:2);k++){ const rr=r+3+k*4;
         const oct=[[ex-rr,cyp],[ex-(rr*7/10|0),cyp-(rr*7/10|0)],[ex,cyp-rr],[ex+(rr*7/10|0),cyp-(rr*7/10|0)],[ex+rr,cyp],[ex+(rr*7/10|0),cyp+(rr*7/10|0)],[ex,cyp+rr],[ex-(rr*7/10|0),cyp+(rr*7/10|0)]];
-        f+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="5"/>'; } } }
+        eyeParts[side]+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="5"/>'; } } }
   else if(t.treat===5){ // STATIC: white interference specks around the stare
     const n=10+rng.int(6); const x0=eyeScr[0][0]-10, x1=eyeScr[1][0]+10;
     let d=''; for(let i=0;i<n;i++){ const x=x0+rng.int(Math.max(4,x1-x0)); const y=Math.min(eyeScr[0][1],eyeScr[1][1])-8+rng.int(16); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; }
-    f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+    eyeParts[2]+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
   else if(t.treat===6){ // CROSS FLARE: rays off each eye
-    for(const [ex,cyp,r] of eyeScr){
-      f+=rect(ex-1,cyp-r-8,2,6,ACID)+rect(ex-1,cyp+r+2,2,6,ACID)+rect(ex-r-8,cyp-1,6,2,ACID)+rect(ex+r+2,cyp-1,6,2,ACID);
-      f+=rect(ex-1,cyp-r-10,2,2,PINK)+rect(ex-1,cyp+r+8,2,2,PINK); } }
-  else if(t.treat===7){ for(const [ex,cyp,r] of eyeScr) f+=octRing(ex,cyp,r+5,5,WHITE); } // HALO EYES
-  else if(t.treat===8){ f+=drawEyes(PINK,8,0); f+=drawEyes(WHITE,4,0); } // SMEAR TRAIL
+    for(const [ex,cyp,r,side] of eyeScr){
+      eyeParts[side]+=rect(ex-1,cyp-r-8,2,6,ACID)+rect(ex-1,cyp+r+2,2,6,ACID)+rect(ex-r-8,cyp-1,6,2,ACID)+rect(ex+r+2,cyp-1,6,2,ACID);
+      eyeParts[side]+=rect(ex-1,cyp-r-10,2,2,PINK)+rect(ex-1,cyp+r+8,2,2,PINK); } }
+  else if(t.treat===7){ for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=octRing(ex,cyp,r+5,5,WHITE); } // HALO EYES
+  else if(t.treat===8){ drawEyes(PINK,8,0); drawEyes(WHITE,4,0); } // SMEAR TRAIL
   else if(t.treat===9){ // INVERTED: knockout — black glyphs on solid acid patches
-    for(const [ex,cyp,r] of eyeScr) f+=rect(ex-r-3,cyp-r+1,2*r+6,2*r-1,ACID);
+    for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=rect(ex-r-3,cyp-r+1,2*r+6,2*r-1,ACID);
     mainFill=BLACK; }
-  else if(t.treat===10){ f+=drawEyes(PINK,4,3); f+=drawEyes(WHITE,-4,-3); } // PRISM
+  else if(t.treat===10){ drawEyes(PINK,4,3); drawEyes(WHITE,-4,-3); } // PRISM
   else if(t.treat===11){ // GOD RAYS: the stare reaches the edge of the signal
-    for(const [ex,cyp] of eyeScr){
-      f+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="4"/>'; } }
-  f+=drawEyes(mainFill,0,0);
+    for(const es of eyeScr){ const ex=es[0], cyp=es[1], side=es[3];
+      eyeParts[side]+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="4"/>'; } }
+  drawEyes(mainFill,0,0);
+  f+=revealFlicker(eyeParts[0]+eyeParts[2],tEyes,FLICK_L);
+  f+=revealFlicker(eyeParts[1],tEyes,FLICK_R);
+  const fRec0=f.length; // battle records join the succession after the mouth
   // hunter marks: kill notches above the left eye (1 per kill, capped at 9)
   if(sState.kills>0){ const n=Math.min(9,sState.kills); const [lx,ly]=eyePos[0];
     const disp=Math.round(heightAt(t,noiseCols,lx,ly,true)/100); const ny2=ly-((disp/3)|0)-t.eyeR-5;
@@ -479,10 +662,14 @@ function buildGenesis(sState){
       const sy2=t.cy-14+drng.int(26);
       f+='<path d="M'+((t.cx-t.rw+2)*U)+' '+(sy2*U)+'l'+((t.rw-4+drng.int(8))*U)+' '+((drng.int(5)-2)*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
     } }
+  f=f.slice(0,fRec0)+reveal(f.slice(fRec0),tRecs);
+  const fMouth0=f.length; // the mouth appears only once the eyes burn steady
   // mouth details on the gap
+  let mgeo=null;
   if(t.mouth>0){
     const dispM=Math.round(heightAt(t,noiseCols,t.cx,mouthY,true)/100);
     const my=mouthY-((dispM/3)|0)+2; // displaced mouth baseline (units)
+    mgeo={x:(t.cx-mw-2)*U,y:(my-9)*U,w:(2*mw+4)*U,cx:t.cx*U,py:(my+3)*U};
     switch(t.mouth){
       case 1: if(t.pink>0) f+=rect(t.cx-mw+2,my+1,mw,1,PINK); break; // GASH
       case 2: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=4){ const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=rect(x,mouthY-((disp/3)|0)+2,2,5,ACID); } break; // GRIN
@@ -501,10 +688,12 @@ function buildGenesis(sState){
       case 15: f+=rect(t.cx-mw+1,my-1,mw+3,2,ACID)+rect(t.cx-mw+4,my+2,mw+3,2,PINK)+rect(t.cx-mw-1,my+5,mw+3,2,WHITE); break; // GLITCH MOUTH
     }
   }
+  f=f.slice(0,fMouth0)+glitchReveal(f.slice(fMouth0),tMouth,t.mouth,mgeo);
   // ward sigil above the crown; block mark at the hem — pulled inboard so both survive the circular PFP crop
-  f+=sigilSVG(s.wardId,20,20,rng,ACID);
-  f+=blockMarkSVG(s.blockId,80,80,rng,ACID);
+  f+=reveal(sigilSVG(s.wardId,20,20,rng,ACID),tSigil);
+  f+=reveal(blockMarkSVG(s.blockId,80,80,rng,ACID),tBlock);
   // mosh: slice shifts
+  const fHalo0=f.length;
   // --- KILL-TIER HALO: a corona over the crest, one signature per tier ---
   // T1 single arc · T2 double · T3 triple broken · T4 arc + ticks · T5 corona rays · T6 full ring
   if(tier>0){
@@ -545,6 +734,7 @@ function buildGenesis(sState){
       f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
     }
   }
+  f=f.slice(0,fHalo0)+reveal(f.slice(fHalo0),tHalo);
   const slices=[];
   if(t.mosh===1||t.mosh===2){ const n=t.mosh===2?4+rng.int(2):2+rng.int(2);
     for(let i=0;i<n;i++) slices.push({y:6+rng.int(84),h:2+rng.int(5),dx:(2+rng.int(7))*(rng.int(2)?1:-1)}); }
@@ -561,7 +751,7 @@ function buildGenesis(sState){
   }
   // screen-space eye anchors (units) for status overlays
   const eyeScreen=eyePos.map(([ex,ey2,r])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r]; });
-  return {defs,figure:f,traits:t,slices,rng,eyeScreen};
+  return {defs,figure:f,traits:t,slices,rng,eyeScreen,introEnd,introBase:tMouth,introSeq:__seq};
 }
 function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
 // ---------------------------------------------------------------------------
@@ -641,7 +831,10 @@ function buildCoffinSVG(s){
     body+='<path d="M0 540h1000" fill="none" stroke="'+RED+'" stroke-width="5"/>';
   } else {
     body+='<path d="M0 540h1000" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
-    body+='<g transform="translate(520 0)"><path d="M-174 540h20l10 -18 10 18h25l12 -75 12 150 12 -75h25l14 -26 14 26h20" fill="none" stroke="'+WHITE+'" stroke-width="5"/><animateTransform attributeName="transform" type="translate" values="0 0;1174 0" dur="2.8s" repeatCount="indefinite"/></g>';
+    // the residual heartbeat: each pass, the flatline itself rises into the
+    // complex — a traveling black cover erases the static line under the beat
+    // so the zigzag replaces it — then melts back flat. One resurrection per pass.
+    body+='<g transform="translate(520 0)"><rect x="-348" y="533" width="348" height="14" fill="'+BLACK+'"/><path d="M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40" fill="none" stroke="'+WHITE+'" stroke-width="5"><animate attributeName="d" values="M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40" keyTimes="0;0.3;0.5;0.7;1" dur="2.8s" repeatCount="indefinite"/></path><animateTransform attributeName="transform" type="translate" values="0 0;1348 0" dur="2.8s" repeatCount="indefinite"/></g>';
   }
   body+=flickerSVG(s);
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+'</defs>'+body+'</svg>';
@@ -787,20 +980,22 @@ function renderSVG(s){
     if(sl.move) body+='<clipPath id="c'+ci+'"><rect x="'+(sl.x*U)+'" y="'+(sl.y*U)+'" width="'+(sl.w*U)+'" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><use href="#f" transform="translate('+(sl.dx*U)+' '+(sl.dy*U)+')"/></g>';
     else if(sl.smear) body+='<clipPath id="c'+ci+'"><rect x="0" y="'+(sl.y*U)+'" width="1000" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f" transform="translate(-500 0) scale(2 1)"/></g>';
     else body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // construction intro: the body layers join the 0.25s succession
+  let iSeq=g.introSeq||0; const iT=()=>g.introBase+0.25*(++iSeq);
   // z7: status overlays, precedence MARKED > WITSEC/LAY_LOW/BUYER > HUNTER
-  if(status==='MARKED') body+=markedOverlay(g,g.rng);
-  else if(status==='WITSEC') body+=witsecOverlay(g,g.rng);
-  else if(status==='LAY_LOW') body+=layLowOverlay(g,g.rng);
-  else if(status==='BUYER_PROTECTED') body+=buyerOverlay(g,g.rng);
-  else if(status==='HUNTER_SELECTED') body+=hunterOverlay(g,g.rng);
+  if(status==='MARKED') body+=reveal(markedOverlay(g,g.rng),iT());
+  else if(status==='WITSEC') body+=reveal(witsecOverlay(g,g.rng),iT());
+  else if(status==='LAY_LOW') body+=reveal(layLowOverlay(g,g.rng),iT());
+  else if(status==='BUYER_PROTECTED') body+=reveal(buyerOverlay(g,g.rng),iT());
+  else if(status==='HUNTER_SELECTED') body+=reveal(hunterOverlay(g,g.rng),iT());
   // z8: persistent HUD — seals, latest season badges, territory ladder
-  body+=sealHud(s,g.rng);
-  body+=seasonChips(s,used);
-  body+=territoryHud(s);
+  body+=reveal(sealHud(s,g.rng),iT());
+  { const c1=seasonChips(s,used); if(c1) body+=reveal(c1,iT()); }
+  { const c2=territoryHud(s); if(c2) body+=reveal(c2,iT()); }
   // z9: STATS display mode band
-  if(s.displayMode===1) body+=statsBand(s,used);
+  if(s.displayMode===1) body+=reveal(statsBand(s,used),iT());
   // z10: flicker
-  body+=flickerSVG(s);
+  { const c3=flickerSVG(s); if(c3) body+=reveal(c3,iT()); }
   return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+glyphDefs(used)+'</defs>'+body+'</svg>';
 }
 // ---------------------------------------------------------------------------
