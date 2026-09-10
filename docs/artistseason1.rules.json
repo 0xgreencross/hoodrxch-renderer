@@ -1,0 +1,91 @@
+{
+  "rulesVersion": "HOODRXCH_SEASON_1_RULES_V1",
+  "status": "DESIGN_LOCK_NOT_IMPLEMENTED",
+  "supply": 666,
+  "tokenIdRange": [1, 666],
+  "wardIdRange": [1, 3],
+  "blockIdRangeWithinEachWard": [1, 6],
+  "charactersPerWard": 222,
+  "charactersPerWardBlockCell": 37,
+  "season": {
+    "warSlots": 6,
+    "automaticNextSeason": false,
+    "preparationSeconds": 172800,
+    "nominalWarSeconds": 259200,
+    "requestSeconds": 86400,
+    "activationMustBeBeforeOffsetSeconds": 172800,
+    "purgeSecondsFromActivation": 86400,
+    "executionSeconds": 21600,
+    "nextStartOffsetFromActivationSeconds": 172800,
+    "minimumPreparationAfterFinalisationDelaySeconds": 64800,
+    "snapshotOffsetFromInitialWarStartSeconds": 1555200,
+    "claimDurationSeconds": 15552000
+  },
+  "combat": {
+    "automaticExposure": true,
+    "hunters": false,
+    "maxDistinctRequestsPerTokenPerWar": 3,
+    "maxAcceptedIncomingPerTokenPerWar": 1,
+    "maxAcceptedUnorderedPairPerSeason": 1,
+    "maxDeathsPerToken": 3,
+    "maxSeasonKills": 1998,
+    "sameWalletAttacks": false,
+    "sameWardAttacks": true,
+    "outgoingSurvivesAttackerDeath": true,
+    "sharedActivation": true,
+    "allocation": "CANONICAL_RANDOM_EDGE_PRIORITY_GREEDY",
+    "purgeAtExactDeadline": true,
+    "executionAtExactPurgeDeadline": false,
+    "executionAtExactCutoff": false
+  },
+  "feesWei": {
+    "witsec": "2300000000000000",
+    "purge": "3300000000000000",
+    "attack": "0",
+    "revival": "0"
+  },
+  "feeAllocationBasisPoints": {
+    "operations": 3000,
+    "security": 1500,
+    "maintenance": 2000,
+    "artCommunity": 1500,
+    "playerPrizes": 1000,
+    "wardProjects": 1000
+  },
+  "wardPlacementBasisPoints": [5000, 3000, 2000],
+  "ranking": {
+    "minimumKills": 1,
+    "comparator": ["KILLS_DESC", "DEATHS_ASC"],
+    "numbering": "COMPETITION",
+    "prizeMaximumRank": 10,
+    "topFiveMaximumRank": 5,
+    "tieInclusive": true,
+    "equalPrizeShares": true,
+    "terminalEligible": true
+  },
+  "tiers": [
+    {"index": 0, "minimumKills": 0, "name": "NONE"},
+    {"index": 1, "minimumKills": 1, "name": "FIRST BLOOD"},
+    {"index": 2, "minimumKills": 2, "name": "RISING THREAT"},
+    {"index": 3, "minimumKills": 3, "name": "SAVAGE"},
+    {"index": 4, "minimumKills": 4, "name": "EXECUTIONER"},
+    {"index": 5, "minimumKills": 5, "name": "DEATH DEALER"},
+    {"index": 6, "minimumKills": 7, "name": "REAPER"}
+  ],
+  "art": {
+    "semanticSchemaOnlyNotSolidityABI": true,
+    "primaryPrecedence": ["TERMINAL", "COFFINED", "MARKED", "WITSEC", "PURGED", "ALIVE"],
+    "removedSeasonOneStates": ["HUNTER_SELECTED", "LAY_LOW", "BUYER_PROTECTED"],
+    "killNotchVisualCap": 9,
+    "killCounterVisualCap": null,
+    "bannerWidth": 3000,
+    "bannerHeight": 1000,
+    "profiles": ["CANONICAL_STATIC", "ANIMATED", "STATS", "BANNER"],
+    "deathSeeds": "CANONICAL_GAME_RECORDS",
+    "genesisSeedIdentity": "artIndex",
+    "displayIdentity": "tokenId",
+    "terminalAwardsVisible": true,
+    "streakScope": "LAST_SETTLED_WAR",
+    "fixtureKillCounts": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 18]
+  }
+}
