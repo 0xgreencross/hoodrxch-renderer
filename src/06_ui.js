@@ -104,7 +104,7 @@ document.querySelectorAll('header button').forEach(b=>b.addEventListener('click'
 document.getElementById('reviewGo').addEventListener('click',drawReview);
 function drawEvo(){
   const id=225; let h='';
-  for(const k of [0,1,10,25,50,75,100]){ const st=defaultState(id); st.kills=k; const svg=renderSVG(st);
+  for(const k of [0,1,2,3,4,5,7]){ const st=defaultState(id); st.kills=k; const svg=renderSVG(st);
     h+='<div class="e">'+svgImg(svg,150)+'<span>'+k+' KILLS · '+TIER_NAMES[tierForKills(k)]+'</span></div>'; }
   document.getElementById('evoKills').innerHTML=h;
   let h2='';
@@ -136,31 +136,31 @@ function drawEvo(){
 const FIXTURES=[
  ['FX-001','GENESIS BASELINE',1,{}],
  ['FX-002','FIRST BLOOD',2,{kills:1}],
- ['FX-003','RISING THREAT',3,{kills:10}],
- ['FX-004','SAVAGE',4,{kills:25}],
- ['FX-005','EXECUTIONER',5,{kills:50}],
- ['FX-006','DEATH DEALER',6,{kills:75}],
- ['FX-007','REAPER',7,{kills:100}],
+ ['FX-003','RISING THREAT',3,{kills:2}],
+ ['FX-004','SAVAGE',4,{kills:3}],
+ ['FX-005','EXECUTIONER',5,{kills:4}],
+ ['FX-006','DEATH DEALER',6,{kills:5}],
+ ['FX-007','REAPER',7,{kills:7}],
  ['FX-008','HUNTER SELECTED',8,{hunterSelected:true}],
  ['FX-009','MARKED',9,{lifeState:1,marked:true,markedByTokenId:66,purgeDeadline:1790000000}],
- ['FX-010','MARKED REAPER',10,{lifeState:1,marked:true,markedByTokenId:13,purgeDeadline:1790000000,kills:100}],
+ ['FX-010','MARKED REAPER',10,{lifeState:1,marked:true,markedByTokenId:13,purgeDeadline:1790000000,kills:18}],
  ['FX-011','WITSEC',11,{witsecApplies:true,exposureState:3}],
  ['FX-012','LAY LOW',12,{laidLow:true,exposureState:2}],
  ['FX-013','BUYER PROTECTED',13,{buyerProtected:true,exposureState:4}],
  ['FX-014','COFFINED DEATH 1',14,{lifeState:2,exposureState:5,deaths:1,sealsRemaining:2}],
- ['FX-015','COFFINED DEATH 2',15,{lifeState:2,exposureState:5,deaths:2,sealsRemaining:1,kills:25}],
+ ['FX-015','COFFINED DEATH 2',15,{lifeState:2,exposureState:5,deaths:2,sealsRemaining:1,kills:3}],
  ['FX-016','TERMINAL COFFIN',16,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0}],
- ['FX-017','TERMINAL REAPER',17,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0,kills:100}],
- ['FX-018','EXHUMED SCARRED',18,{deaths:2,sealsRemaining:1,kills:30}],
+ ['FX-017','TERMINAL REAPER',17,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0,kills:18}],
+ ['FX-018','EXHUMED SCARRED',18,{deaths:2,sealsRemaining:1,kills:10}],
  ['FX-019','SAVED FIVE TIMES',19,{savesReceived:5,savesGiven:3}],
  ['FX-020','ENFORCER',20,{forcedPurges:10}],
- ['FX-021','STREAK SEVEN',21,{currentKillStreak:7,kills:12}],
+ ['FX-021','STREAK FIVE',21,{currentKillStreak:5,kills:9}],
  ['FX-022','SEASON TOP 10',22,{latestSeasonBadgeFlags:1,latestSeasonRank:7,latestAwardSeasonId:1}],
  ['FX-023','SEASON TOP 5',23,{latestSeasonBadgeFlags:3,latestSeasonRank:2,latestAwardSeasonId:2}],
- ['FX-024','WARLORD',24,{territoryAchievementCount:6,kills:50}],
- ['FX-025','STATS MODE',25,{displayMode:1,kills:25,deaths:1,sealsRemaining:2,currentKillStreak:3}],
+ ['FX-024','WARLORD',24,{territoryAchievementCount:6,kills:8}],
+ ['FX-025','STATS MODE',25,{displayMode:1,kills:6,deaths:1,sealsRemaining:2,currentKillStreak:3}],
  ['FX-026','FLICKER',26,{flicker:true,kills:10}],
- ['FX-027','FULL DECORATION',27,{kills:75,deaths:1,sealsRemaining:2,forcedPurges:6,savesReceived:3,latestSeasonBadgeFlags:3,latestSeasonRank:1,latestAwardSeasonId:1,territoryAchievementCount:4,currentKillStreak:5}],
+ ['FX-027','FULL DECORATION',27,{kills:7,deaths:1,sealsRemaining:2,forcedPurges:6,savesReceived:3,latestSeasonBadgeFlags:3,latestSeasonRank:1,latestAwardSeasonId:1,territoryAchievementCount:4,currentKillStreak:5}],
  ['FX-028','DIAG SEAL MISMATCH',28,{sealsRemaining:0}],
  ['FX-029','DIAG DOUBLE SHIELD',29,{witsecApplies:true,laidLow:true,exposureState:3}],
  ['FX-030','DIAG MARKED TERMINAL',30,{lifeState:3,exposureState:6,deaths:3,sealsRemaining:0,marked:true}]];

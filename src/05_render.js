@@ -6,7 +6,10 @@ const EXPO=['NOT_APPLICABLE','ON_THE_STREET','LAY_LOW','WITSEC','BUYER_PROTECTED
 const TIER_NAMES=['NONE','FIRST BLOOD','RISING THREAT','SAVAGE','EXECUTIONER','DEATH DEALER','REAPER'];
 const TIER_MIN=[0,1,10,25,50,75,100];
 const PHASES=['REGISTRATION','SELECTION','RESCUE','EXECUTION','FINALISATION','ARMISTICE'];
-function tierForKills(k){ if(k>=100)return 6; if(k>=75)return 5; if(k>=50)return 4; if(k>=25)return 3; if(k>=10)return 2; if(k>=1)return 1; return 0; }
+// HOODRXCH_SEASON_1_RULES_V1 tier table — seven ACHIEVABLE stages on actual
+// kills (6 wars, 1 accepted incoming per token per war; 100 kills would have
+// taken years). 5-6 = DEATH DEALER, 7+ = REAPER. Kills keep counting above 7.
+function tierForKills(k){ if(k>=7)return 6; if(k>=5)return 5; if(k>=4)return 4; if(k>=3)return 3; if(k>=2)return 2; if(k>=1)return 1; return 0; }
 function defaultState(tokenId){
   tokenId=tokenId||1;
   const wardId=((tokenId-1)%3)+1, blockId=(Math.floor((tokenId-1)/3)%6)+1; // demo assignment only; WardRegistry is canonical
