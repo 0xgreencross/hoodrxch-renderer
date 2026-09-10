@@ -47,12 +47,14 @@ library GenesisLib {
         return abi.encodePacked(genesisHash, uint16(tokenId), uint8(deaths), "DMG");
     }
 
+    /// HOODRXCH_SEASON_1_RULES_V1 tier table — seven ACHIEVABLE stages on
+    /// actual kills. 5-6 = DEATH DEALER, 7+ = REAPER. Kills count above 7.
     function tierForKills(uint256 k) internal pure returns (uint256) {
-        if (k >= 100) return 6;
-        if (k >= 75) return 5;
-        if (k >= 50) return 4;
-        if (k >= 25) return 3;
-        if (k >= 10) return 2;
+        if (k >= 7) return 6;
+        if (k >= 5) return 5;
+        if (k >= 4) return 4;
+        if (k >= 3) return 3;
+        if (k >= 2) return 2;
         if (k >= 1) return 1;
         return 0;
     }
