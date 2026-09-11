@@ -59,7 +59,8 @@ function draw(card){
   else ph.textContent="render failed";});
 }
 function io(){const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting)draw(e.target)}),{rootMargin:"600px 0px"});
- cards.forEach(c=>obs.observe(c));}
+ cards.forEach(c=>obs.observe(c));draw(cards.find(c=>!dec[c.dataset.k])||cards[0]);addEventListener("scroll",vis,{passive:true});document.addEventListener("visibilitychange",()=>{if(!document.hidden)vis()});}
+function vis(){const h=innerHeight;for(const c of cards){const r=c.getBoundingClientRect();if(r.top<h+600&&r.bottom>-600)draw(c);}}
 function paint(){let n=0;
  cards.forEach(c=>{const d=dec[c.dataset.k];c.classList.toggle("done",!!d);
   c.querySelector(".cur").textContent=d?("→ "+(d.v==="ban"?"NEVER MIX":d.v==="ok"?"ALLOWED":"NOTED")+(d.note?" · "+d.note:"")):"";if(d)n++;});
