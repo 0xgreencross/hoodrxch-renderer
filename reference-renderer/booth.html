@@ -1,0 +1,2093 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Pull a random Signal Wraith from the 666 and export its seamless loop as a GIF or the finished mask as a PNG.">
+<style>
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+img{max-width:100%}
+[hidden]{display:none!important}
+</style>
+<title>Signal Wraith Booth</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one column — a square stage holding the live wraith, a control rail beneath it,
+   then the genesis readout as a two-column data grid. Committed single dark theme: this
+   artwork only exists on black, so there is no light palette to design. */
+:root{
+  --ink:#070807; --panel:#0f110e; --raise:#161916; --line:#242a21;
+  --fg:#D6DAD2; --dim:#7a8174; --acid:#CCFF00; --pink:#FF3EB5; --red:#FF2A2A;
+  --display:'Archivo','Helvetica Neue',Arial,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{
+  background:var(--ink); color:var(--fg); font-family:var(--mono); font-size:13px; line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:28px 48px;
+}
+.wrap{max-width:720px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+
+header{display:flex;flex-direction:column;gap:6px}
+h1{
+  font-family:var(--display); font-weight:900; font-size:clamp(26px,7vw,40px);
+  letter-spacing:-.02em; line-height:.98; margin:0; text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--acid)}
+.sub{color:var(--dim);max-width:60ch}
+
+/* stage */
+.stage{
+  position:relative; aspect-ratio:1/1; width:100%; max-width:min(100%,560px); margin:0 auto; background:#000;
+  border:1px solid var(--line); overflow:hidden;
+}
+.stage svg{display:block;width:100%;height:100%}
+.stage.round{border-radius:50%}
+.tag{
+  position:absolute; left:0; top:0; display:flex; gap:1px; font-size:10px; letter-spacing:.14em;
+}
+.tag span{background:#000;border:1px solid var(--line);border-left:0;border-top:0;padding:4px 7px;color:var(--dim)}
+.tag span.id{color:var(--acid)}
+
+/* controls */
+.rail{display:flex;flex-wrap:wrap;gap:8px;align-items:stretch}
+button,select,input[type=number]{
+  font:inherit; font-size:12px; color:var(--fg); background:var(--raise);
+  border:1px solid var(--line); padding:9px 13px; border-radius:2px;
+}
+button{cursor:pointer;letter-spacing:.06em}
+button:hover:not(:disabled){border-color:var(--dim)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acid);outline-offset:1px}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:var(--acid);color:#000;border-color:var(--acid);font-weight:600}
+button.primary:hover:not(:disabled){filter:brightness(1.08)}
+input[type=number]{width:9ch;text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{appearance:none;margin:0}
+label.inline{display:flex;align-items:center;gap:7px;color:var(--dim);font-size:11px;letter-spacing:.1em}
+.grow{flex:1 1 auto;min-width:0}
+
+.exports{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.card{
+  background:var(--panel); border:1px solid var(--line); padding:14px;
+  display:flex; flex-direction:column; gap:10px; min-width:0;
+}
+.card h2{
+  font-family:var(--display); font-weight:700; font-size:12px; letter-spacing:.18em;
+  margin:0; color:var(--fg); text-transform:uppercase;
+}
+.card p{margin:0;color:var(--dim);font-size:11.5px}
+.card .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.card button{width:100%}
+
+/* progress */
+.bar{height:3px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--acid);transition:width .12s linear}
+.note{font-size:11px;color:var(--dim);min-height:1.4em}
+.note.warn{color:var(--pink)}
+.note.ok{color:var(--acid)}
+
+/* readout */
+.readout{background:var(--panel);border:1px solid var(--line)}
+.readout .hd{
+  padding:10px 14px;border-bottom:1px solid var(--line);
+  font-family:var(--display);font-weight:700;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--dim);
+}
+dl{margin:0;display:grid;grid-template-columns:minmax(0,12ch) minmax(0,1fr);gap:0}
+dt,dd{margin:0;padding:7px 14px;border-bottom:1px solid var(--line);min-width:0;overflow-wrap:anywhere}
+dt{color:var(--dim);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+dd{color:var(--fg)}
+dl>:nth-last-child(1),dl>:nth-last-child(2){border-bottom:0}
+footer{color:var(--dim);font-size:11px;border-top:1px solid var(--line);padding-top:14px}
+@media (prefers-reduced-motion:reduce){.bar i{transition:none}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Signal <em>Wraith</em> Booth</h1>
+    <p class="sub">Pull a wraith out of the 666 and take it home: the loop as a seamless GIF, the finished mask as a PNG. Rendered from the onchain renderer itself, not a copy of it.</p>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="tag"><span class="id" id="tagId">#—</span><span id="tagStatus">—</span><span id="tagPeriod">—</span></div>
+  </div>
+
+  <div class="rail">
+    <button class="primary grow" id="btnRandom">Random wraith</button>
+    <label class="inline">Token
+      <input type="number" id="tokenIn" min="1" max="666" step="1" value="94">
+    </label>
+    <button id="btnGo">Load</button>
+    <label class="inline">Kills
+      <select id="killsIn">
+        <option value="0">0 · none</option>
+        <option value="1">1 · first blood</option>
+        <option value="2">2 · rising threat</option>
+        <option value="3">3 · savage</option>
+        <option value="4">4 · executioner</option>
+        <option value="5">5 · death dealer</option>
+        <option value="7">7 · reaper</option>
+      </select>
+    </label>
+    <button id="btnReplay">Replay build</button>
+    <label class="inline"><input type="checkbox" id="roundIn"> Circle crop</label>
+  </div>
+
+  <div class="exports">
+    <div class="card">
+      <h2>Animated GIF</h2>
+      <p>One exact loop period, so the GIF's own restart lands on the wrap. The construction intro is left out.</p>
+      <div class="row">
+        <label class="inline">Size
+          <select id="gifSize"><option>320</option><option selected>420</option><option>600</option></select>
+        </label>
+        <label class="inline">FPS
+          <select id="gifFps"><option>12</option><option selected>20</option><option>25</option></select>
+        </label>
+      </div>
+      <button id="btnGif">Download GIF</button>
+      <div class="bar"><i id="gifBar"></i></div>
+      <div class="note" id="gifNote"></div>
+    </div>
+    <div class="card">
+      <h2>Still PNG</h2>
+      <p>The mask fully constructed — frame one of the loop, which is the same finished art a non-animating renderer shows.</p>
+      <div class="row">
+        <label class="inline">Size
+          <select id="pngSize"><option>1000</option><option selected>2000</option><option>4000</option></select>
+        </label>
+      </div>
+      <button id="btnPng">Download PNG</button>
+      <div class="bar"><i id="pngBar"></i></div>
+      <div class="note" id="pngNote"></div>
+    </div>
+  </div>
+
+  <div class="readout">
+    <div class="hd">Genesis traits</div>
+    <dl id="traits"></dl>
+  </div>
+
+  <footer id="foot">Drawn by the reference renderer itself (commit 34a2623), the same code the Solidity mirrors byte for byte. The field loop is wrap-exact, so the GIF’s restart <em>is</em> the seam.</footer>
+</div>
+
+<script>window.HRX=(function(){
+'use strict';
+// ============================================================================
+// HOODRXCH reference renderer — single file, vanilla JS, no deps.
+// Mirrors contracts/ one-to-one. Same state → byte-identical SVG.
+// ============================================================================
+const RENDERER_VERSION = 1, SCHEMA_VERSION = 1;
+const BLACK = '#000000', ACID = '#CCFF00', RED = '#FF2A2A';
+// ---------------------------------------------------------------------------
+// keccak256 (Ethereum variant, pad 0x01..0x80). BigInt lanes. Input: Uint8Array.
+// ---------------------------------------------------------------------------
+const KECCAK_RC = [
+  0x0000000000000001n,0x0000000000008082n,0x800000000000808an,0x8000000080008000n,
+  0x000000000000808bn,0x0000000080000001n,0x8000000080008081n,0x8000000000008009n,
+  0x000000000000008an,0x0000000000000088n,0x0000000080008009n,0x000000008000000an,
+  0x000000008000808bn,0x800000000000008bn,0x8000000000008089n,0x8000000000008003n,
+  0x8000000000008002n,0x8000000000000080n,0x000000000000800an,0x800000008000000an,
+  0x8000000080008081n,0x8000000000008080n,0x0000000080000001n,0x8000000080008008n];
+const KECCAK_ROT = [[0,36,3,41,18],[1,44,10,45,2],[62,6,43,15,61],[28,55,25,21,56],[27,20,39,8,14]];
+const M64 = (1n<<64n)-1n;
+function rotl64(x,n){ n=BigInt(n); return n===0n?x:(((x<<n)|(x>>(64n-n)))&M64); }
+function keccakF(A){
+  for(let r=0;r<24;r++){
+    const C=[0n,0n,0n,0n,0n];
+    for(let x=0;x<5;x++) C[x]=A[x]^A[x+5]^A[x+10]^A[x+15]^A[x+20];
+    for(let x=0;x<5;x++){ const D=C[(x+4)%5]^rotl64(C[(x+1)%5],1); for(let y=0;y<25;y+=5) A[x+y]^=D; }
+    const B=new Array(25);
+    for(let x=0;x<5;x++) for(let y=0;y<5;y++) B[y+5*((2*x+3*y)%5)]=rotl64(A[x+5*y],KECCAK_ROT[x][y]);
+    for(let x=0;x<5;x++) for(let y=0;y<5;y++) A[x+5*y]=B[x+5*y]^((~B[(x+1)%5+5*y]&M64)&B[(x+2)%5+5*y]);
+    A[0]^=KECCAK_RC[r];
+  }
+}
+function keccak256(bytes){
+  const rate=136, A=new Array(25).fill(0n);
+  const padded=new Uint8Array(Math.ceil((bytes.length+1)/rate)*rate);
+  padded.set(bytes); padded[bytes.length]^=0x01; padded[padded.length-1]^=0x80;
+  for(let off=0;off<padded.length;off+=rate){
+    for(let i=0;i<17;i++){ let v=0n; for(let b=7;b>=0;b--) v=(v<<8n)|BigInt(padded[off+i*8+b]); A[i]^=v; }
+    keccakF(A);
+  }
+  const out=new Uint8Array(32);
+  for(let i=0;i<4;i++){ let v=A[i]; for(let b=0;b<8;b++){ out[i*8+b]=Number(v&0xffn); v>>=8n; } }
+  return out;
+}
+function hexToBytes(h){ h=h.replace(/^0x/,''); const o=new Uint8Array(h.length/2); for(let i=0;i<o.length;i++) o[i]=parseInt(h.substr(i*2,2),16); return o; }
+function bytesToHex(b){ return '0x'+Array.from(b,x=>x.toString(16).padStart(2,'0')).join(''); }
+function strBytes(s){ return new TextEncoder().encode(s); }
+function concatBytes(...arrs){ let n=0; for(const a of arrs) n+=a.length; const o=new Uint8Array(n); let p=0; for(const a of arrs){ o.set(a,p); p+=a.length; } return o; }
+function u16be(n){ return new Uint8Array([(n>>8)&255,n&255]); }
+function u32be(n){ return new Uint8Array([(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255]); }
+function u8(n){ return new Uint8Array([n&255]); }
+// abi.encode of a uint: 32-byte big-endian
+function word(n){ const o=new Uint8Array(32); let v=BigInt(n); for(let i=31;i>=0;i--){ o[i]=Number(v&0xffn); v>>=8n; } return o; }
+// self-test
+(function(){ const h=bytesToHex(keccak256(new Uint8Array(0))); if(h!=='0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470') throw new Error('keccak self-test failed '+h); })();
+
+// ---------------------------------------------------------------------------
+// Deterministic RNG: stream of bytes from keccak(seed), refilled by keccak(prev).
+// Solidity: same construction (bytes32 pool, counter, rehash).
+// ---------------------------------------------------------------------------
+class Rng{
+  constructor(seedBytes){ this.pool=keccak256(seedBytes); this.i=0; }
+  byte(){ if(this.i===32){ this.pool=keccak256(this.pool); this.i=0; } return this.pool[this.i++]; }
+  // uniform-ish int in [0,n)
+  int(n){ return this.byte()%n; }
+  // per-mille roll [0,1000) from two bytes (for the rarity weight tables)
+  r1000(){ return (this.byte()*256+this.byte())%1000; }
+  // jitter in [-2..2] with weight towards small values: bytes 0..255 → {-2,-1,-1,0,0,0,1,1,2}
+  jit(){ const t=[-2,-1,-1,0,0,0,1,1,2]; return t[this.byte()%9]; }
+  // pick from a 3-value stroke set
+  sw(){ return [8,12,16][this.byte()%3]; }
+}
+function genesisSeed(genesisHash,tokenId){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId)); }
+// Provisional damage seed (open item O-3): keccak(genesisHash, tokenId, deaths)
+function damageSeed(genesisHash,tokenId,deaths){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId),u8(deaths),strBytes('DMG')); }
+// Demo genesisHash for the workbench when the provider isn't wired: keccak("HOODRXCH_GENESIS_V1", tokenId)
+function demoGenesisHash(tokenId){ return bytesToHex(keccak256(concatBytes(strBytes('HOODRXCH_GENESIS_V1'),word(tokenId)))); }
+// ---------------------------------------------------------------------------
+// Block glyph set: 5x7 cells, A–Z 0–9 # / . and space. Each glyph becomes one
+// <path> in <defs> (only glyphs actually used are emitted). Unit grid; placed
+// with <use transform="translate(x y) scale(s)">.
+// ---------------------------------------------------------------------------
+const GLYPHS = {
+A:['01110','10001','10001','11111','10001','10001','10001'],
+B:['11110','10001','10001','11110','10001','10001','11110'],
+C:['01111','10000','10000','10000','10000','10000','01111'],
+D:['11110','10001','10001','10001','10001','10001','11110'],
+E:['11111','10000','10000','11110','10000','10000','11111'],
+F:['11111','10000','10000','11110','10000','10000','10000'],
+G:['01111','10000','10000','10111','10001','10001','01111'],
+H:['10001','10001','10001','11111','10001','10001','10001'],
+I:['11111','00100','00100','00100','00100','00100','11111'],
+J:['00111','00001','00001','00001','00001','10001','01110'],
+K:['10001','10010','10100','11000','10100','10010','10001'],
+L:['10000','10000','10000','10000','10000','10000','11111'],
+M:['10001','11011','10101','10101','10001','10001','10001'],
+N:['10001','11001','10101','10011','10001','10001','10001'],
+O:['01110','10001','10001','10001','10001','10001','01110'],
+P:['11110','10001','10001','11110','10000','10000','10000'],
+Q:['01110','10001','10001','10001','10101','10010','01101'],
+R:['11110','10001','10001','11110','10100','10010','10001'],
+S:['01111','10000','10000','01110','00001','00001','11110'],
+T:['11111','00100','00100','00100','00100','00100','00100'],
+U:['10001','10001','10001','10001','10001','10001','01110'],
+V:['10001','10001','10001','10001','10001','01010','00100'],
+W:['10001','10001','10001','10101','10101','11011','10001'],
+X:['10001','10001','01010','00100','01010','10001','10001'],
+Y:['10001','10001','01010','00100','00100','00100','00100'],
+Z:['11111','00001','00010','00100','01000','10000','11111'],
+'0':['01110','10001','10011','10101','11001','10001','01110'],
+'1':['00100','01100','00100','00100','00100','00100','01110'],
+'2':['01110','10001','00001','00110','01000','10000','11111'],
+'3':['11110','00001','00001','01110','00001','00001','11110'],
+'4':['00010','00110','01010','10010','11111','00010','00010'],
+'5':['11111','10000','10000','11110','00001','00001','11110'],
+'6':['01110','10000','10000','11110','10001','10001','01110'],
+'7':['11111','00001','00010','00100','01000','01000','01000'],
+'8':['01110','10001','10001','01110','10001','10001','01110'],
+'9':['01110','10001','10001','01111','00001','00001','01110'],
+'#':['01010','01010','11111','01010','11111','01010','01010'],
+'/':['00001','00010','00010','00100','01000','01000','10000'],
+'.':['00000','00000','00000','00000','00000','01100','01100'],
+':':['00000','01100','01100','00000','01100','01100','00000'],
+'-':['00000','00000','00000','11111','00000','00000','00000'],
+};
+const GLYPH_ID = {'#':'gNum','/':'gSla','.':'gDot',':':'gCol','-':'gDsh'};
+function glyphId(ch){ return GLYPH_ID[ch] || ('g'+ch); }
+// bitmap → path (runs per row, unit grid, relative commands)
+function glyphPath(rows){
+  let d='';
+  for(let y=0;y<7;y++){ const r=rows[y]; let x=0;
+    while(x<5){ if(r[x]==='1'){ let w=1; while(x+w<5&&r[x+w]==='1') w++; d+='M'+x+' '+y+'h'+w+'v1h-'+w+'z'; x+=w; } else x++; }
+  }
+  return d;
+}
+// Text placement. Returns {svg, used:Set}. size = pixels per cell. Advance 6 cells.
+function text(str, x, y, size, fill, used){
+  let s='';
+  for(let i=0;i<str.length;i++){ const ch=str[i]; if(ch===' ') continue; if(!GLYPHS[ch]) continue;
+    used.add(ch);
+    s+='<use href="#'+glyphId(ch)+'" transform="translate('+(x+i*6*size)+' '+y+') scale('+size+')" fill="'+fill+'"/>';
+  }
+  return s;
+}
+function textWidth(str,size){ return (str.length*6-1)*size; }
+function glyphDefs(used){ let s=''; for(const ch of used) s+='<path id="'+glyphId(ch)+'" d="'+glyphPath(GLYPHS[ch])+'"/>'; return s; }
+// ---------------------------------------------------------------------------
+// Geometry primitives. Logical 100-unit grid → ×10 px. Integer output only.
+// (Glitch.sol / SVGBuilder.sol equivalents.)
+// ---------------------------------------------------------------------------
+const U = 10; // px per unit
+function jitterPts(pts, rng, amp){ // amp 1 or 2 units
+  const o=[]; for(const p of pts){ let jx=rng.jit(), jy=rng.jit(); if(amp===1){ jx=Math.max(-1,Math.min(1,jx)); jy=Math.max(-1,Math.min(1,jy)); } o.push([p[0]+jx,p[1]+jy]); } return o;
+}
+function offsetPts(pts,dx,dy){ return pts.map(p=>[p[0]+dx,p[1]+dy]); }
+function mirrorPts(pts,cx){ return pts.map(p=>[2*cx-p[0],p[1]]); }
+// closed polygon path, relative integer commands, px
+function pathD(pts){
+  let d='M'+(pts[0][0]*U)+' '+(pts[0][1]*U);
+  for(let i=1;i<pts.length;i++){ const dx=(pts[i][0]-pts[i-1][0])*U, dy=(pts[i][1]-pts[i-1][1])*U;
+    if(dy===0) d+='h'+dx; else if(dx===0) d+='v'+dy; else d+='l'+dx+' '+dy; }
+  return d+'z';
+}
+function poly(pts,fill,extra){ return '<path d="'+pathD(pts)+'" fill="'+fill+'"'+(extra||'')+'/>'; }
+function rect(x,y,w,h,fill){ return '<rect x="'+x*U+'" y="'+y*U+'" width="'+w*U+'" height="'+h*U+'" fill="'+fill+'"/>'; }
+// crude-clean stroked polyline: each segment gets a width from the 3-value set;
+// segments are grouped by width into ≤3 paths. closed=true joins last→first.
+function strokeLine(pts,rng,color,closed,scale){
+  const groups={}; const n=closed?pts.length:pts.length-1;
+  for(let i=0;i<n;i++){ const a=pts[i], b=pts[(i+1)%pts.length]; const w=rng.sw()*(scale||1);
+    (groups[w]=groups[w]||[]).push('M'+(a[0]*U)+' '+(a[1]*U)+'l'+((b[0]-a[0])*U)+' '+((b[1]-a[1])*U)); }
+  let s=''; for(const w of Object.keys(groups).sort((a,b)=>a-b)) s+='<path d="'+groups[w].join('')+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-linecap="square"/>';
+  return s;
+}
+function thickLine(pts,color,w){ let d=''; for(let i=0;i<pts.length-1;i++){ const a=pts[i],b=pts[i+1]; d+='M'+(a[0]*U)+' '+(a[1]*U)+'l'+((b[0]-a[0])*U)+' '+((b[1]-a[1])*U); } return '<path d="'+d+'" fill="none" stroke="'+color+'" stroke-width="'+w+'" stroke-linecap="square"/>'; }
+// solid drip: a tapered polygon hanging from (x,y) of length len (units)
+function drip(x,y,len,w,fill,rng){ const pts=[[x-w,y],[x+w,y],[x+w,y+len-2],[x,y+len],[x-w,y+len-2]]; return poly(jitterPts(pts,rng,1),fill); }
+// displacement slice of group #id: band [y,y+h) shifted dx units. idx numbers the clipPath.
+function slice(id,idx,y,h,dx,groundFill){
+  return '<clipPath id="c'+idx+'"><rect x="0" y="'+(y*U)+'" width="1000" height="'+(h*U)+'"/></clipPath>'
+       + '<g clip-path="url(#c'+idx+')"><rect width="1000" height="1000" fill="'+groundFill+'"/><use href="#'+id+'" transform="translate('+(dx*U)+' 0)"/></g>';
+}
+// X mark centred at (cx,cy), half-size r, bar width b (units)
+function xmark(cx,cy,r,b,fill,rng){
+  const a=[[cx-r,cy-r+b],[cx-r+b,cy-r],[cx+r,cy+r-b],[cx+r-b,cy+r]];
+  const c=[[cx+r-b,cy-r],[cx+r,cy-r+b],[cx-r+b,cy+r],[cx-r,cy+r-b]];
+  return poly(jitterPts(a,rng,1),fill)+poly(jitterPts(c,rng,1),fill);
+}
+// ---------------------------------------------------------------------------
+// Genesis (MaskGeometry.sol). Round 10 — SIGNAL WRAITH.
+// A completely different construction: no blocks, no checkers, no cartoon
+// shapes. The whole image is a field of horizontal signal lines; a skull-form
+// heightfield displaces them upward, so the figure exists only as a
+// disturbance in the signal — a shroud draped over the scan. Eye sockets dent
+// the field and burn as the only solid fills. Lines tear, spike and
+// double-expose in pink. All integer fixed-point math (centi-units) so the
+// Solidity port is bit-exact.
+//
+// TRAIT ENGINE V2 — 110 values across 9 traits, six rarity tiers:
+// COMMON > UNCOMMON > RARE > ULTRA RARE > LEGENDARY > EPIC (rarest, ~5‰).
+// Every value is drawn from a per-mille weight table with a two-byte roll.
+// ---------------------------------------------------------------------------
+const PINK='#FF3EB5', WHITE='#FFFFFF';
+
+// tier names for the rarity UI/docs (index into TIER_OF tables below)
+const RARITY_NAMES=['COMMON','UNCOMMON','RARE','ULTRA RARE','LEGENDARY','EPIC'];
+
+const FORM_NAMES=['BROAD','LEAN','SKEW L','SKEW R','HOLLOW','TOWERING','SPIRE','SUNKEN',
+ 'TWIN PEAK','HORNED','TILTED','CRATER','COLOSSUS','NEEDLE','WRAITH TALL','PHANTOM'];
+const FORM_W=[195,185,95,95,90,80,55,55,30,30,28,25,12,12,8,5];
+const FORM_TIER=[0,0,0,0,0,0,1,1,2,2,2,2,3,3,4,5];
+
+const LINE_NAMES=['FINE','MID','HEAVY','DENSE','SPARSE','DASHED','DUAL WEIGHT','BARCODE','NO SIGNAL'];
+const LINE_W=[240,260,210,90,90,55,35,15,5];
+const LINE_TIER=[0,0,0,1,1,2,3,4,5];
+
+const TEAR_NAMES=['CLEAN','TORN','SHREDDED','RIPPED EDGE','MOTH EATEN','SPLIT FIELD','VAPOR','CENSORED'];
+const TEAR_W=[330,330,150,90,50,30,15,5];
+const TEAR_TIER=[0,0,1,1,2,3,4,5];
+
+const SPIKE_NAMES=['NONE','FEW','STORM','NEEDLES','SEISMIC','PULSE TRAIN','LIGHTNING','EARTHQUAKE','FLATLINE SCAR'];
+const SPIKE_W=[300,330,130,90,50,45,35,15,5];
+const SPIKE_TIER=[0,0,1,1,2,2,3,4,5];
+
+const EYE_NAMES=['X','BROKEN X','SMEARED X','VISOR','SPLIT VISOR','X + SLIT','X + VOID','HOLLOW','DOUBLE X',
+ 'SLIT','GLITCH BAR','PIXEL STORM','CROSSHAIR','TRIPLE SLIT','VOID RING','NAILED X','BINARY',
+ 'TARGET','SPIRAL','WEEPING X','SPLIT PAIR','BURNING X','STAR','DEAD LIGHT','ALL SEEING'];
+const EYE_W=[155,100,55,100,45,95,45,40,30,50,45,40,30,28,27,25,25,12,12,12,9,5,5,5,5];
+const EYE_TIER=[0,0,1,0,1,0,1,1,2,1,1,1,2,2,2,2,2,3,3,3,3,4,4,4,5];
+
+const TREAT_NAMES=['RAW','ECHO GLOW','CHROMATIC','RIPPLE','FULL SIGNAL',
+ 'STATIC','CROSS FLARE','HALO EYES','SMEAR TRAIL','INVERTED','PRISM','GOD RAYS'];
+const TREAT_W=[190,240,190,90,120,60,35,25,25,12,8,5];
+const TREAT_TIER=[0,0,0,1,0,1,2,3,3,4,4,5];
+
+const MOUTH_NAMES=['NONE','GASH','GRIN','SEWN','WIRE','STITCHED GRIN','DOUBLE GASH','SIDE SMIRK',
+ 'ZIPPER','SNARL','DRIP','SCREAM','FANGS','HOWL','MUZZLE','GLITCH MOUTH'];
+const MOUTH_W=[200,165,160,128,60,55,50,45,32,30,28,14,13,8,7,5];
+const MOUTH_TIER=[0,0,0,0,1,1,1,1,2,2,2,3,3,4,4,5];
+
+const PINKAMT_NAMES=['NONE','ECHO','BLEED','FLOOD','WHITE ECHO','INVERSION','TRICHROME','HEARTBEAT'];
+const PINK_W=[320,350,150,80,50,30,15,5];
+const PINK_TIER=[0,0,1,2,2,3,4,5];
+
+const MOSH_NAMES=['NONE','SHIFTS','HEAVY','TEARDROP','CORRUPTED','SPLIT','MELTDOWN'];
+const MOSH_W=[360,330,160,80,50,15,5];
+const MOSH_TIER=[0,0,1,2,3,4,5];
+
+const WARD_NAMES=['','CHEVRON','THREE BARS','DIAMOND'];
+
+// weighted pick: two-byte per-mille roll against a cumulative table
+function pick(rng,W){
+  let r=rng.r1000(); for(let i=0;i<W.length;i++){ r-=W[i]; if(r<0) return i; }
+  return W.length-1;
+}
+
+// CURATE MODE (workbench-only, never set onchain): force any trait value while
+// still burning the exact blessed rng stream — every pick is drawn as normal,
+// only the resulting value is replaced, so anatomy params/downstream draws stay
+// coherent and deterministic. TRAIT_OV=null → byte-identical to production.
+var TRAIT_OV=null;
+function ovv(k,v){ return (TRAIT_OV&&TRAIT_OV[k]!=null)?TRAIT_OV[k]:v; }
+// traits: form-driven anatomy + weighted buckets
+function drawTraits(rng){
+  const t={};
+  t.form=ovv('form',pick(rng,FORM_W));
+  // anatomy per form (ranges keep continuous variety inside each silhouette)
+  // cx pinned to dead center so the hood (and everything drawn around it) survives
+  // the circular PFP crop; the draw is still consumed to keep all other traits identical
+  // cx AND cy pinned to dead center (circular-crop safe); draws consumed for trait parity
+  rng.int(13); t.cx=50; rng.int(9); t.cy=52;
+  t.rw=25+rng.int(9); t.rh=29+rng.int(11); t.amp=19+rng.int(7);
+  t.peak=rng.int(9)-4; t.pamp=6+rng.int(4);
+  t.x2mode=0; t.x2amp=0; t.x2dx=0;
+  switch(t.form){
+    case 0: t.rw=30+rng.int(9); t.amp=20+rng.int(7); break;                    // BROAD
+    case 1: t.rw=22+rng.int(5); t.rh=30+rng.int(11); break;                    // LEAN
+    case 2: t.peak=-(8+rng.int(7)); t.rw=25+rng.int(9); break;                 // SKEW L
+    case 3: t.peak=8+rng.int(7); t.rw=25+rng.int(9); break;                    // SKEW R
+    case 4: t.amp=14+rng.int(4); t.rw=27+rng.int(8); break;                    // HOLLOW
+    case 5: t.rh=38+rng.int(7); t.rw=24+rng.int(7); t.amp=20+rng.int(7); break;// TOWERING
+    case 6: t.rw=20+rng.int(5); t.pamp=12+rng.int(5); t.rh=34+rng.int(9); break;// SPIRE
+    case 7: t.amp=12+rng.int(4); rng.int(4); t.rh=26+rng.int(7); break;       // SUNKEN (squatness via amp/rh; cy stays centered)
+    case 8: t.x2mode=1; t.x2amp=8+rng.int(5); t.x2dx=10+rng.int(5); break;     // TWIN PEAK
+    case 9: t.x2mode=2; t.x2amp=10+rng.int(5); break;                          // HORNED
+    case 10: t.peak=(12+rng.int(5))*(rng.int(2)?1:-1); if(rng.int(2)){rng.int(5);}else{rng.int(5);} t.cx=50; break; // TILTED (leans via peak; placement centered, draws consumed)
+    case 11: t.x2mode=3; t.x2amp=8+rng.int(5); break;                          // CRATER
+    case 12: t.rw=36+rng.int(5); t.amp=26+rng.int(5); t.rh=34+rng.int(7); break;// COLOSSUS
+    case 13: t.rw=18+rng.int(4); t.pamp=14+rng.int(5); t.rh=38+rng.int(7); t.amp=16+rng.int(5); break; // NEEDLE
+    case 14: rng.int(3); t.rh=40+rng.int(5); break;                            // WRAITH TALL (height via rh; cy stays centered)
+    case 15: t.amp=10+rng.int(4); break;                                       // PHANTOM
+  }
+  t.jawY=t.cy+22+rng.int(8);
+  // sockets (asymmetric)
+  t.sLdx=-(8+rng.int(6)); t.sLdy=-(4+rng.int(6)); t.sLr=7+rng.int(4); t.sLd=13+rng.int(9);
+  t.sRdx=  7+rng.int(6);  t.sRdy=-(3+rng.int(7)); t.sRr=6+rng.int(5); t.sRd=13+rng.int(9);
+  t.nas = 4+rng.int(4);
+  // field + surface buckets
+  t.lineW=ovv('lineW',pick(rng,LINE_W));
+  t.tear=ovv('tear',pick(rng,TEAR_W));
+  t.spike=ovv('spike',pick(rng,SPIKE_W));
+  t.eyes=ovv('eyes',pick(rng,EYE_W));
+  t.eyeR=6+rng.int(3);
+  t.treat=ovv('treat',pick(rng,TREAT_W));
+  t.mouth=ovv('mouth',pick(rng,MOUTH_W));
+  t.pink=ovv('pink',pick(rng,PINK_W));
+  t.mosh=ovv('mosh',pick(rng,MOSH_W));
+  return t;
+}
+// heightfield in centi-units. x,y in units. Integer math only.
+// bump: A * ((1e4-d2)/1e4)^2 * 100  where d2 = (dx*100/rw)^2+(dy*100/rh)^2
+function bump100(x,y,cx,cy,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((y-cy)*100)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q=10000-d2;                          // 0..1e4
+  return Math.trunc(A*q*q/1000000);          // ≤ A*100
+}
+// flat-top head mass: full amplitude plateau, steep linear falloff at the edge
+function bumpFlat100(x,y,cx,cy,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((y-cy)*100)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q = d2<4200 ? 10000 : Math.trunc((10000-d2)*10000/5800);
+  return Math.trunc(A*q/100);
+}
+function heightAt(t,noiseCols,x,y,noSock){
+  let b=bumpFlat100(x,y,t.cx,t.cy,t.rw,t.rh,t.amp);
+  b+=bump100(x,y,t.cx+t.peak,t.cy-t.rh+6,14,16,t.pamp);
+  b+=bumpFlat100(x,y,t.cx+((t.peak/2)|0),t.cy+18,t.rw+5,14,(t.amp>>1));
+  b-=bump100(x,y,t.cx+((t.peak/3)|0),t.cy+7,4,6,t.nas);
+  // form modifiers: twin peak / horns / crater
+  if(t.x2mode===1){ b+=bump100(x,y,t.cx-t.x2dx,t.cy-t.rh+7,10,14,t.x2amp); b+=bump100(x,y,t.cx+t.x2dx,t.cy-t.rh+7,10,14,t.x2amp); }
+  else if(t.x2mode===2){ b+=bump100(x,y,t.cx-t.rw+4,t.cy-t.rh+10,5,12,t.x2amp); b+=bump100(x,y,t.cx+t.rw-4,t.cy-t.rh+10,5,12,t.x2amp); }
+  else if(t.x2mode===3){ b-=bump100(x,y,t.cx+((t.peak/2)|0),t.cy-t.rh+8,9,10,t.x2amp); }
+  if(y>t.jawY){ const f=Math.max(0,1400-(y-t.jawY)*100); b=Math.trunc(b*f/1400); }
+  if(b<-400) b=-400;
+  const col=Math.max(0,Math.min(50,(x>>1)));
+  return b+noiseCols[col];
+}
+// --- DECI-UNIT variants (conveyor animation pass) ------------------------
+// yd is y in deci-units (1 deci-unit = 1px at 1000-scale). Integer-only math,
+// exact generalizations: heightAtD(t,nc,x,y*10) === heightAt(t,nc,x,y).
+function floorDiv(a,b){ return Math.floor(a/b); }
+function rdiv(a,b){ return floorDiv(a+Math.floor(b/2),b); } // == Math.round(a/b) for integer a; exact for large b (no 32-bit wrap)
+function bump100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q=10000-d2;
+  return Math.trunc(A*q*q/1000000);
+}
+function bumpFlat100D(x,yd,cx,cyd,rw,rh,A){
+  const nx=Math.trunc(((x-cx)*100)/rw), ny=Math.trunc(((yd-cyd)*10)/rh);
+  const d2=nx*nx+ny*ny;
+  if(d2>=10000) return 0;
+  const q = d2<4200 ? 10000 : Math.trunc((10000-d2)*10000/5800);
+  return Math.trunc(A*q/100);
+}
+function heightAtD(t,noiseCols,x,yd){
+  let b=bumpFlat100D(x,yd,t.cx,t.cy*10,t.rw,t.rh,t.amp);
+  b+=bump100D(x,yd,t.cx+t.peak,(t.cy-t.rh+6)*10,14,16,t.pamp);
+  b+=bumpFlat100D(x,yd,t.cx+((t.peak/2)|0),(t.cy+18)*10,t.rw+5,14,(t.amp>>1));
+  b-=bump100D(x,yd,t.cx+((t.peak/3)|0),(t.cy+7)*10,4,6,t.nas);
+  if(t.x2mode===1){ b+=bump100D(x,yd,t.cx-t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); b+=bump100D(x,yd,t.cx+t.x2dx,(t.cy-t.rh+7)*10,10,14,t.x2amp); }
+  else if(t.x2mode===2){ b+=bump100D(x,yd,t.cx-t.rw+4,(t.cy-t.rh+10)*10,5,12,t.x2amp); b+=bump100D(x,yd,t.cx+t.rw-4,(t.cy-t.rh+10)*10,5,12,t.x2amp); }
+  else if(t.x2mode===3){ b-=bump100D(x,yd,t.cx+((t.peak/2)|0),(t.cy-t.rh+8)*10,9,10,t.x2amp); }
+  if(yd>t.jawY*10){ const f=Math.max(0,1400-(yd-t.jawY*10)*10); b=Math.trunc(b*f/1400); }
+  if(b<-400) b=-400;
+  const col=Math.max(0,Math.min(50,(x>>1)));
+  return b+noiseCols[col];
+}
+function inSocketD(t,x,yvd,which){
+  const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
+  const nx=Math.trunc(((x-(t.cx+dx))*100)/(r+1)), ny=Math.trunc(((yvd-(t.cy+dy)*10)*10)/Math.max(2,r-1));
+  return nx*nx+ny*ny<10000;
+}
+// 32-bit hash for stationary field features (Solidity: uint32 wrapping math)
+function fhash(a,b){
+  let x=(Math.imul(a,2654435761)^Math.imul(b,97655331)^0x9e3779b9)>>>0;
+  x^=x>>>13; x=Math.imul(x,1274126177)>>>0; x^=x>>>16; return x>>>0;
+}
+// inside-socket test (for line gaps at the eyes)
+function inSocket(t,x,y,which){
+  const dx=which?t.sRdx:t.sLdx, dy=which?t.sRdy:t.sLdy, r=which?t.sRr:t.sLr;
+  const nx=Math.trunc(((x-(t.cx+dx))*100)/(r+1)), ny=Math.trunc(((y-(t.cy+dy))*100)/Math.max(2,r-1));
+  return nx*nx+ny*ny<10000;
+}
+function sigilSVG(ward,cx,cy,rng,fill){
+  const J=(pts)=>offsetPts(pts,cx,cy); let s='';
+  if(ward===1) s+=poly(J([[-3,1],[0,-3],[3,1],[3,3],[0,-1],[-3,3]]),fill);
+  else if(ward===2){ for(let y=-3;y<=3;y+=3) s+=poly(J([[-3,y-1],[3,y-1],[3,y],[-3,y]]),fill); }
+  else s+=poly(J([[0,-3],[3,0],[0,3],[-3,0]]),fill);
+  return s;
+}
+function blockMarkSVG(block,cx,cy,rng,fill){
+  switch(block){
+    case 1: return rect(cx-1,cy-1,2,2,fill);
+    case 2: return rect(cx-3,cy-1,6,2,fill);
+    case 3: return rect(cx-3,cy-1,2,2,fill)+rect(cx+1,cy-1,2,2,fill);
+    case 4: return poly(offsetPts([[-2,2],[0,-3],[2,2]],cx,cy),fill);
+    case 5: return poly(offsetPts([[-2,-2],[2,-2],[2,2],[-2,2]],cx,cy),fill);
+    case 6: return xmark(cx,cy,2,1,fill,rng);
+  }
+  return '';
+}
+// ---------------------------------------------------------------------------
+// RenderStateV1 (handoff §13.2) + displayMode/flicker (open item O-2)
+// ---------------------------------------------------------------------------
+const LIFE=['ALIVE','MARKED','COFFINED','TERMINAL_COFFIN'];
+const EXPO=['NOT_APPLICABLE','ON_THE_STREET','LAY_LOW','WITSEC','BUYER_PROTECTED','COFFINED','TERMINAL'];
+const TIER_NAMES=['NONE','FIRST BLOOD','RISING THREAT','SAVAGE','EXECUTIONER','DEATH DEALER','REAPER'];
+const TIER_MIN=[0,1,10,25,50,75,100];
+const PHASES=['REGISTRATION','SELECTION','RESCUE','EXECUTION','FINALISATION','ARMISTICE'];
+// HOODRXCH_SEASON_1_RULES_V1 tier table — seven ACHIEVABLE stages on actual
+// kills (6 wars, 1 accepted incoming per token per war; 100 kills would have
+// taken years). 5-6 = DEATH DEALER, 7+ = REAPER. Kills keep counting above 7.
+function tierForKills(k){ if(k>=7)return 6; if(k>=5)return 5; if(k>=4)return 4; if(k>=3)return 3; if(k>=2)return 2; if(k>=1)return 1; return 0; }
+function defaultState(tokenId){
+  tokenId=tokenId||1;
+  const wardId=((tokenId-1)%3)+1, blockId=(Math.floor((tokenId-1)/3)%6)+1; // demo assignment only; WardRegistry is canonical
+  return {schemaVersion:1,tokenId,artIndex:tokenId,wardId,blockId,genesisHash:demoGenesisHash(tokenId),
+    warId:1,campaignId:1,seasonId:1,activeBlockId:1,warPhase:0,
+    lifeState:0,exposureState:1,sealsRemaining:3,hunterSelected:false,transferLocked:false,transferLockUntil:0,
+    marked:false,markedByTokenId:0,markedByWardId:0,purgeDeadline:0,
+    witsecCredits:0,witsecApplies:false,laidLow:false,buyerProtected:false,
+    kills:0,deaths:0,forcedPurges:0,savesGiven:0,savesReceived:0,currentKillStreak:0,longestKillStreak:0,terminalKills:0,
+    lifetimeKillTier:0,latestAwardSeasonId:0,latestSeasonRank:0,latestSeasonBadgeFlags:0,seasonAwardCount:0,territoryAchievementCount:0,
+    deathRecordCount:0,historicalStateCount:1,
+    displayMode:0,flicker:false};
+}
+// Impossible states (STATE_TO_LAYER_MAP §5). Returns array of codes.
+function validate(s){
+  const e=[]; const prot=(s.witsecApplies?1:0)+(s.laidLow?1:0)+(s.buyerProtected?1:0);
+  const T=s.lifeState===3, C=s.lifeState===2, M=s.lifeState===1||s.marked;
+  if(T&&(prot>0||s.hunterSelected||s.marked)) e.push('E01');
+  if(C&&(prot>0||s.hunterSelected||s.marked)) e.push('E02');
+  if(M&&(s.witsecApplies||s.laidLow)) e.push('E03');
+  if(s.sealsRemaining===0&&!T) e.push('E04');
+  if((s.deaths>=3&&!T)||(T&&s.deaths<3)) e.push('E05');
+  if(s.sealsRemaining+Math.min(s.deaths,3)!==3) e.push('E06');
+  if((s.latestSeasonBadgeFlags&2)&&!(s.latestSeasonBadgeFlags&1)) e.push('E07');
+  if(prot>1) e.push('E08');
+  if(s.marked!==(s.lifeState===1)) e.push('E09');
+  const exC=s.exposureState===5, exT=s.exposureState===6;
+  if((exT&&!T)||(T&&!exT)||(exC&&!C)||(C&&!exC)) e.push('E10');
+  if(s.wardId<1||s.wardId>3||s.blockId<1||s.blockId>6||s.tokenId<1||s.tokenId>666||s.schemaVersion!==1) e.push('E11');
+  if(s.latestSeasonBadgeFlags!==0&&(s.latestSeasonRank===0||s.latestAwardSeasonId===0)) e.push('E12');
+  if(s.latestSeasonRank>=1&&s.latestSeasonRank<=5&&s.latestSeasonBadgeFlags!==3) e.push('E12');
+  if(s.latestSeasonRank>=6&&s.latestSeasonRank<=10&&s.latestSeasonBadgeFlags!==1) e.push('E12');
+  return [...new Set(e)];
+}
+// stateHash over material fields (map §6) — abi.encode, every field a 32-byte word.
+function stateHash(s){
+  const f=[s.schemaVersion,s.tokenId,s.artIndex,s.wardId,s.blockId];
+  let b=concatBytes(...f.map(word), hexToBytes(s.genesisHash));
+  const rest=[s.seasonId,s.lifeState,s.exposureState,s.sealsRemaining,s.hunterSelected?1:0,s.transferLocked?1:0,s.marked?1:0,s.markedByTokenId,s.purgeDeadline,
+    s.witsecApplies?1:0,s.laidLow?1:0,s.buyerProtected?1:0,s.kills,s.deaths,s.forcedPurges,s.savesReceived,s.currentKillStreak,
+    s.latestAwardSeasonId,s.latestSeasonRank,s.latestSeasonBadgeFlags,s.territoryAchievementCount,s.displayMode];
+  b=concatBytes(b,...rest.map(word));
+  return bytesToHex(keccak256(b));
+}
+function resolveStatus(s){
+  if(s.lifeState===3) return 'TERMINAL';
+  if(s.lifeState===2) return 'COFFINED';
+  if(s.lifeState===1||s.marked) return 'MARKED';
+  if(s.witsecApplies) return 'WITSEC';
+  if(s.buyerProtected) return 'BUYER_PROTECTED';
+  if(s.laidLow) return 'LAY_LOW';
+  if(s.hunterSelected) return 'HUNTER_SELECTED';
+  return 'ALIVE';
+}
+// ---------------------------------------------------------------------------
+// Diagnostic SVG
+// ---------------------------------------------------------------------------
+function diagnosticSVG(s,errs){
+  const used=new Set(); let body='';
+  body+=text('INVALID STATE',74,380,11,RED,used);
+  body+=text(errs.join(' '),110,520,10,RED,used);
+  body+=text('#'+String(s.tokenId),110,620,10,RED,used);
+  body+=text(stateHash(s).slice(2,18).toUpperCase(),110,710,8,RED,used);
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+glyphDefs(used)+'</defs><rect width="1000" height="1000" fill="'+BLACK+'"/><rect x="20" y="20" width="960" height="960" fill="none" stroke="'+RED+'" stroke-width="24"/>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// Eye glyphs (shared by the live figure and the coffin compositions).
+// One X arm: quad from centre toward (dx,dy); used to build broken/half arms.
+// ---------------------------------------------------------------------------
+function eyeArm(cx,cy,dx,dy,r,b,fill){ return poly([[cx-b*dy/2|0 || cx, cy+b*dx/2|0 || cy],[cx+(b*dy/2|0),cy-(b*dx/2|0)],[cx+dx*r+(b*dy/2|0),cy+dy*r-(b*dx/2|0)],[cx+dx*r-(b*dy/2|0),cy+dy*r+(b*dx/2|0)]],fill); }
+// octagon ring (stroke) centred at cx,cy — shared by eyes/treatments/mouths
+function octRing(cx,cy,r,w,color){
+  const q=(r*7/10)|0;
+  const pts=[[cx-r,cy],[cx-q,cy-q],[cx,cy-r],[cx+q,cy-q],[cx+r,cy],[cx+q,cy+q],[cx,cy+r],[cx-q,cy+q]];
+  return '<path d="'+pathD(pts)+'" fill="none" stroke="'+color+'" stroke-width="'+w+'"/>';
+}
+function octFill(cx,cy,r,fill){
+  const q=(r*7/10)|0;
+  return poly([[cx-r,cy],[cx-q,cy-q],[cx,cy-r],[cx+q,cy-q],[cx+r,cy],[cx+q,cy+q],[cx,cy+r],[cx-q,cy+q]],fill);
+}
+function eyeGlyph(st,side,cx,cy,r,fill,rng){
+  let e='';
+  const X=(rr,bb)=>xmark(cx,cy,rr,bb,fill,rng);
+  switch(st){
+    case 0: e+=X(r,3); break;
+    case 1: { const arms=[[1,-1],[-1,1],[-1,-1],[1,1]]; const skip=side?0:2;
+      for(let k=0;k<4;k++){ if(k===skip) continue; e+=eyeArm(cx,cy,arms[k][0],arms[k][1],r,3,fill); }
+      e+=eyeArm(cx,cy,arms[skip][0],arms[skip][1],(r>>1),3,fill); break; }
+    case 2: e+=X(r,3); e+=rect(side?cx+2:cx-r-5,cy-1,r+3,2,fill); break;
+    case 3: e+=rect(cx-r-1,cy-1,2*r+2,4,fill); break; // visor (standalone: one blade per eye)
+    case 4: e+=rect(cx-r,cy-((r/2)|0),2*r,3,fill); e+=rect(cx-r+2,cy+2,2*r-2,3,fill); break;
+    case 5: if(side) e+=rect(cx-r,cy-1,2*r,4,fill); else e+=X(r,3); break;
+    case 6: if(!side) e+=X(r,3); break; // right eye = pure void
+    case 7: break;                       // hollow: both void
+    case 8: e+=X(side?(r>>1)+1:r+1,3); break;
+    case 9: e+=rect(cx-r,cy-1,2*r,2,fill); break; // SLIT
+    case 10: e+=rect(cx-1,cy-r,3,2*r,fill); e+=rect(cx+1,cy-2,r+2,3,fill); break; // GLITCH BAR
+    case 11: for(let i=0;i<5;i++) e+=rect(cx-r+rng.int(2*r),cy-r+rng.int(2*r),2,2,fill); break; // PIXEL STORM
+    case 12: e+=X(r,3); e+=rect(cx-1,cy-r-4,2,3,fill)+rect(cx-1,cy+r+1,2,3,fill)+rect(cx-r-4,cy-1,3,2,fill)+rect(cx+r+1,cy-1,3,2,fill); break; // CROSSHAIR
+    case 13: e+=rect(cx-r,cy-4,2*r,2,fill)+rect(cx-r,cy-1,2*r,2,fill)+rect(cx-r,cy+2,2*r,2,fill); break; // TRIPLE SLIT
+    case 14: e+=octRing(cx,cy,r,9,fill); break; // VOID RING
+    case 15: e+=X(r,3); e+=rect(cx-1,cy-3,2,6,WHITE)+rect(cx-3,cy-1,6,2,WHITE); break; // NAILED X
+    case 16: if(side) e+=octRing(cx,cy,r-1,9,fill); else e+=rect(cx-1,cy-r,3,2*r,fill); break; // BINARY (1|0)
+    case 17: e+=octRing(cx,cy,r+1,10,fill); e+=rect(cx-2,cy-2,3,3,fill); break; // TARGET
+    case 18: { // SPIRAL: square spiral inward
+      let d='M'+((cx-r)*U)+' '+((cy-r)*U);
+      const dirs=[[1,0],[0,1],[-1,0],[0,-1]];
+      for(let k=0;k<7;k++){ const len=k<3?2*r:2*r-3*((k-1)>>1); if(len<2) break;
+        const dxy=dirs[k%4]; d+= dxy[0]!==0 ? 'h'+(dxy[0]*len*U) : 'v'+(dxy[1]*len*U); }
+      e+='<path d="'+d+'" fill="none" stroke="'+fill+'" stroke-width="6"/>'; break; }
+    case 19: e+=X(r,3); e+=rect(cx+1,cy+r,2,7+rng.int(4),fill); break; // WEEPING X
+    case 20: if(side) e+=octRing(cx,cy,r,9,fill); else e+=X(r,3); break; // SPLIT PAIR
+    case 21: e+=xmark(cx+2,cy+2,r,3,PINK,rng); e+=X(r,3); e+=xmark(cx,cy,(r>>1),2,WHITE,rng); break; // BURNING X
+    case 22: e+=poly(offsetPts([[0,-r-1],[2,-2],[r+1,0],[2,2],[0,r+1],[-2,2],[-r-1,0],[-2,-2]],cx,cy),fill); break; // STAR
+    case 23: e+=octFill(cx,cy,r,fill); break; // DEAD LIGHT
+    // 24 ALL SEEING handled at drawEyes level
+  }
+  return e;
+}
+// ---------------------------------------------------------------------------
+// --- CONSTRUCTION INTRO (draft): reveal helpers ----------------------------
+// Every base attribute stays the finished art; reveals hide-then-show via
+// one-shot discrete display animates, so non-SMIL renderers see the final PFP.
+function T2(x){ return (Math.round(x*100)/100)+'s'; }
+function kt4(x){ return (Math.round(x*10000)/10000)+''; }
+function reveal(content,tSec){
+  if(!content||!tSec||tSec<=0.01) return content;
+  return '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tSec)+'" repeatCount="1"/>'+content+'</g>';
+}
+// cyberpunk ignition rhythms — the eyes sputter on independent phases,
+// pulses 20-40ms, both solid by +0.37s
+const FLICK_L=[0,0.03,0.05,0.08,0.10,0.13,0.15,0.19,0.21,0.24,0.26,0.30,0.36];
+const FLICK_R=[0.02,0.04,0.07,0.09,0.12,0.16,0.18,0.22,0.25,0.28,0.31,0.33,0.37];
+function revealFlicker(content,tSec,offs){
+  if(!content) return content;
+  const d2=tSec+offs[offs.length-1]+0.05;
+  const kt=[0]; for(const o of offs) kt.push((tSec+o)/d2);
+  const vals=['none']; for(let i=0;i<offs.length;i++) vals.push(i%2?'none':'inline');
+  return '<g><animate attributeName="display" values="'+vals.join(';')+'" keyTimes="'+kt.map(kt4).join(';')+'" calcMode="discrete" dur="'+T2(d2)+'" repeatCount="1"/>'+content+'</g>';
+}
+// mouth materialization: each mouth archetype gets its own reveal effect,
+// tailored to the motif of the mouth itself — a cut is slashed open, a zipper
+// zips shut, a wire twangs, a scream erupts from the baseline, a drip falls.
+// Base attrs always stay the finished art (static fallback rule); one-shot
+// animates run only at tSec. Ghost doubles (glitch family only) are intro-only.
+// geo: mouth bounding geometry in px {x,y,w,cx,py}.
+function glitchReveal(content,tSec,mid,geo){
+  if(!content||!tSec||tSec<=0.01) return content;
+  const b=T2(tSec);
+  const an=(attr,vals,dur2,mode,kts)=>'<animate attributeName="'+attr+'" values="'+vals+'"'+(kts?' keyTimes="'+kts+'"':'')+' calcMode="'+mode+'" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/>';
+  const tr=(vals,dur2,mode,kts)=>'<g><animateTransform attributeName="transform" type="translate" values="'+vals+'"'+(kts?' keyTimes="'+kts+'"':'')+' calcMode="'+mode+'" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/>'+content+'</g>';
+  const clip=(anims,inner2)=>'<clipPath id="mgc"><rect x="'+geo.x+'" y="'+geo.y+'" width="'+geo.w+'" height="320">'+anims+'</rect></clipPath><g clip-path="url(#mgc)">'+(inner2||content)+'</g>';
+  const sc=(px,py,vals,dur2)=>'<g transform="translate('+px+' '+py+')"><g><animateTransform attributeName="transform" type="scale" values="'+vals+'" calcMode="linear" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/><g transform="translate('+(-px)+' '+(-py)+')">'+content+'</g></g></g>';
+  const gh=(dx,dy,gdur)=>{ const D=tSec+gdur; return '<g display="none"><animate attributeName="display" values="none;inline;none;inline;none" keyTimes="'
+    +[0,(tSec+0.015)/D,(tSec+0.04)/D,(tSec+0.075)/D,(tSec+0.11)/D].map(kt4).join(';')
+    +'" calcMode="discrete" dur="'+T2(D)+'" repeatCount="1"/><g transform="translate('+dx+' '+dy+')">'+content+'</g></g>'; };
+  const w3=Math.round(geo.w/3), w23=Math.round(geo.w*2/3), w4=Math.round(geo.w/4), w2=Math.round(geo.w/2), w34=Math.round(geo.w*3/4);
+  let inner='', ghosts='';
+  switch(mid){
+    case 1:  // GASH — a blade slashes the cut open, right to left, one stroke
+      inner=clip(an('x',(geo.x+geo.w)+';'+geo.x,0.1,'linear')+an('width','0;'+geo.w,0.1,'linear')); break;
+    case 2:  // GRIN — the jaw chatters, teeth clacking up and down
+      inner=tr('0 -14;0 12;0 -10;0 8;0 -6;0 4;0 0',0.15,'discrete'); break;
+    case 3:  // SEWN — stitched shut one X at a time, needle steps left to right
+      inner=clip(an('width','0;'+w3+';'+w23+';'+geo.w,0.18,'discrete')); break;
+    case 4:  // WIRE — snaps taut and twangs like a plucked string
+      inner=tr('0 -10;0 8;0 -6;0 4;0 -2;0 1;0 0',0.15,'linear'); break;
+    case 5:  // STITCHED GRIN — quick needle passes, then the teeth clack once
+      inner='<g><animateTransform attributeName="transform" type="translate" values="0 -6;0 4;0 0" calcMode="discrete" begin="'+T2(tSec+0.11)+'" dur="0.06s" repeatCount="1"/>'
+        +clip(an('width','0;'+w4+';'+w2+';'+w34+';'+geo.w,0.11,'discrete'))+'</g>'; break;
+    case 6:  // DOUBLE GASH — two cuts: the acid slash lands, then the pink one under it
+      inner=clip(an('height','0;120;320',0.14,'discrete')); break;
+    case 7:  // SIDE SMIRK — slides in sideways, sly, with a small overshoot
+      inner=tr('90 -8;-8 2;0 0',0.2,'linear','0;0.7;1'); break;
+    case 8:  // ZIPPER — zips shut in one steady pull, left to right
+      inner=clip(an('width','0;'+geo.w,0.22,'linear')); break;
+    case 9:  // SNARL — lunges in with violent hops, a ghost snapping at its heels
+      inner=tr('-46 -18;38 14;-30 -10;26 8;-14 -4;8 2;0 0',0.15,'discrete');
+      ghosts=gh(-40,-16,0.15); break;
+    case 10: // DRIP — falls from above and bounces to rest, like a drop landing
+      inner=tr('0 -90;0 0;0 -16;0 0;0 -5;0 0',0.2,'linear','0;0.35;0.55;0.75;0.9;1'); break;
+    case 11: // SCREAM — erupts vertically out of the baseline, overshoots, settles
+      inner=sc(0,geo.py,'1 0;1 1.5;1 0.7;1 1.2;1 1',0.18); break;
+    case 12: // FANGS — chomp-chomp: bites down hard from above, twice
+      inner=tr('0 -90;0 0;0 -34;0 0;0 0',0.16,'linear','0;0.3;0.55;0.8;1'); break;
+    case 13: // HOWL — the ring resonates outward: swells past size, rings back
+      inner=sc(geo.cx,geo.py,'0.2 0.2;1.35 1.35;0.85 0.85;1.1 1.1;1 1',0.2); break;
+    case 14: // MUZZLE — clamps up from below and shudders tight
+      inner=tr('0 90;0 0;0 10;0 0;0 4;0 0',0.16,'linear','0;0.3;0.5;0.7;0.85;1'); break;
+    default: // 15 GLITCH MOUTH — maximal signal tear: hops + double stutter ghosts
+      inner=tr('-80 0;64 -10;-52 12;44 -8;-28 6;14 -3;0 0',0.15,'discrete');
+      ghosts=gh(-64,8,0.15)+gh(52,-8,0.15); break;
+  }
+  return '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tSec)+'" repeatCount="1"/>'+inner+'</g>'+ghosts;
+}
+// Genesis figure. Returns {defs, figure, traits, hoodPts}
+// ---------------------------------------------------------------------------
+function buildGenesis(sState){
+  const s=sState;
+  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const t=drawTraits(rng);
+  // column noise: a smooth random walk shared by every line (organic wobble)
+  const noiseAmp = t.form===15 ? 24 : 12; // PHANTOM: the figure barely holds together
+  const noiseCols=[]; { let n=0; for(let c=0;c<=50;c++){ n+=(rng.int(3)-1)*noiseAmp; if(n>150)n=150; if(n<-150)n=-150; noiseCols.push(n); } }
+  // --- FIELD LINE LIST per LINES style ---
+  const lines=[]; // {y, w, dash?, figOnly?}
+  if(t.lineW<=2){ const w=[3,4,6][t.lineW]; for(let li=0;li<47;li++) lines.push({y:4+li*2,w}); }
+  else if(t.lineW===3){ for(let li=0;li<93;li++) lines.push({y:4+li,w:2}); }                    // DENSE
+  else if(t.lineW===4){ for(let li=0;li<24;li++) lines.push({y:4+li*4,w:5}); }                  // SPARSE
+  else if(t.lineW===5){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:4,dash:1}); }           // DASHED
+  else if(t.lineW===6){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:li%2?6:2}); }           // DUAL WEIGHT
+  else if(t.lineW===7){ for(let li=0;li<47;li++) lines.push({y:4+li*2,w:[2,4,7][rng.int(3)]}); }// BARCODE
+  else { for(let li=0;li<16;li++) lines.push({y:4+li*6,w:3});                                   // NO SIGNAL
+         for(let li=0;li<47;li++) lines.push({y:4+li*2,w:3,figOnly:1}); }
+  // --- SPIKE STYLE pre-draws (deterministic order) ---
+  const spikes={}; let pulseLi=-1,pulseAmp=0, flatLi=-1, quake=null, lightning=false;
+  {
+    const addSpikes=(n,ampFn)=>{ for(let i=0;i<n;i++){ const li=rng.int(lines.length); (spikes[li]=spikes[li]||[]).push([rng.int(34),ampFn()]); } };
+    if(t.spike===1) addSpikes(1+rng.int(2),()=> (25+rng.int(25))*(rng.int(3)?1:-1));
+    else if(t.spike===2) addSpikes(3+rng.int(3),()=> (25+rng.int(25))*(rng.int(3)?1:-1));
+    else if(t.spike===3) addSpikes(8+rng.int(4),()=> -(8+rng.int(8)));                    // NEEDLES
+    else if(t.spike===4) addSpikes(1,()=> (60+rng.int(31))*(rng.int(3)?1:-1));            // SEISMIC
+    else if(t.spike===5){ pulseLi=rng.int(lines.length); pulseAmp=18+rng.int(10); }       // PULSE TRAIN
+    else if(t.spike===6) lightning=true;                                                  // LIGHTNING
+    else if(t.spike===7){ quake=[]; for(let i=0;i<13;i++) quake.push(rng.int(17)-8); }    // EARTHQUAKE
+    else if(t.spike===8){ const target=25+rng.int(50); flatLi=0;                          // FLATLINE SCAR
+      for(let li=0;li<lines.length;li++){ if(lines[li].y>=target){ flatLi=li; break; } } }
+  }
+  // --- TEAR STYLE pre-draws ---
+  let moth=null, splitY=-1, censor=null;
+  if(t.tear===4){ moth=[]; const nB=3+rng.int(3); for(let i=0;i<nB;i++) moth.push([rng.int(100),4+rng.int(90),5+rng.int(4)]); }
+  else if(t.tear===5) splitY=14+rng.int(66);
+  else if(t.tear===7){ censor=[]; for(let i=0;i<3;i++) censor.push([rng.int(70),rng.int(80),12+rng.int(14),8+rng.int(8)]); }
+  const mw=9+rng.int(5), mouthY=t.cy+13+rng.int(3);
+  const STEP=3;
+  // mouth gap band height per type (rows below mouthY-1)
+  const mouthGapLo = t.mouth>0 ? mouthY-1 : 0;
+  const mouthGapHi = t.mouth===11||t.mouth===13 ? mouthY+8 : (t.mouth===4 ? mouthY+2 : (t.mouth===14||t.mouth===15 ? mouthY+6 : mouthY+4));
+  // --- BUILD EVERY LINE PATH (displaced, torn, spiked) ---
+  // Conveyor note: this legacy pass burns the exact rng stream of the original
+  // build (so every downstream trait stays blessed) and records the random
+  // break runs; animated styles convert them into stationary field holes.
+  const linesD=[]; const brkRuns=[];
+  for(let li=0;li<lines.length;li++){
+    const L=lines[li]; const baseY=L.y;
+    if(li===flatLi){ linesD.push({d:'',maxH:0,baseY,w:L.w}); continue; } // drawn as the scar below
+    let d=''; let pen=false; let px=0,py=0; let breakLeft=0; let maxH=0;
+    for(let xi=0;xi<=33;xi++){
+      const x=xi*STEP;
+      const h=heightAt(t,noiseCols,x,baseY);
+      if(h>maxH) maxH=h;
+      let ypx=baseY*10-Math.round(h/10);
+      if(spikes[li]) for(const [sx,amp] of spikes[li]) if(sx===xi) ypx+=amp;
+      if(li===pulseLi && xi%6<3) ypx-=pulseAmp;
+      if(quake) ypx+=quake[(xi+li*3)%13];
+      // gaps: figure-only lines, eye sockets, mouth, tear styles
+      let gap=false;
+      if(L.figOnly && h<=300) gap=true;
+      { const yv=baseY-Math.round(heightAt(t,noiseCols,x,baseY,true)/100); if(inSocket(t,x,yv,0)||inSocket(t,x,yv,1)) gap=true; }
+      if(t.mouth>0 && baseY>=mouthGapLo && baseY<=mouthGapHi && Math.abs(x-t.cx)<mw) gap=true;
+      if(L.dash && (xi+baseY)%7<2) gap=true;
+      if(moth){ for(const [bx,by,r] of moth){ const ddx=x-bx, ddy=baseY-by; if(ddx*ddx+ddy*ddy<r*r) gap=true; } }
+      if(splitY>=0 && baseY>=splitY && baseY<splitY+5) gap=true;
+      if(censor){ for(const [cx0,cy0,cw,ch] of censor){ if(x>=cx0&&x<cx0+cw&&baseY>=cy0&&baseY<cy0+ch) gap=true; } }
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else { const inFig=h>300;
+        let p0;
+        if(t.tear<=2) p0=[3,12,26][t.tear]+(inFig?[3,10,16][t.tear]:0);
+        else if(t.tear===3) p0=(xi<6||xi>27)?45:4;                          // RIPPED EDGE
+        else if(t.tear===6) p0=Math.max(3,Math.trunc((92-baseY)*13/10));    // VAPOR
+        else p0=t.tear===4?4:6;                                             // MOTH/SPLIT/CENSORED base
+        if(rng.int(1000)<p0){ breakLeft=1+rng.int(5); if(t.tear!==6&&brkRuns.length<200) brkRuns.push([li,xi,breakLeft+1,ypx]); gap=true; } }
+      if(gap){ pen=false; continue; }
+      const X=x*10;
+      if(!pen){ d+='M'+X+' '+ypx; pen=true; }
+      else { const dy=ypx-py; d+= dy===0 ? 'h'+(X-px) : 'l'+(X-px)+' '+dy; }
+      px=X; py=ypx;
+    }
+    linesD.push({d,maxH,baseY,w:L.w});
+  }
+  const sw=Math.max(3,Math.min(6,lines[0].w)); // reference width for echoes/marks
+  let defs='';
+  let f='';
+  // white specks, faint (captured; revealed on the intro schedule)
+  let specksSvg='';
+  { let d=''; const n=12+rng.int(16); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } specksSvg='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // --- KILL-TIER COLOUR LADDER (handoff §9.3): the figure's own signal
+  // changes colour as kills accumulate. acid → pink → white, role-shifted.
+  const tier=tierForKills(sState.kills);
+  const figLines=linesD.filter(L=>L.d&&L.maxH>800).sort((a,b)=>a.baseY-b.baseY);
+  const isFig=new Set(figLines);
+  const crestN = tier>=5?4 : tier>=4?2 : tier>=3?1 : 0;
+  const crest=new Set(figLines.slice(0,crestN));
+  const pinkFigAll = tier>=4, pinkFigUpper = tier===3, pinkCrest6 = tier===2;
+  const crest6=new Set(figLines.slice(0,6));
+  const whiteFig = tier>=6;
+  const invert = t.pink===5; // INVERSION: the figure runs pink from genesis
+  // echo rng draws (shared by both field modes so the stream stays blessed)
+  const eDx=(2+rng.int(3))*U, eDy=(1+rng.int(2))*U;
+  const ePicks=[], e2Picks=[];
+  if(t.pink===1||t.pink===2||t.pink===3){
+    const k=t.pink===3?8+rng.int(3):(t.pink===2?4+rng.int(3):2+rng.int(2));
+    for(let i=0;i<k;i++) ePicks.push(rng.int(lines.length)); }
+  else if(t.pink===4){ const k=3+rng.int(2); // WHITE ECHO
+    for(let i=0;i<k;i++) e2Picks.push(rng.int(lines.length)); }
+  else if(t.pink===6){ // TRICHROME: pink pass + white counter-pass
+    let k=3+rng.int(2); for(let i=0;i<k;i++) ePicks.push(rng.int(lines.length));
+    k=2+rng.int(2); for(let i=0;i<k;i++) e2Picks.push(rng.int(lines.length)); }
+  // --- CONSTRUCTION INTRO (draft): the reveal schedule ---------------------
+  // populate (flat, flowing) -> extrude -> eyes/mouth flicker -> everything
+  // else in 0.25s succession. Times skip absent elements.
+  const introEnd = 1.0; // populate 0.5s + extrude 0.5s, every band rushes whole cycles
+  const tEyes=introEnd;
+  const tMouth=introEnd+0.42; // only once the eyes burn steady does the mouth appear
+  let __seq=0; const __nextT=()=>tMouth+0.25*(++__seq);
+  const tSigil=__nextT(), tBlock=__nextT(), tSpecks=__nextT();
+  const tRecs=(sState.kills>0||sState.forcedPurges>0||sState.savesReceived>0||sState.deaths>0)?__nextT():0;
+  const tEcho=(ePicks.length||e2Picks.length||tier>=6)?__nextT():0;
+  const tHalo=tier>0?__nextT():0;
+  const tFlat=flatLi>=0?__nextT():0;
+  const tLight=lightning?__nextT():0;
+  const tHeart=t.pink===7?__nextT():0;
+  f+=reveal(specksSvg,tSpecks);
+  // === THE CONVEYOR (animation pass): every LINES style flows =============
+  // Standard styles: one band. BARCODE: widths live in the AIR — a standing
+  // slot pattern the lines breathe through (2-key linear stroke-width morph,
+  // wrap-exact). NO SIGNAL: a slow sky band + a fast signal band clipped to
+  // the stationary hood silhouette. All geometry integer deci-units.
+  {
+    const spikeAtD=[]; for(const li in spikes){ if(lines[li]) for(const [sx,amp] of spikes[li]) spikeAtD.push([lines[li].y*10,sx,amp]); }
+    const pulseYd = pulseLi>=0&&lines[pulseLi] ? lines[pulseLi].y*10 : -9999;
+    // integer sqrt (Babylonian, floor) — deterministic, Solidity-portable;
+    // used for exact path arc length so dash phase can be centre-anchored
+    const isqrt=(n)=>{ if(n<2) return n; let ix=n, iy=Math.floor((n+1)/2); while(iy<ix){ ix=iy; iy=Math.floor((iy+Math.floor(n/iy))/2); } return ix; };
+    const rowD=(y0d,pD,stepD,num,den)=>{
+      const yd=y0d-pD; let d='',py=0,maxH=0,L=0;
+      for(let xi=0;xi<=33;xi++){
+        const x=xi*STEP;
+        const h=heightAtD(t,noiseCols,x,yd);
+        if(h>maxH)maxH=h;
+        let ypx=yd-rdiv(h,10);
+        for(const [syd,sx,amp] of spikeAtD) if(sx===xi){ const dd=Math.abs(yd-syd); if(dd<10) ypx+=rdiv(amp*(10-dd),10); }
+        if(pulseYd>-9000&&xi%6<3){ const dd=Math.abs(yd-pulseYd); if(dd<10) ypx-=rdiv(pulseAmp*(10-dd),10); }
+        if(quake){ const liE=floorDiv(yd-40+(stepD>>1),stepD); ypx+=quake[(((xi+liE*3)%13)+13)%13]; }
+        // INTRO EXTRUSION — 3D SPECTRUM ANALYZER: the hood is not inflated by
+        // bending whole lines (that reads as material pulled in from the
+        // sides); it is extruded column by column from its own center spine.
+        // EXTRUSION — VARIABLE-SPEED COLUMNS, NO TRAVELING FRONT. A moving
+        // wavefront can only advance in keyframe-sized steps (linear d
+        // interpolation freezes its edge between samples), which reads as
+        // chunked widening. Instead every column starts rising TOGETHER at
+        // the extrusion's start, each at a speed inversely proportional to
+        // its distance from the spine: u = T*80/(|x-cx|+30), eased by an
+        // integer smoothstep. The spine completes first (height), the flanks
+        // settle progressively later (width), nothing is ever at rest beside
+        // something moving — so there is no edge to see stepping — and the
+        // zero-slope smoothstep ending makes each column's arrival seamless.
+        // Farthest column (dxc=50) reaches u=1 exactly at introEnd.
+        if(den){ const dxc=Math.abs(x-t.cx);
+          const a=num*80, b=den*(dxc+30);
+          if(a<b){ const E=rdiv(30*a*a*(3*b-2*a),b*b*b);
+            ypx=yd+rdiv((ypx-yd)*E,30); } }
+        if(xi===0) d='M0 '+ypx; else { d+='l30 '+(ypx-py); L+=isqrt(900+(ypx-py)*(ypx-py)); }
+        py=ypx;
+      }
+      return [d,maxH,L];
+    };
+    const strokeOf=c2=> c2==='A'?ACID : c2==='P'?PINK : WHITE;
+    // one flowing band: keyframes + position-keyed colours + animate-d emission
+    const emitBand=(o)=>{
+      const NKC=o.cycD>>1;
+      const rows=[]; for(let k2=0;k2<o.nRows;k2++) rows.push(o.y0Start+k2*o.stepD);
+      const vals=rows.map(()=>[]), mhh=rows.map(()=>[]);
+      for(let j=0;j<=NKC;j++){ const pD=j*2;
+        for(let ri=0;ri<rows.length;ri++){ const [d,m]=rowD(rows[ri],pD,o.stepD); vals[ri].push(d); mhh[ri].push(m); } }
+      const colK=rows.map(()=>[]);
+      for(let j=0;j<NKC;j++){
+        let rank=0;
+        for(let ri=0;ri<rows.length;ri++){
+          const y0d=rows[ri];
+          const fig=o.colours && y0d>=40 && y0d<=960 && mhh[ri][j]>800;
+          let col='A';
+          if(fig){
+            if(invert) col='P';
+            if(whiteFig) col='W';
+            else if(pinkFigAll) col='P';
+            else if(pinkFigUpper && y0d-j*2<t.cy*10) col='P';
+            else if(pinkCrest6 && rank<6) col='P';
+            if(!whiteFig && rank<crestN) col='W';
+            rank++;
+          }
+          colK[ri].push(col);
+        }
+      }
+      let out='';
+      for(let ri=0;ri<rows.length;ri++){
+        const y0d=rows[ri];
+        const w=o.wOf(y0d);
+        const widthOf=c2=> (c2==='A'&&tier>=5&&!o.bcW) ? Math.max(2,w-1) : w;
+        const cols=colK[ri];
+        let varies=false; for(let j=1;j<NKC;j++) if(cols[j]!==cols[0]) varies=true;
+        // DASH PHASE MUST TRAVEL WITH THE CONTENT: a static screen-keyed
+        // dashoffset snaps at every cycle wrap (the line handing off to the
+        // band above suddenly wears that band's phase). So the offset is a
+        // function of content identity — sampled per cycle c as F(y0d+cycD*c),
+        // periodic over 7 cycles — and animated discretely, one value per
+        // cycle, aligned to the loop clock. Frame 0 stays the static attr.
+        const bg=o.intro?' begin="'+o.intro.durS+'"':'';
+        let dash='', dashAnim='', dashF=null;
+        if(t.lineW===5){
+          dashF=(c)=>(((((y0d+o.cycD*c)/10)%7)+7)%7)*30;
+          dash=' stroke-dasharray="150 60" stroke-dashoffset="'+dashF(0)+'"';
+        } else if(t.tear===6){ const y0=y0d/10; const p0v=Math.max(3,Math.trunc((92-y0)*13/10));
+          const g6=Math.min(45,rdiv(p0v*3*60,1000));
+          if(g6>2){
+            const m=o.cycD/o.stepD, P7=7*m;
+            dashF=(c)=>fhash((((floorDiv(y0d,o.stepD)+m*c)%P7)+P7)%P7,13)%60;
+            dash=' stroke-dasharray="'+(60-g6)+' '+g6+'" stroke-dashoffset="'+dashF(0)+'"';
+          } }
+        if(dashF){ const vs=[]; for(let c=0;c<7;c++) vs.push(dashF(c));
+          dashAnim='<animate attributeName="stroke-dashoffset" values="'+vs.join(';')+'" dur="'+T2(o.cycD*7*75/1000)+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>'; }
+        out+='<path stroke="'+strokeOf(cols[0])+'" stroke-width="'+widthOf(cols[0])+'"'+dash+' d="'+vals[ri][0]+'">';
+        if(o.intro){
+          // construction: populate as a flat flowing line, then extrude the
+          // envelope over the back half — ends exactly on the loop's frame 0
+          const P=o.intro.P, half=P>>1, den=P-half, st2=(o.cycD%4===0)?4:2, nCycE=P/o.cycD;
+          // WIDENING MUST FLOW: the front position is only seen at keyframes,
+          // so a coarsely sampled extrusion widens the hood in synchronized
+          // chunks ("wide, then wider"). The back half is sampled at 2-4×
+          // the populate density so each column's rise spans several
+          // keyframes and the spread reads as continuous motion.
+          const stE=(o.cycD%4===0)?2:1;
+          const pts=[];
+          for(let p=0;p<half;p+=st2) pts.push(p);
+          pts.push(half);
+          for(let p=half+stE;p<P;p+=stE) pts.push(p);
+          pts.push(P);
+          const vlist=[], tlist=[], slist=[], llist=[];
+          for(const p of pts){
+            const num=Math.max(0,p-half);
+            if(p>0&&p<P&&p%o.cycD===0){
+              const r1=rowD(y0d,o.cycD,o.stepD,num,den); vlist.push(r1[0]); tlist.push(p/P); slist.push(p/o.cycD); llist.push(r1[2]);
+              const r2=rowD(y0d,0,o.stepD,num,den); vlist.push(r2[0]); tlist.push(p/P); slist.push(p/o.cycD+1); llist.push(r2[2]);
+            } else {
+              const r=rowD(y0d,(p===P?o.cycD:p%o.cycD),o.stepD,num,den); vlist.push(r[0]); tlist.push(p/P);
+              slist.push(Math.min(nCycE,Math.max(1,Math.ceil(p/o.cycD)))); llist.push(r[2]);
+            }
+          }
+          out+='<animate attributeName="d" values="'+vlist.join(';')+'" keyTimes="'+tlist.map(kt4).join(';')+'" dur="'+o.intro.durS+'" calcMode="linear" repeatCount="1"/>';
+          const tp=(o.intro.endSec/2)*((rows.length-1-ri)/rows.length);
+          if(tp>0.02) out+='<animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tp)+'" repeatCount="1"/>';
+          if(cols[0]!=='A') out+='<animate attributeName="stroke" values="'+ACID+';'+strokeOf(cols[0])+'" calcMode="discrete" dur="'+T2(2*o.intro.endSec)+'" repeatCount="1"/>';
+          // intro→loop continuity: during the intro each rising line already
+          // wears the dash phase it must hand to the loop's cycle-0 painter
+          // (segment s of nCycE holds the c=s-nCycE-1 value), and a BARCODE
+          // line morphs into the standing air-slot width it is rising toward —
+          // both animates end exactly at introEnd, reverting to base attrs
+          // that equal the loop's own starting values. No snap at 1s.
+          // Dash phase during the intro: the per-segment hold hands the loop's
+          // cycle-0 painter its exact phase (as before), PLUS a centre-anchor
+          // term rdiv(Lfull-L(p),2): as the hood lengthens the path, dashes
+          // no longer stream in from the right — the pattern stays pinned at
+          // the path's midpoint and the growth spills symmetrically to both
+          // sides. The term is 0 at introEnd, so the 1s handoff stays exact.
+          if(dashF){ const Lf=llist[llist.length-1];
+            const ov=[]; for(let k2=0;k2<vlist.length;k2++) ov.push(dashF(slist[k2]-nCycE-1)+rdiv(Lf-llist[k2],2));
+            out+='<animate attributeName="stroke-dashoffset" values="'+ov.join(';')+'" keyTimes="'+tlist.map(kt4).join(';')+'" calcMode="linear" dur="'+o.intro.durS+'" repeatCount="1"/>'; }
+          if(o.bcW){ const w1b=o.bcW(y0d), w2c=o.bcW(y0d-o.cycD);
+            if(w2c!==w1b) out+='<animate attributeName="stroke-width" values="'+w1b+';'+w2c+'" calcMode="linear" dur="'+o.intro.durS+'" repeatCount="1"/>'; }
+        }
+        out+='<animate attributeName="d" values="'+vals[ri].join(';')+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"'+bg+'/>';
+        out+=dashAnim;
+        if(o.bcW){ const w1=o.bcW(y0d), w2b=o.bcW(y0d-o.cycD);
+          if(w2b!==w1) out+='<animate attributeName="stroke-width" values="'+w1+';'+w2b+'" dur="'+o.durS+'" calcMode="linear" repeatCount="indefinite"'+bg+'/>'; }
+        if(varies){
+          out+='<animate attributeName="stroke" values="'+cols.map(strokeOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>';
+          if(!o.bcW){
+            let wv=false; for(let j=1;j<NKC;j++) if(widthOf(cols[j])!==widthOf(cols[0])) wv=true;
+            if(wv) out+='<animate attributeName="stroke-width" values="'+cols.map(widthOf).join(';')+'" dur="'+o.durS+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>';
+          }
+        }
+        out+='</path>';
+      }
+      return {svg:out, rows, d0:vals.map(v=>v[0]), mh0:mhh.map(m=>m[0])};
+    };
+    const durOf=cyc=>(cyc*75/1000)+'s';
+    const ghostGroups=(d0For,tier6Band)=>{
+      let e='', e2='';
+      for(const li of ePicks) e+='<path d="'+d0For(li)+'"/>';
+      for(const li of e2Picks) e2+='<path d="'+d0For(li)+'"/>';
+      if(tier>=6&&tier6Band){ let n=0;
+        for(let ri=0;ri<tier6Band.rows.length&&n<8;ri++)
+          if(tier6Band.rows[ri]>=40&&tier6Band.rows[ri]<=960&&tier6Band.mh0[ri]>800){ e+='<path d="'+tier6Band.d0[ri]+'"/>'; n++; } }
+      let g2='';
+      if(e) g2+='<g fill="none" stroke="'+PINK+'" stroke-width="'+sw+'" transform="translate('+eDx+' '+eDy+')">'+e+'</g>';
+      if(e2) g2+='<g fill="none" stroke="'+WHITE+'" stroke-width="'+sw+'" transform="translate('+(-eDx)+' '+eDy+')">'+e2+'</g>';
+      return g2;
+    };
+    if(t.lineW===8){
+      // NO SIGNAL: the wraith is the only thing carrying signal — sparse sky
+      // drifts slowly, the figure band flows fast inside the hood clip
+      const skyB=emitBand({stepD:60,cycD:60,y0Start:-20,nRows:19,durS:durOf(60),wOf:()=>3,colours:false,bcW:null,intro:{P:60,endSec:1.0,durS:'1s'}});
+      const figB=emitBand({stepD:20,cycD:20,y0Start:0,nRows:52,durS:durOf(20),wOf:()=>3,colours:true,bcW:null,intro:{P:20,endSec:1.0,durS:'1s'}});
+      f+=reveal(ghostGroups(li=> li<16 ? skyB.d0[li+1] : figB.d0[li-14], figB),tEcho);
+      f+='<g fill="none">'+skyB.svg+'</g>';
+      let clip='<clipPath id="nsg">';
+      for(let xi=0;xi<=33;xi++){ const x=xi*STEP; let runA=-1;
+        for(let yd=0;yd<=1022;yd+=2){
+          const gI=yd<=1020&&heightAtD(t,noiseCols,x,yd)>300;
+          if(gI&&runA<0) runA=yd;
+          else if(!gI&&runA>=0){
+            let sMin=100000,sMax=-100000;
+            for(let q=runA;q<yd;q+=2){ const sy=q-rdiv(heightAtD(t,noiseCols,x,q),10); if(sy<sMin)sMin=sy; if(sy>sMax)sMax=sy; }
+            clip+='<rect x="'+(xi*30-15)+'" y="'+(sMin-4)+'" width="30" height="'+(sMax-sMin+8)+'"/>';
+            runA=-1;
+          }
+        }
+      }
+      clip+='</clipPath>';
+      f+=clip+'<g fill="none" clip-path="url(#nsg)">'+figB.svg+'</g>';
+    } else {
+      const stepD = t.lineW===3?10 : t.lineW===4?40 : 20;
+      const cycD = t.lineW===6? stepD*2 : stepD;
+      const nRows = (1000+cycD)/stepD + 1;
+      // BARCODE: standing slot widths — blessed per-line draws at the blessed
+      // slots, hash picks for the feeder slots
+      const bcSlotW=(y0d)=>{
+        if(y0d>=40&&y0d<=960&&((y0d-40)%20)===0) return lines[(y0d-40)/20].w;
+        return [2,4,7][fhash(y0d+1000,11)%3];
+      };
+      const wOf=(y0d)=> t.lineW===3?2 : t.lineW===4?5 : t.lineW===5?4 : t.lineW===6?(((y0d/20)%2)?6:2) : t.lineW===7?bcSlotW(y0d) : [3,4,6][t.lineW];
+      const nCyc=cycD===10?2:1;
+      const B=emitBand({stepD,cycD,y0Start:0,nRows,durS:durOf(cycD),wOf,colours:true,bcW: t.lineW===7?bcSlotW:null,intro:{P:nCyc*cycD,endSec:1.0,durS:'1s'}});
+      f+=reveal(ghostGroups(li=> B.d0[lines[li].y*10/stepD], B),tEcho);
+      f+='<g fill="none">'+B.svg+'</g>';
+    }
+    const fHC0=f.length; // holes+covers reveal with the extrusion's completion
+    // the blessed break runs as stationary holes (VAPOR dissolves via dasharray)
+    if(t.tear!==6){
+      for(const [bli,bxi,blen,bypx] of brkRuns){
+        const x0=Math.max(0,(bxi-1)*30);
+        f+='<rect x="'+x0+'" y="'+(bypx-6)+'" width="'+Math.min(1000-x0,(blen+2)*30)+'" height="12" fill="'+BLACK+'"/>';
+      }
+    }
+    // envelope gap covers: sockets, moth holes, split, censor
+    { const gapC=(x,yd)=>{
+        const yvd=yd-10*rdiv(heightAtD(t,noiseCols,x,yd),100);
+        if(inSocketD(t,x,yvd,0)||inSocketD(t,x,yvd,1)) return true;
+        if(moth){ for(const [bx,by,r] of moth){ const ddx=x-bx, ddyd=yd-by*10; if(ddx*ddx*100+ddyd*ddyd<r*r*100) return true; } }
+        if(splitY>=0 && yd>=splitY*10 && yd<splitY*10+50) return true;
+        if(censor){ for(const [cx0,cy0,cw,ch] of censor){ if(x>=cx0&&x<cx0+cw&&yd>=cy0*10&&yd<(cy0+ch)*10) return true; } }
+        return false;
+      };
+      for(let xi=0;xi<=33;xi++){ const x=xi*STEP;
+        let runA=-1;
+        for(let yd=0;yd<=1022;yd+=2){
+          const g=yd<=1020&&gapC(x,yd);
+          if(g&&runA<0) runA=yd;
+          else if(!g&&runA>=0){
+            let sMin=100000,sMax=-100000;
+            for(let q=runA;q<yd;q+=2){ const sy=q-rdiv(heightAtD(t,noiseCols,x,q),10); if(sy<sMin)sMin=sy; if(sy>sMax)sMax=sy; }
+            f+='<rect x="'+(xi*30-16)+'" y="'+(sMin-7)+'" width="32" height="'+(sMax-sMin+14)+'" fill="'+BLACK+'"/>';
+            runA=-1;
+          }
+        }
+      }
+    }
+    f=f.slice(0,fHC0)+reveal(f.slice(fHC0),introEnd);
+  }
+  // FLATLINE SCAR: one perfect white line cutting through everything
+  if(flatLi>=0) f+=reveal('<path d="M0 '+(lines[flatLi].y*U)+'h1000" fill="none" stroke="'+WHITE+'" stroke-width="6"/>',tFlat);
+  // LIGHTNING: one jagged bolt across the field
+  if(lightning){ let d='M0 '+((20+rng.int(60))*U); let ly=0;
+    for(let x=8;x<=100;x+=8){ const ny=(10+rng.int(80)); d+='L'+(x*U)+' '+(ny*U); ly=ny; }
+    f+=reveal('<path d="'+d+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>'
+     +'<path d="'+d+'" fill="none" stroke="'+WHITE+'" stroke-width="3"/>',tLight); }
+  // HEARTBEAT: a single pink pulse line — the signal refuses to die
+  if(t.pink===7){ const hy=(20+rng.int(60))*U; const bx=(10+rng.int(60))*U;
+    f+=reveal('<path d="M0 '+hy+'h'+bx+'l15 -70 15 140 15 -70h'+(1000-bx-45)+'" fill="none" stroke="'+PINK+'" stroke-width="6"/>',tHeart); }
+  // --- THE EYES — the signature. Weighted archetypes + trait-driven treatments.
+  // Left / right / spans-both collectors: the eyes ignite on independent rhythms.
+  const rB=t.eyeR;
+  const eyePos=[[t.cx-(11+rng.int(4)),t.cy+t.sLdy,rB,0],[t.cx+(11+rng.int(4)),t.cy+t.sRdy,Math.max(5,rB+rng.int(4)-1),1]];
+  const glyph=(st,side,cx,cy,r,fill)=>eyeGlyph(st,side,cx,cy,r,fill,rng);
+  // screen-space eye centres (used by several treatments)
+  const eyeScr=eyePos.map(([ex,ey2,r,side])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r,side]; });
+  const eyeParts=['','',''];
+  const drawEyes=(fill,ox,oy)=>{
+    if(t.eyes===3){ // continuous visor: one blade across both sockets
+      const [lx,ly,lr]=eyePos[0], [rx2,ry2,rr2]=eyePos[1];
+      const dispL=Math.round(heightAt(t,noiseCols,lx,ly,true)/100);
+      const vy=ly-((dispL/3)|0)+2;
+      eyeParts[2]+=poly(offsetPts([[lx-lr,vy+2],[rx2+rr2,vy],[rx2+rr2,vy+5],[lx-lr,vy+7]],ox,oy),fill);
+      return; }
+    if(t.eyes===24){ // ALL SEEING: hollow sockets + the third eye above
+      for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=octRing(ex+ox,cyp+oy,r-1,9,fill);
+      const mx=((eyeScr[0][0]+eyeScr[1][0])/2)|0;
+      const ty=Math.min(eyeScr[0][1],eyeScr[1][1])-t.eyeR-7;
+      eyeParts[2]+=xmark(mx+ox,ty+oy,t.eyeR+2,3,fill,rng);
+      return; }
+    for(const [ex,ey2,r,side] of eyePos){
+      const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100);
+      eyeParts[side]+=glyph(t.eyes,side,ex+ox,ey2-((disp/3)|0)+2+oy,r,fill);
+    }
+  };
+  // treatments (trait, escalated by kill tier: 10+ at least ECHO GLOW, 50+ FULL
+  // SIGNAL — special treatments 5+ are never overridden by the ladder)
+  { const base=t.treat; if(base<=4) t.treat = tier>=4 ? 4 : (tier>=2 ? Math.max(1,base) : base); }
+  let mainFill=ACID;
+  if(t.treat===1||t.treat===4){ drawEyes(PINK,3,2); drawEyes(ACID,-2,-2); }
+  else if(t.treat===2||(t.mosh>0&&t.treat===0)) drawEyes(PINK,2,2);
+  if(t.treat===3||t.treat===4){ // ripple rings: the field reacting to the stare
+    for(const [ex,ey2,r,side] of eyePos){
+      if(t.eyes===6&&side) continue; if(t.eyes===7) continue;
+      const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); const cyp=ey2-((disp/3)|0)+2;
+      for(let k=1;k<=(t.treat===4?1:2);k++){ const rr=r+3+k*4;
+        const oct=[[ex-rr,cyp],[ex-(rr*7/10|0),cyp-(rr*7/10|0)],[ex,cyp-rr],[ex+(rr*7/10|0),cyp-(rr*7/10|0)],[ex+rr,cyp],[ex+(rr*7/10|0),cyp+(rr*7/10|0)],[ex,cyp+rr],[ex-(rr*7/10|0),cyp+(rr*7/10|0)]];
+        eyeParts[side]+='<path d="'+pathD(oct)+'" fill="none" stroke="'+(k===1?ACID:PINK)+'" stroke-width="5"/>'; } } }
+  else if(t.treat===5){ // STATIC: white interference specks around the stare
+    const n=10+rng.int(6); const x0=eyeScr[0][0]-10, x1=eyeScr[1][0]+10;
+    let d=''; for(let i=0;i<n;i++){ const x=x0+rng.int(Math.max(4,x1-x0)); const y=Math.min(eyeScr[0][1],eyeScr[1][1])-8+rng.int(16); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; }
+    eyeParts[2]+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  else if(t.treat===6){ // CROSS FLARE: rays off each eye
+    for(const [ex,cyp,r,side] of eyeScr){
+      eyeParts[side]+=rect(ex-1,cyp-r-8,2,6,ACID)+rect(ex-1,cyp+r+2,2,6,ACID)+rect(ex-r-8,cyp-1,6,2,ACID)+rect(ex+r+2,cyp-1,6,2,ACID);
+      eyeParts[side]+=rect(ex-1,cyp-r-10,2,2,PINK)+rect(ex-1,cyp+r+8,2,2,PINK); } }
+  else if(t.treat===7){ for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=octRing(ex,cyp,r+5,5,WHITE); } // HALO EYES
+  else if(t.treat===8){ drawEyes(PINK,8,0); drawEyes(WHITE,4,0); } // SMEAR TRAIL
+  else if(t.treat===9){ // INVERTED: knockout — black glyphs on solid acid patches
+    for(const [ex,cyp,r,side] of eyeScr) eyeParts[side]+=rect(ex-r-3,cyp-r+1,2*r+6,2*r-1,ACID);
+    mainFill=BLACK; }
+  else if(t.treat===10){ drawEyes(PINK,4,3); drawEyes(WHITE,-4,-3); } // PRISM
+  else if(t.treat===11){ // GOD RAYS: the stare reaches the edge of the signal
+    for(const es of eyeScr){ const ex=es[0], cyp=es[1], side=es[3];
+      eyeParts[side]+='<path d="M'+(ex*U)+' '+(cyp*U)+'L0 0M'+(ex*U)+' '+(cyp*U)+'L1000 0M'+(ex*U)+' '+(cyp*U)+'L'+(ex>50?1000:0)+' '+(cyp*U-300)+'" fill="none" stroke="'+ACID+'" stroke-width="4"/>'; } }
+  drawEyes(mainFill,0,0);
+  f+=revealFlicker(eyeParts[0]+eyeParts[2],tEyes,FLICK_L);
+  f+=revealFlicker(eyeParts[1],tEyes,FLICK_R);
+  const fRec0=f.length; // battle records join the succession after the mouth
+  // hunter marks: kill notches above the left eye (1 per kill, capped at 9)
+  if(sState.kills>0){ const n=Math.min(9,sState.kills); const [lx,ly]=eyePos[0];
+    const disp=Math.round(heightAt(t,noiseCols,lx,ly,true)/100); const ny2=ly-((disp/3)|0)-t.eyeR-5;
+    for(let i=0;i<n;i++) f+=rect(lx-t.eyeR+i*3,ny2,2,3,PINK); }
+  // forced-purge tallies: white ticks along the hem
+  if(sState.forcedPurges>0){ const n=Math.min(10,sState.forcedPurges);
+    for(let i=0;i<n;i++) f+=rect(8+i*4,95,2,3,WHITE); }
+  // survival stitches: pink x per purged warrant survived (max 5), low left
+  if(sState.savesReceived>0){ const n=Math.min(5,sState.savesReceived);
+    for(let i=0;i<n;i++) f+=xmark(8+i*6,88,2,1,PINK,rng); }
+  // death damage: permanent scar bands + exposed bone lines (survives exhumation)
+  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
+    for(let k2=0;k2<sState.deaths;k2++){
+      const sy2=t.cy-14+drng.int(26);
+      f+='<path d="M'+((t.cx-t.rw+2)*U)+' '+(sy2*U)+'l'+((t.rw-4+drng.int(8))*U)+' '+((drng.int(5)-2)*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
+    } }
+  f=f.slice(0,fRec0)+reveal(f.slice(fRec0),tRecs);
+  const fMouth0=f.length; // the mouth appears only once the eyes burn steady
+  // mouth details on the gap
+  let mgeo=null;
+  if(t.mouth>0){
+    const dispM=Math.round(heightAt(t,noiseCols,t.cx,mouthY,true)/100);
+    const my=mouthY-((dispM/3)|0)+2; // displaced mouth baseline (units)
+    mgeo={x:(t.cx-mw-2)*U,y:(my-9)*U,w:(2*mw+4)*U,cx:t.cx*U,py:(my+3)*U};
+    switch(t.mouth){
+      case 1: if(t.pink>0) f+=rect(t.cx-mw+2,my+1,mw,1,PINK); break; // GASH
+      case 2: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=4){ const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=rect(x,mouthY-((disp/3)|0)+2,2,5,ACID); } break; // GRIN
+      case 3: for(let i=-1;i<=1;i++){ const x=t.cx+i*6; const disp=Math.round(heightAt(t,noiseCols,x,mouthY,true)/100); f+=xmark(x,mouthY-((disp/3)|0)+3,2,1,ACID,rng); } break; // SEWN
+      case 4: f+=rect(t.cx-mw+2,my+1,2*mw-4,1,WHITE); break; // WIRE
+      case 5: for(let x=t.cx-mw+2,i=0;x<t.cx+mw-1;x+=4,i++){ if(i%2===0) f+=rect(x,my,2,5,ACID); else f+=xmark(x+1,my+2,2,1,PINK,rng); } break; // STITCHED GRIN
+      case 6: f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID)+rect(t.cx-mw+3,my+3,2*mw-6,2,PINK); break; // DOUBLE GASH
+      case 7: f+=rect(t.cx,my+1,mw,2,ACID)+rect(t.cx+mw-2,my-2,2,3,ACID); break; // SIDE SMIRK
+      case 8: { f+=rect(t.cx-mw+2,my+1,2*mw-4,1,WHITE); for(let x=t.cx-mw+3;x<t.cx+mw-2;x+=3) f+=rect(x,my-1,1,5,WHITE); break; } // ZIPPER
+      case 9: f+=poly(offsetPts([[-mw+2,3],[mw-2,-2],[mw-2,0],[-mw+2,5]],t.cx,my),ACID); break; // SNARL
+      case 10: f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID)+drip(t.cx-2,my+2,6+rng.int(4),1,PINK,rng)+drip(t.cx+4,my+2,4+rng.int(3),1,PINK,rng); break; // DRIP
+      case 11: for(let x=t.cx-mw+2;x<t.cx+mw-1;x+=3){ const hh=5+rng.int(5); f+=rect(x,my,2,hh,ACID); } break; // SCREAM
+      case 12: { f+=rect(t.cx-mw+2,my,2*mw-4,2,ACID); f+=poly(offsetPts([[-4,2],[-1,2],[-2,7]],t.cx,my),WHITE)+poly(offsetPts([[2,2],[5,2],[4,7]],t.cx,my),WHITE); break; } // FANGS
+      case 13: f+=octRing(t.cx,my+3,5,4,ACID); break; // HOWL
+      case 14: f+=rect(t.cx-mw,my-2,2*mw,7,BLACK)+'<rect x="'+((t.cx-mw)*U)+'" y="'+((my-2)*U)+'" width="'+(2*mw*U)+'" height="70" fill="none" stroke="'+ACID+'" stroke-width="5"/>'+rect(t.cx-4,my-1,1,5,ACID)+rect(t.cx,my-1,1,5,ACID)+rect(t.cx+4,my-1,1,5,ACID); break; // MUZZLE
+      case 15: f+=rect(t.cx-mw+1,my-1,mw+3,2,ACID)+rect(t.cx-mw+4,my+2,mw+3,2,PINK)+rect(t.cx-mw-1,my+5,mw+3,2,WHITE); break; // GLITCH MOUTH
+    }
+  }
+  f=f.slice(0,fMouth0)+glitchReveal(f.slice(fMouth0),tMouth,t.mouth,mgeo);
+  // ward sigil above the crown; block mark at the hem — pulled inboard so both survive the circular PFP crop
+  f+=reveal(sigilSVG(s.wardId,20,20,rng,ACID),tSigil);
+  f+=reveal(blockMarkSVG(s.blockId,80,80,rng,ACID),tBlock);
+  // mosh: slice shifts
+  const fHalo0=f.length;
+  // --- KILL-TIER HALO: a corona over the crest, one signature per tier ---
+  // T1 single arc · T2 double · T3 triple broken · T4 arc + ticks · T5 corona rays · T6 full ring
+  if(tier>0){
+    // crest profile: topmost visual point of the figure per column (px)
+    const crest=[];
+    for(let xi=0;xi<=33;xi++){ const x=xi*STEP; let best=100000;
+      for(let li=0;li<47;li++){ const baseY=4+li*2; const h=heightAt(t,noiseCols,x,baseY);
+        if(h>300){ const vy=baseY*10-Math.round(h/10); if(vy<best) best=vy; } }
+      crest.push(best===100000?-1:best); }
+    const gcol = tier>=4 ? WHITE : PINK;
+    const arcPath=(off)=>{ let d='',pen=false;
+      for(let xi=0;xi<=33;xi++){ const c=crest[xi];
+        if(c<0){ pen=false; continue; }
+        const X=xi*STEP*10, Y=c-off*10;
+        if(Y<20){ pen=false; continue; }
+        if(!pen){ d+='M'+X+' '+Y; pen=true; } else d+='L'+X+' '+Y; }
+      return d; };
+    const nArcs = tier===1?1 : tier===2?2 : tier===3?3 : tier>=5?2 : 1;
+    for(let k=0;k<nArcs;k++){
+      let d=arcPath(5+k*3);
+      if(tier===3&&k===2){ // outermost arc broken: re-emit with gaps
+        d=''; let pen=false; for(let xi=0;xi<=33;xi++){ const c=crest[xi];
+          if(c<0||xi%5===0){ pen=false; continue; } const X=xi*STEP*10, Y=c-110;
+          if(Y<20){ pen=false; continue; }
+          if(!pen){ d+='M'+X+' '+Y; pen=true; } else d+='L'+X+' '+Y; } }
+      if(d) f+='<path d="'+d+'" fill="none" stroke="'+gcol+'" stroke-width="'+(tier>=4?5:4)+'"/>';
+    }
+    if(tier>=4){ // radiating ticks along the arc
+      for(let xi=1;xi<33;xi+=3){ const c=crest[xi]; if(c<0) continue; const X=xi*STEP*10, Y=c-50;
+        if(Y>60) f+='<path d="M'+X+' '+(Y-10)+'V'+Math.max(20,Y-10-(tier>=5?50:30))+'" stroke="'+gcol+'" stroke-width="4" fill="none"/>'; } }
+    if(tier>=5){ // corona rays: triangles between the ticks
+      for(let xi=2;xi<33;xi+=4){ const c=crest[xi]; if(c<0) continue; const X=xi*STEP, Y=Math.round(c/10)-9;
+        if(Y>7) f+=poly([[X-1,Y],[X+1,Y],[X,Math.max(3,Y-4)]],PINK); } }
+    if(tier>=6){ // REAPER: the complete ring, white with a pink echo
+      const rcx=t.cx*10, rcy=(t.cy-2)*10;
+      const rx=Math.min((t.rw+16)*10,rcx-20,1000-rcx-20), ry=Math.min((t.rh+((t.amp/2)|0)+12)*10,rcy-20);
+      f+='<ellipse cx="'+(rcx+8)+'" cy="'+(rcy+6)+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+PINK+'" stroke-width="4"/>';
+      f+='<ellipse cx="'+rcx+'" cy="'+rcy+'" rx="'+rx+'" ry="'+ry+'" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
+    }
+  }
+  f=f.slice(0,fHalo0)+reveal(f.slice(fHalo0),tHalo);
+  const slices=[];
+  if(t.mosh===1||t.mosh===2){ const n=t.mosh===2?4+rng.int(2):2+rng.int(2);
+    for(let i=0;i<n;i++) slices.push({y:6+rng.int(84),h:2+rng.int(5),dx:(2+rng.int(7))*(rng.int(2)?1:-1)}); }
+  else if(t.mosh===3){ slices.push({y:6+rng.int(70),h:8+rng.int(5),dx:(12+rng.int(7))*(rng.int(2)?1:-1)}); } // TEARDROP
+  else if(t.mosh===4){ const n=8+rng.int(3); // CORRUPTED
+    for(let i=0;i<n;i++) slices.push({y:4+rng.int(88),h:2+rng.int(3),dx:(3+rng.int(7))*(rng.int(2)?1:-1)}); }
+  else if(t.mosh===5){ const d5=6+rng.int(4); const sgn=rng.int(2)?1:-1; // SPLIT
+    slices.push({y:4,h:46,dx:d5*sgn}); slices.push({y:50,h:46,dx:-d5*sgn}); }
+  else if(t.mosh===6){ // MELTDOWN: one smear band + corruption
+    slices.push({y:30+rng.int(40),h:6+rng.int(5),smear:1});
+    for(let i=0;i<3;i++) slices.push({y:6+rng.int(84),h:2+rng.int(4),dx:(4+rng.int(7))*(rng.int(2)?1:-1)}); }
+  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
+    for(let k2=0;k2<sState.deaths;k2++) slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)});
+  }
+  // screen-space eye anchors (units) for status overlays
+  const eyeScreen=eyePos.map(([ex,ey2,r])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r]; });
+  return {defs,figure:f,traits:t,slices,rng,eyeScreen,introEnd,introBase:tMouth,introSeq:__seq};
+}
+function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
+// ---------------------------------------------------------------------------
+// COFFIN COMPOSITIONS (lifeState COFFINED / TERMINAL_COFFIN).
+// The signal flatlines. The field goes still and undisturbed; the wraith is
+// gone — only a coffin-shaped void remains where the signal refuses to run.
+// COFFINED keeps a residual heartbeat blip and pink ember eyes (revivable).
+// TERMINAL is the only other legal use of red: flat red line, red planks,
+// three red broken seals. Identity persists: sigil, block mark, eye archetype.
+// ---------------------------------------------------------------------------
+const COFFIN_PTS=[[44,22],[56,22],[65,38],[57,86],[43,86],[35,38]];
+const COFFIN_INSET=[[45,27],[55,27],[63,40],[56,81],[44,81],[37,40]];
+function inCoffin(x,y,pad){
+  // convex test against the hexagon expanded by `pad` units from its centroid
+  const cx=50,cy=54;
+  for(let i=0;i<6;i++){
+    const a=COFFIN_PTS[i], b=COFFIN_PTS[(i+1)%6];
+    const ax=a[0]+Math.sign(a[0]-cx)*pad, ay=a[1]+Math.sign(a[1]-cy)*pad;
+    const bx=b[0]+Math.sign(b[0]-cx)*pad, by=b[1]+Math.sign(b[1]-cy)*pad;
+    if((bx-ax)*(y-ay)-(by-ay)*(x-ax)<0) return false;
+  }
+  return true;
+}
+function buildCoffinSVG(s){
+  const terminal=s.lifeState===3;
+  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const t=drawTraits(rng);
+  const C=terminal?RED:WHITE;
+  let f='';
+  // the still field: flat lines, torn, silent around the void
+  const sw=t.lineW<=2?[3,4,6][t.lineW]:4;
+  for(let li=0;li<47;li++){
+    const y=4+li*2; let d='',pen=false,px=0,breakLeft=0;
+    for(let xi=0;xi<=33;xi++){
+      const x=xi*3; let gap=false;
+      if(inCoffin(x,y,2)) gap=true;
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else if(rng.int(1000)<(terminal?60:22)){ breakLeft=1+rng.int(5); gap=true; }
+      if(gap){ pen=false; continue; }
+      const X=x*U;
+      if(!pen){ d+='M'+X+' '+(y*U); pen=true; } else d+='h'+(X-px);
+      px=X;
+    }
+    if(d) f+='<path d="'+d+'" fill="none" stroke="'+ACID+'" stroke-width="'+sw+'"/>';
+  }
+  // white specks
+  { let d=''; const n=8+rng.int(10); for(let i=0;i<n;i++){ const x=rng.int(100), y=rng.int(100); d+='M'+(x*U)+' '+(y*U)+'h'+U+'v'+U+'h-'+U+'z'; } f+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // the coffin void outline (structure stays white; red is reserved for the verdict)
+  f+='<path d="'+pathD(jitterPts(COFFIN_PTS,rng,1))+'" fill="none" stroke="'+WHITE+'" stroke-width="7"/>';
+  // inner lid outline: a built object, not a wire
+  f+='<path d="'+pathD(COFFIN_INSET)+'" fill="none" stroke="'+WHITE+'" stroke-width="2"/>';
+  // nail ticks at the vertices
+  for(const [vx,vy] of COFFIN_PTS) f+=rect(vx-1,vy-1,2,2,WHITE);
+  // eyes: the archetype survives the grave
+  if(!terminal){
+    f+=eyeGlyph(t.eyes,0,46,42,4,PINK,rng);
+    f+=eyeGlyph(t.eyes,1,54,42,4,PINK,rng);
+  }
+  // seal pips inside the coffin
+  for(let i=0;i<3;i++){ const x=43+i*5, y=72;
+    if(i<s.sealsRemaining) f+=rect(x,y,3,3,ACID);
+    else { f+='<path d="M'+(x*U)+' '+(y*U)+'h30v30h-30z" fill="none" stroke="'+(terminal?RED:PINK)+'" stroke-width="3"/>'+xmark(x+1,y+1,2,1,terminal?RED:PINK,rng); }
+  }
+  // identity marks — same inboard coords as the live render (circular-crop safe)
+  f+=sigilSVG(s.wardId,20,20,rng,ACID);
+  f+=blockMarkSVG(s.blockId,80,80,rng,ACID);
+  // death scars displace the stillness too
+  const slices=[];
+  { const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,s.deaths||1));
+    for(let k=0;k<Math.max(1,s.deaths);k++) slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); }
+  let defs='<g id="f">'+f+'</g>', body='<rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f"/>';
+  let ci=0; for(const sl of slices){ ++ci; body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // the verdict is drawn after the scars — planks and vitals can never be shredded
+  if(terminal){
+    body+=poly([[40,33],[44,32],[60,79],[56,80]],RED);
+    body+=poly([[56,32],[60,33],[44,80],[40,79]],RED);
+    body+='<path d="M0 540h1000" fill="none" stroke="'+RED+'" stroke-width="5"/>';
+  } else {
+    body+='<path d="M0 540h1000" fill="none" stroke="'+WHITE+'" stroke-width="5"/>';
+    // the residual heartbeat: each pass, the flatline itself rises into the
+    // complex — a traveling black cover erases the static line under the beat
+    // so the zigzag replaces it — then melts back flat. One resurrection per pass.
+    body+='<g transform="translate(520 0)"><rect x="-348" y="533" width="348" height="14" fill="'+BLACK+'"/><path d="M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40" fill="none" stroke="'+WHITE+'" stroke-width="5"><animate attributeName="d" values="M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40" keyTimes="0;0.3;0.5;0.7;1" dur="2.8s" repeatCount="indefinite"/></path><animateTransform attributeName="transform" type="translate" values="0 0;1348 0" dur="2.8s" repeatCount="indefinite"/></g>';
+  }
+  body+=flickerSVG(s);
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+'</defs>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// STATUS OVERLAYS + HUD (z7+). Precedence handled in renderSVG; overlays sit
+// above mosh slices so danger/protection stays legible even when the figure
+// glitches. Red appears ONLY in the MARKED overlay (and TERMINAL/diagnostic).
+// ---------------------------------------------------------------------------
+function markedOverlay(g,rng){
+  const t=g.traits; let o='';
+  // corner brackets
+  const L=9;
+  o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)+'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)+'" fill="none" stroke="'+RED+'" stroke-width="14"/>';
+  // the warrant lock: red scope ring + full-bleed hairlines + chevrons closing in
+  { const cx=t.cx, cy=t.cy-2, R=t.rh+12;
+    o+=octRing(cx,cy,R,10,RED);
+    o+='<path d="M0 '+(cy*U)+'H'+((cx-R)*U)+'M'+((cx+R)*U)+' '+(cy*U)+'H1000M'+(cx*U)+' 0V'+(Math.max(0,cy-R)*U)+'M'+(cx*U)+' '+((cy+R)*U)+'V1000" stroke="'+RED+'" stroke-width="6" fill="none"/>';
+    o+=poly([[cx-5,cy-R+3],[cx+5,cy-R+3],[cx,cy-R+11]],RED);
+    o+=poly([[cx-5,cy+R-3],[cx+5,cy+R-3],[cx,cy+R-11]],RED);
+    o+=poly([[cx-R+3,cy-5],[cx-R+3,cy+5],[cx-R+11,cy]],RED);
+    o+=poly([[cx+R-3,cy-5],[cx+R-3,cy+5],[cx+R-11,cy]],RED); }
+  // warrant strip: purge countdown ticks along the crown edge
+  for(let i=0;i<8;i++) o+=rect(33+i*4,2,2,3,RED);
+  return o;
+}
+function witsecOverlay(g,rng){
+  // witness protection: the witness feed is cut to static (6-frame SMIL loop)
+  const [[lx,ly,lr],[rx2,ry2,rr2]]=g.eyeScreen;
+  const y=Math.min(ly,ry2)-8, X0=Math.max(0,lx-lr-8), X1=Math.min(100,rx2+rr2+8);
+  let o='<g shape-rendering="crispEdges">'+rect(X0,y,X1-X0,22,BLACK);
+  for(let f=0;f<6;f++){
+    let v=''; for(let k=0;k<6;k++) v+=(k?';':'')+(k===f?'inline':'none');
+    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>';
+    for(let ys=y; ys<y+22; ys+=2) for(let x=X0; x<X1; x+=2){
+      const n=rng.int(100);
+      if(n>=44&&n<92) o+='<rect x="'+(x*U)+'" y="'+(ys*U)+'" width="21" height="21" fill="'+(n<86?WHITE:ACID)+'"/>';
+    }
+    o+='</g>';
+  }
+  return o+'</g>';
+}
+function layLowOverlay(g,rng){
+  // gone dark: blinds close over the figure
+  const t=g.traits; let o='';
+  const x0=t.cx-t.rw-9, w=2*t.rw+18;
+  for(let y=t.cy-t.rh-4;y<t.cy+24;y+=7) o+=rect(x0,y,w,4,BLACK);
+  o+=poly([[t.cx-4,t.cy-t.rh-9],[t.cx+4,t.cy-t.rh-9],[t.cx,t.cy-t.rh-5]],ACID);
+  return o;
+}
+function buyerOverlay(g,rng){
+  // buyer protected: sealed force field — shield octagon, radiating echo (SMIL), padlock clasp
+  const t=g.traits, cx=t.cx, cy=t.cy-2, R=t.rh+16;
+  let o=octRing(cx,cy,R,12,ACID);
+  // echo wave collapses inward: born at the shield, dissolving toward the face
+  const ER=[R-3,R-11,R-19,R-27], EW=[4,3,3,2], ED=['','24 10','14 16','8 22'];
+  for(let f=0;f<4;f++){
+    let v=''; for(let k=0;k<4;k++) v+=(k?';':'')+(k===f?'inline':'none');
+    let ring=octRing(cx,cy,ER[f],EW[f],ACID);
+    if(ED[f]) ring=ring.replace('"/>','" stroke-dasharray="'+ED[f]+'"/>');
+    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+ring+'</g>';
+  }
+  const bx=cx, by=cy+R-4;
+  o+='<path d="M'+((bx-5)*U)+' '+((by-6)*U)+'V'+((by-12)*U)+'L'+((bx-3)*U)+' '+((by-14)*U)+'H'+((bx+3)*U)+'L'+((bx+5)*U)+' '+((by-12)*U)+'V'+((by-6)*U)+'" stroke="'+ACID+'" stroke-width="16" fill="none"/>';
+  o+=poly([[bx-9,by-4],[bx-6,by-7],[bx+6,by-7],[bx+9,by-4],[bx+9,by+4],[bx+6,by+7],[bx-6,by+7],[bx-9,by+4]],ACID);
+  o+=poly([[bx-2,by-2],[bx,by-4],[bx+2,by-2],[bx,by]],BLACK);
+  o+=rect(bx-1,by-1,2,5,BLACK);
+  return o;
+}
+function hunterOverlay(g,rng){
+  // volunteered hunter: the MARKED lock in white — the hunter carries the warrant
+  const t=g.traits; let o='';
+  const L=9;
+  o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)+'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)+'" fill="none" stroke="'+WHITE+'" stroke-width="14"/>';
+  { const cx=t.cx, cy=t.cy-2, R=t.rh+12;
+    o+=octRing(cx,cy,R,10,WHITE);
+    o+='<path d="M0 '+(cy*U)+'H'+((cx-R)*U)+'M'+((cx+R)*U)+' '+(cy*U)+'H1000M'+(cx*U)+' 0V'+(Math.max(0,cy-R)*U)+'M'+(cx*U)+' '+((cy+R)*U)+'V1000" stroke="'+WHITE+'" stroke-width="6" fill="none"/>';
+    o+=poly([[cx-5,cy-R+3],[cx+5,cy-R+3],[cx,cy-R+11]],WHITE);
+    o+=poly([[cx-5,cy+R-3],[cx+5,cy+R-3],[cx,cy+R-11]],WHITE);
+    o+=poly([[cx-R+3,cy-5],[cx-R+3,cy+5],[cx-R+11,cy]],WHITE);
+    o+=poly([[cx+R-3,cy-5],[cx+R-3,cy+5],[cx+R-11,cy]],WHITE); }
+  return o;
+}
+// seals HUD: three pips top-right — acid intact, pink broken
+function sealHud(s,rng){
+  // moved inboard (x64-75, y8) so the pips survive the circular PFP crop;
+  // broken seal = solid pink square split by a black diagonal crack
+  let o='';
+  for(let i=0;i<3;i++){ const x=64+i*4, y=8;
+    if(i<s.sealsRemaining) o+=rect(x,y,3,3,ACID);
+    else { o+=poly([[x,y],[x+3,y],[x,y+3]],PINK); o+=poly([[x+3,y+1],[x+3,y+3],[x+1,y+3]],PINK); }
+  }
+  return o;
+}
+// latest season badges: SLOT B (top 10, white) + SLOT C (top 5, pink)
+function seasonChips(s,used){
+  let o=''; if(!(s.latestSeasonBadgeFlags&1)) return o;
+  // nudged inboard (+40px x, -40px y) so the top-5 chip survives the circular PFP crop
+  o+=text('S'+s.latestAwardSeasonId,102,592,4,ACID,used);
+  o+='<rect x="100" y="632" width="104" height="60" fill="none" stroke="'+WHITE+'" stroke-width="4"/>'+text('10',116,642,6,WHITE,used);
+  if(s.latestSeasonBadgeFlags&2) o+='<rect x="100" y="704" width="104" height="60" fill="none" stroke="'+PINK+'" stroke-width="4"/>'+text('5',134,714,6,PINK,used);
+  return o;
+}
+// territory achievements: acid tick ladder up the right edge (cap 12)
+// pulled inboard to x90, base y69 so all 12 ticks survive the circular PFP crop
+function territoryHud(s){
+  let o=''; const n=Math.min(12,s.territoryAchievementCount);
+  for(let i=0;i<n;i++) o+=rect(90,69-i*3,3,2,ACID);
+  return o;
+}
+// STATS display mode: a data band across the hem
+function statsBand(s,used){
+  const tier=tierForKills(s.kills);
+  let o='<rect x="0" y="880" width="1000" height="120" fill="'+BLACK+'"/><path d="M0 880h1000" stroke="'+ACID+'" stroke-width="3"/>';
+  const l1='K '+s.kills+' / D '+s.deaths+' / KD '+kdText(s)+' / STK '+s.currentKillStreak;
+  let l2=TIER_NAMES[tier]+' / W'+s.wardId+' B'+s.blockId+(s.latestSeasonRank?' / S'+s.latestAwardSeasonId+' RANK '+s.latestSeasonRank:'');
+  o+=text(l1,24,896,5,ACID,used);
+  o+=text(l2,24,946,5,WHITE,used);
+  return o;
+}
+// flicker: SMIL scanline sweep + a pink echo tracer (deterministic, loops)
+function flickerSVG(s){
+  if(!s.flicker) return '';
+  return '<rect x="0" y="-8" width="1000" height="6" fill="'+WHITE+'"><animate attributeName="y" values="-8;1000;-8" dur="7s" repeatCount="indefinite"/></rect>'
+       + '<rect x="0" y="-4" width="1000" height="3" fill="'+PINK+'"><animate attributeName="y" values="1000;-4;1000" dur="11s" repeatCount="indefinite"/></rect>';
+}
+// ---------------------------------------------------------------------------
+// renderSVG — composition per STATE_TO_LAYER_MAP z-order
+// ---------------------------------------------------------------------------
+function renderSVG(s){
+  const errs=validate(s); if(errs.length) return diagnosticSVG(s,errs);
+  const status=resolveStatus(s);
+  if(status==='TERMINAL'||status==='COFFINED') return buildCoffinSVG(s);
+  const g=buildGenesis(s);
+  const used=new Set();
+  let defs=g.defs, body='';
+  // z0 ground
+  body+='<rect width="1000" height="1000" fill="'+BLACK+'"/>';
+  // figure group (z1–z6)
+  defs+='<g id="f">'+g.figure+'</g>';
+  body+='<use href="#f"/>';
+  let ci=0; for(const sl of g.slices){ ++ci;
+    if(sl.move) body+='<clipPath id="c'+ci+'"><rect x="'+(sl.x*U)+'" y="'+(sl.y*U)+'" width="'+(sl.w*U)+'" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><use href="#f" transform="translate('+(sl.dx*U)+' '+(sl.dy*U)+')"/></g>';
+    else if(sl.smear) body+='<clipPath id="c'+ci+'"><rect x="0" y="'+(sl.y*U)+'" width="1000" height="'+(sl.h*U)+'"/></clipPath><g clip-path="url(#c'+ci+')"><rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f" transform="translate(-500 0) scale(2 1)"/></g>';
+    else body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // construction intro: the body layers join the 0.25s succession
+  let iSeq=g.introSeq||0; const iT=()=>g.introBase+0.25*(++iSeq);
+  // z7: status overlays, precedence MARKED > WITSEC/LAY_LOW/BUYER > HUNTER
+  if(status==='MARKED') body+=reveal(markedOverlay(g,g.rng),iT());
+  else if(status==='WITSEC') body+=reveal(witsecOverlay(g,g.rng),iT());
+  else if(status==='LAY_LOW') body+=reveal(layLowOverlay(g,g.rng),iT());
+  else if(status==='BUYER_PROTECTED') body+=reveal(buyerOverlay(g,g.rng),iT());
+  else if(status==='HUNTER_SELECTED') body+=reveal(hunterOverlay(g,g.rng),iT());
+  // z8: persistent HUD — seals, latest season badges, territory ladder
+  body+=reveal(sealHud(s,g.rng),iT());
+  { const c1=seasonChips(s,used); if(c1) body+=reveal(c1,iT()); }
+  { const c2=territoryHud(s); if(c2) body+=reveal(c2,iT()); }
+  // z9: STATS display mode band
+  if(s.displayMode===1) body+=reveal(statsBand(s,used),iT());
+  // z10: flicker
+  { const c3=flickerSVG(s); if(c3) body+=reveal(c3,iT()); }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs>'+defs+glyphDefs(used)+'</defs>'+body+'</svg>';
+}
+// ---------------------------------------------------------------------------
+// renderBanner — 3000×1000 X-banner. The token's own render (any state) sits
+// at the left; its signal field continues across the full width; the name and
+// campaign line run in block glyphs. Nested <svg> keeps ids self-contained.
+// ---------------------------------------------------------------------------
+function renderBanner(s){
+  const errs=validate(s);
+  const inner=renderSVG(s);
+  const used=new Set();
+  const rng=new Rng(concatBytes(genesisSeed(s.genesisHash,s.tokenId),strBytes('BNR')));
+  const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId)));
+  const sw=t.lineW<=2?[3,4,6][t.lineW]:4;
+  let body='<rect width="3000" height="1000" fill="'+BLACK+'"/>';
+  // the signal continues past the portrait
+  for(let li=0;li<47;li++){
+    const y=(4+li*2)*U; let d='',pen=false,px=1000,breakLeft=0;
+    for(let xi=0;xi<=66;xi++){
+      const X=1000+xi*30; let gap=false;
+      if(breakLeft>0){ breakLeft--; gap=true; }
+      else if(rng.int(1000)<30){ breakLeft=1+rng.int(5); gap=true; }
+      // clear a window for the wordmark and campaign lines
+      if(y>290&&y<660&&X>1180&&X<2720) gap=true;
+      if(gap){ pen=false; continue; }
+      if(!pen){ d+='M'+X+' '+y; pen=true; } else d+='h'+(X-px);
+      px=X;
+    }
+    if(d) body+='<path d="'+d+'" fill="none" stroke="'+ACID+'" stroke-width="'+sw+'"/>';
+  }
+  // white specks on the wide field
+  { let d=''; const n=16+rng.int(12); for(let i=0;i<n;i++){ const x=1000+rng.int(2000), y=rng.int(1000); d+='M'+x+' '+y+'h10v10h-10z'; } body+='<path d="'+d+'" fill="'+WHITE+'"/>'; }
+  // wordmark + campaign line
+  const tier=tierForKills(s.kills), status=resolveStatus(s);
+  body+=text('HOODRXCH',1220,330,15,ACID,used);
+  const sub=errs.length?'INVALID STATE':'#'+s.tokenId+' / WARD 0'+s.wardId+' / BLOCK 0'+s.blockId+(tier>0?' / '+TIER_NAMES[tier]:'');
+  body+=text(sub,1224,510,6,errs.length?RED:WHITE,used);
+  if(!errs.length&&status!=='ALIVE') body+=text(status.replace(/_/g,' '),1224,580,6,(status==='MARKED'||status==='TERMINAL')?RED:PINK,used);
+  // right block: seals + kill tally, banner-scaled
+  for(let i=0;i<3;i++){ const x=2800+i*50, y=60;
+    if(i<s.sealsRemaining) body+='<rect x="'+x+'" y="'+y+'" width="34" height="34" fill="'+ACID+'"/>';
+    else body+='<rect x="'+x+'" y="'+y+'" width="34" height="34" fill="none" stroke="'+PINK+'" stroke-width="4"/><path d="M'+x+' '+(y+34)+'l34 -34" stroke="'+PINK+'" stroke-width="4" fill="none"/>';
+  }
+  if(s.kills>0){ const n=Math.min(20,s.kills);
+    for(let i=0;i<n;i++) body+='<rect x="'+(2800+(i%10)*14)+'" y="'+(130+((i/10)|0)*30)+'" width="8" height="20" fill="'+PINK+'"/>'; }
+  return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 3000 1000"><defs>'+glyphDefs(used)+'</defs>'+body
+    +'<svg x="0" y="0" width="1000" height="1000" viewBox="0 0 1000 1000">'+inner.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')+'</svg>'
+    +'<path d="M1000 0v1000" stroke="'+ACID+'" stroke-width="3"/></svg>';
+}
+function kdText(s){ if(s.deaths===0) return s.kills===0?'UNTESTED':'UNDEFEATED'; return (Math.floor(s.kills*10/s.deaths)/10).toFixed(1); }
+function renderMetadata(s){
+  const svg=renderSVG(s); const tier=tierForKills(s.kills);
+  const a=(t,v)=>({trait_type:t,value:v});
+  const attrs=[a('Token ID',s.tokenId),a('Ward','WARD 0'+s.wardId),a('Block','BLOCK 0'+s.blockId),a('Art Index',s.artIndex),
+    a('Life State',LIFE[s.lifeState]),a('Exposure State',EXPO[s.exposureState]),a('Seals Remaining',s.sealsRemaining),
+    a('Kills',s.kills),a('Deaths',s.deaths),a('K/D',kdText(s)),a('Forced Purges',s.forcedPurges),a('Saves Given',s.savesGiven),a('Saves Received',s.savesReceived),
+    a('Current Kill Streak',s.currentKillStreak),a('Longest Kill Streak',s.longestKillStreak),a('Terminal Kills',s.terminalKills),
+    a('Lifetime Kill Tier',TIER_NAMES[tier]),a('Latest Season',s.latestAwardSeasonId),a('Latest Season Rank',s.latestSeasonRank),
+    a('Season Top 10',(s.latestSeasonBadgeFlags&1)?'YES':'NO'),a('Season Top 5',(s.latestSeasonBadgeFlags&2)?'YES':'NO'),a('Season Award Count',s.seasonAwardCount),
+    a('Territory Achievements',s.territoryAchievementCount),a('Current War',s.warId),a('Current Campaign',s.campaignId),a('Current Season',s.seasonId),a('War Phase',PHASES[s.warPhase]||String(s.warPhase)),
+    a('WITSEC Credits',s.witsecCredits),a('WITSEC Applies',s.witsecApplies?'YES':'NO'),a('Lay Low',s.laidLow?'YES':'NO'),a('Buyer Protected',s.buyerProtected?'YES':'NO'),a('Hunter Selected',s.hunterSelected?'YES':'NO'),
+    a('Marked By Token ID',s.markedByTokenId),a('Purge Deadline',s.purgeDeadline),a('Transfer Locked',s.transferLocked?'YES':'NO'),a('Transfer Lock Expiry',s.transferLockUntil),
+    a('Historical State Count',s.historicalStateCount),a('Display Mode',s.displayMode?'STATS':'PLAIN'),a('Canonical Game State',LIFE[s.lifeState]),
+    a('Renderer Version',RENDERER_VERSION),a('Render-State Schema Version',SCHEMA_VERSION),a('State Hash',stateHash(s))];
+  const tn=traitNames(s); for(const k in tn) attrs.push(a('Genesis '+k[0].toUpperCase()+k.slice(1),tn[k]));
+  return JSON.stringify({name:'HOODRXCH #'+s.tokenId,description:'A persistent onchain HOODRXCH mask. Fully generative, fully onchain.',image:'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg))),attributes:attrs});
+}
+return {defaultState:defaultState,renderSVG:renderSVG,buildGenesis:buildGenesis,
+        traitNames:traitNames,resolveStatus:resolveStatus,tierForKills:tierForKills};
+})();</script>
+<script>
+(function(){
+'use strict';
+var R = window.HRX;
+
+// ---------------------------------------------------------------------------
+// SMIL baking. The renderer's standing invariant is that every base attribute
+// is already the finished art and animations only ride on top, so the intro
+// (every repeatCount="1" element) can simply be deleted: what remains is the
+// constructed mask. The indefinite loops are then evaluated at time t and
+// written back as plain attributes, which gives a static SVG per frame — no
+// screenshot API required.
+// ---------------------------------------------------------------------------
+function parseTime(v){
+  if(!v) return 0;
+  v = String(v).trim();
+  var m = /^(-?[\d.]+)(ms|s)?$/.exec(v);
+  if(!m) return 0;
+  return m[2] === 'ms' ? parseFloat(m[1])/1000 : parseFloat(m[1]);
+}
+
+var NUMRE = /-?\d*\.?\d+/g;
+
+function lerpValue(a, b, u){
+  if(a.charAt(0) === '#' || b.charAt(0) === '#') return u < 0.5 ? a : b; // colours never interpolate here
+  var na = a.match(NUMRE), nb = b.match(NUMRE);
+  if(!na || !nb || na.length !== nb.length) return u < 0.5 ? a : b;
+  var i = 0;
+  return a.replace(NUMRE, function(){
+    var x = parseFloat(na[i]), y = parseFloat(nb[i]); i++;
+    var v = x + (y - x) * u;
+    return String(Math.round(v * 1000) / 1000);
+  });
+}
+
+// SMIL: `discrete` with no keyTimes splits dur into values.length equal slots;
+// `linear` spans values.length-1 segments.
+function sampleValues(vals, keyTimes, f, discrete){
+  var n = vals.length;
+  if(n === 1) return vals[0];
+  if(discrete && !keyTimes){
+    var i = Math.floor(f * n);
+    if(i > n - 1) i = n - 1;
+    if(i < 0) i = 0;
+    return vals[i];
+  }
+  var times = keyTimes;
+  if(!times){
+    times = [];
+    for(var k = 0; k < n; k++) times.push(k / (n - 1));
+  }
+  var seg = 0;
+  while(seg < n - 2 && f >= times[seg + 1]) seg++;
+  if(discrete) return vals[seg];
+  var span = times[seg + 1] - times[seg];
+  var u = span > 0 ? (f - times[seg]) / span : 0;
+  if(u < 0) u = 0; if(u > 1) u = 1;
+  return lerpValue(vals[seg], vals[seg + 1], u);
+}
+
+function bakeAt(svgText, t, size){
+  var doc = new DOMParser().parseFromString(svgText, 'image/svg+xml');
+  var root = doc.documentElement;
+  if(root.getElementsByTagName('parsererror').length) throw new Error('could not parse the render');
+
+  var all = root.querySelectorAll('animate,animateTransform');
+  var i, a;
+  // 1. the construction intro is one-shot; dropping it leaves the finished art
+  for(i = all.length - 1; i >= 0; i--){
+    a = all[i];
+    if(a.getAttribute('repeatCount') !== 'indefinite') a.parentNode.removeChild(a);
+  }
+  // 2. freeze every eternal loop at t
+  all = root.querySelectorAll('animate,animateTransform');
+  for(i = all.length - 1; i >= 0; i--){
+    a = all[i];
+    var parent = a.parentNode;
+    var dur = parseTime(a.getAttribute('dur'));
+    var begin = parseTime(a.getAttribute('begin'));
+    var raw = a.getAttribute('values');
+    var local = t - begin;
+    if(raw && dur > 0 && local >= 0){
+      var vals = raw.split(';');
+      var ktAttr = a.getAttribute('keyTimes');
+      var kts = ktAttr ? ktAttr.split(';').map(Number) : null;
+      var discrete = a.getAttribute('calcMode') === 'discrete';
+      var f = (local % dur) / dur;
+      var v = sampleValues(vals, kts, f, discrete);
+      if(a.tagName === 'animateTransform'){
+        parent.setAttribute('transform', (a.getAttribute('type') || 'translate') + '(' + v + ')');
+      } else {
+        parent.setAttribute(a.getAttribute('attributeName'), v);
+      }
+    }
+    parent.removeChild(a);
+  }
+  root.setAttribute('width', size);
+  root.setAttribute('height', size);
+  return new XMLSerializer().serializeToString(root);
+}
+
+function raster(svgText, size, round){
+  return new Promise(function(resolve, reject){
+    var blob = new Blob([svgText], {type:'image/svg+xml;charset=utf-8'});
+    var url = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function(){
+      var c = document.createElement('canvas');
+      c.width = c.height = size;
+      var g = c.getContext('2d', {willReadFrequently:true});
+      g.fillStyle = '#000000';
+      g.fillRect(0, 0, size, size);
+      if(round){
+        g.save();
+        g.beginPath();
+        g.arc(size/2, size/2, size/2, 0, Math.PI*2);
+        g.clip();
+      }
+      g.drawImage(img, 0, 0, size, size);
+      if(round) g.restore();
+      URL.revokeObjectURL(url);
+      resolve(c);
+    };
+    img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('the render would not rasterise')); };
+    img.src = url;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// The field's exact loop period in seconds, from the token's own traits.
+// Travel is 0.075s per pixel; DASHED rows and the VAPOR break carry a dash
+// phase that only repeats every seventh cycle.
+// ---------------------------------------------------------------------------
+function loopPeriod(state){
+  var t = R.buildGenesis(Object.assign({}, state)).traits;
+  var sevens = (t.lineW === 5 || t.tear === 6);
+  if(t.lineW === 8) return {base:4.5, exact: t.tear === 6 ? 31.5 : 4.5};
+  var stepD = t.lineW === 3 ? 10 : t.lineW === 4 ? 40 : 20;
+  var cycD = t.lineW === 6 ? stepD * 2 : stepD;
+  var base = cycD * 0.075;
+  return {base:base, exact: sevens ? 7 * base : base};
+}
+
+// ---------------------------------------------------------------------------
+// GIF89a writer. Adaptive 256-colour global table (this palette is nearly
+// flat, so the quantisation is all but lossless) and standard LZW.
+// ---------------------------------------------------------------------------
+function buildPalette(samples){
+  var counts = new Map(), i, j, px;
+  for(i = 0; i < samples.length; i++){
+    px = samples[i];
+    for(j = 0; j < px.length; j += 12){ // every third pixel
+      var key = (px[j] << 16) | (px[j+1] << 8) | px[j+2];
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+  }
+  var entries = Array.from(counts.entries()).sort(function(a, b){ return b[1] - a[1]; });
+  var pal = [0x000000];
+  for(i = 0; i < entries.length && pal.length < 256; i++){
+    if(entries[i][0] !== 0x000000) pal.push(entries[i][0]);
+  }
+  var table = new Uint8Array(768);
+  for(i = 0; i < pal.length; i++){
+    table[i*3] = (pal[i] >> 16) & 255;
+    table[i*3+1] = (pal[i] >> 8) & 255;
+    table[i*3+2] = pal[i] & 255;
+  }
+  return {table:table, count:pal.length};
+}
+
+function quantize(rgba, pal, cache){
+  var n = rgba.length / 4, out = new Uint8Array(n), table = pal.table, count = pal.count;
+  for(var p = 0; p < n; p++){
+    var r = rgba[p*4], g = rgba[p*4+1], b = rgba[p*4+2];
+    var key = (r << 16) | (g << 8) | b;
+    var idx = cache.get(key);
+    if(idx === undefined){
+      var best = 0, bestD = Infinity;
+      for(var c = 0; c < count; c++){
+        var dr = r - table[c*3], dg = g - table[c*3+1], db = b - table[c*3+2];
+        var d = dr*dr + dg*dg + db*db;
+        if(d < bestD){ bestD = d; best = c; if(d === 0) break; }
+      }
+      idx = best;
+      cache.set(key, idx);
+    }
+    out[p] = idx;
+  }
+  return out;
+}
+
+function lzw(minCodeSize, px){
+  var clear = 1 << minCodeSize, eoi = clear + 1;
+  var codeSize = minCodeSize + 1, next = eoi + 1;
+  var dict = new Map();
+  var bytes = [], cur = 0, bits = 0;
+  function emit(code){
+    cur |= code << bits; bits += codeSize;
+    while(bits >= 8){ bytes.push(cur & 255); cur >>= 8; bits -= 8; }
+  }
+  emit(clear);
+  var prefix = px[0];
+  for(var i = 1; i < px.length; i++){
+    var k = px[i], key = (prefix << 8) | k;
+    var found = dict.get(key);
+    if(found !== undefined){ prefix = found; continue; }
+    emit(prefix);
+    if(next < 4096){
+      dict.set(key, next);
+      if(next === (1 << codeSize) && codeSize < 12) codeSize++;
+      next++;
+    } else {
+      emit(clear);
+      dict = new Map(); next = eoi + 1; codeSize = minCodeSize + 1;
+    }
+    prefix = k;
+  }
+  emit(prefix);
+  emit(eoi);
+  if(bits > 0) bytes.push(cur & 255);
+  return bytes;
+}
+
+function gifEncode(frames, size, delayCs, pal){
+  var out = [];
+  function b(v){ out.push(v & 255); }
+  function w(v){ out.push(v & 255, (v >> 8) & 255); }
+  function str(s){ for(var i = 0; i < s.length; i++) out.push(s.charCodeAt(i)); }
+  str('GIF89a');
+  w(size); w(size);
+  b(0xF7); b(0); b(0);                      // global table, 256 entries
+  for(var i = 0; i < 768; i++) b(pal.table[i]);
+  b(0x21); b(0xFF); b(0x0B); str('NETSCAPE2.0'); b(0x03); b(0x01); w(0); b(0); // loop forever
+  for(var f = 0; f < frames.length; f++){
+    b(0x21); b(0xF9); b(0x04); b(0x04); w(delayCs); b(0); b(0);  // disposal 1, no transparency
+    b(0x2C); w(0); w(0); w(size); w(size); b(0);
+    b(8);
+    var data = lzw(8, frames[f]);
+    for(var p = 0; p < data.length; p += 255){
+      var chunk = data.slice(p, p + 255);
+      b(chunk.length);
+      for(var q = 0; q < chunk.length; q++) b(chunk[q]);
+    }
+    b(0);
+  }
+  b(0x3B);
+  return new Uint8Array(out);
+}
+
+// ---------------------------------------------------------------------------
+// UI
+// ---------------------------------------------------------------------------
+var $ = function(id){ return document.getElementById(id); };
+var stage = $('stage'), traitsEl = $('traits');
+var state = null, svgText = '', period = null, downloads = null;
+var LOOP_T0 = 8; // every intro reveal has landed well before this
+
+// Inside a claude.ai artifact a save goes through the downloads capability and
+// the viewer confirms it; served as an ordinary web page, an anchor does it.
+var inArtifact = !!(window.claude && window.claude.use);
+var useDownloads = inArtifact ? window.claude.use('downloads') : Promise.resolve(null);
+useDownloads.then(function(d){
+  downloads = d;
+  if(inArtifact && !d){
+    $('btnGif').disabled = true;
+    $('btnPng').disabled = true;
+    $('gifNote').textContent = 'Saving files is not available in this view.';
+    $('gifNote').className = 'note warn';
+    $('pngNote').textContent = 'Open this page in claude.ai to export.';
+    $('pngNote').className = 'note warn';
+  }
+}).catch(function(){});
+
+function label(k){ return k === 'lineW' ? 'lines' : k; }
+
+function load(tokenId, kills){
+  state = R.defaultState(tokenId);
+  state.kills = kills;
+  svgText = R.renderSVG(state);
+  period = loopPeriod(state);
+  var status = R.resolveStatus(state);
+
+  stage.querySelectorAll('svg').forEach(function(n){ n.remove(); });
+  stage.insertAdjacentHTML('beforeend', svgText);
+  if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches){
+    var live = stage.querySelector('svg');
+    if(live && live.pauseAnimations){ live.pauseAnimations(); live.setCurrentTime(LOOP_T0); }
+  }
+  $('tagId').textContent = '#' + tokenId;
+  $('tagStatus').textContent = status;
+  $('tagPeriod').textContent = period.exact.toFixed(2).replace(/\.00$/, '') + 's loop';
+  $('tokenIn').value = tokenId;
+
+  var tn = R.traitNames(state), html = '';
+  var order = ['form','lines','tear','spikes','eyes','treatment','mouth','pink','mosh','sigil'];
+  order.forEach(function(k){
+    if(tn[k] === undefined) return;
+    html += '<dt>' + k + '</dt><dd>' + tn[k] + '</dd>';
+  });
+  traitsEl.innerHTML = html;
+  $('gifNote').textContent = ''; $('gifNote').className = 'note';
+  $('pngNote').textContent = ''; $('pngNote').className = 'note';
+  $('gifBar').style.width = '0'; $('pngBar').style.width = '0';
+}
+
+function randomToken(){
+  var a = new Uint32Array(1);
+  crypto.getRandomValues(a);
+  return (a[0] % 666) + 1;
+}
+
+$('btnRandom').addEventListener('click', function(){ load(randomToken(), Number($('killsIn').value)); });
+$('btnGo').addEventListener('click', function(){
+  var v = Math.min(666, Math.max(1, Number($('tokenIn').value) || 1));
+  load(v, Number($('killsIn').value));
+});
+$('killsIn').addEventListener('change', function(){ load(Number($('tokenIn').value), Number($('killsIn').value)); });
+$('btnReplay').addEventListener('click', function(){ load(Number($('tokenIn').value), Number($('killsIn').value)); });
+$('roundIn').addEventListener('change', function(){ stage.classList.toggle('round', this.checked); });
+
+function canSave(){ return !inArtifact || !!downloads; }
+function busy(on){
+  ['btnGif','btnPng','btnRandom','btnGo','btnReplay'].forEach(function(id){
+    $(id).disabled = on || (!canSave() && (id === 'btnGif' || id === 'btnPng'));
+  });
+}
+function frame(){ return new Promise(function(r){ requestAnimationFrame(function(){ r(); }); }); }
+
+async function offerSave(filename, data, noteEl){
+  if(!downloads){
+    var url = URL.createObjectURL(data);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename; a.rel = 'noopener';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+    noteEl.textContent = 'Saved ' + filename;
+    noteEl.className = 'note ok';
+    return;
+  }
+  try{
+    await downloads.save({filename:filename, data:data});
+    noteEl.textContent = 'Saved ' + filename;
+    noteEl.className = 'note ok';
+  }catch(err){
+    var code = (err && err.code) || 'unavailable';
+    noteEl.className = 'note warn';
+    if(code === 'declined') noteEl.textContent = 'Save cancelled.';
+    else if(code === 'too_large') noteEl.textContent = 'Too large for this destination — try a smaller size.';
+    else if(code === 'rate_limited') noteEl.textContent = 'Another save is still open. Try again in a moment.';
+    else noteEl.textContent = 'Could not save here (' + code + ').';
+  }
+}
+
+$('btnPng').addEventListener('click', async function(){
+  if(!canSave() || !state) return;
+  busy(true);
+  var note = $('pngNote'), bar = $('pngBar');
+  note.textContent = 'Rendering the finished mask…'; note.className = 'note';
+  try{
+    var size = Number($('pngSize').value);
+    bar.style.width = '35%';
+    await frame();
+    var baked = bakeAt(svgText, LOOP_T0, size);
+    bar.style.width = '70%';
+    await frame();
+    var canvas = await raster(baked, size, $('roundIn').checked);
+    bar.style.width = '100%';
+    var blob = await new Promise(function(r){ canvas.toBlob(r, 'image/png'); });
+    note.textContent = downloads ? 'Waiting for you to confirm the save…' : 'Saving…';
+    await offerSave('hoodrxch_' + state.tokenId + '_' + size + '.png', blob, note);
+  }catch(e){
+    note.textContent = 'PNG failed: ' + e.message; note.className = 'note warn';
+  }
+  bar.style.width = '0';
+  busy(false);
+});
+
+$('btnGif').addEventListener('click', async function(){
+  if(!canSave() || !state) return;
+  busy(true);
+  var note = $('gifNote'), bar = $('gifBar');
+  try{
+    var size = Number($('gifSize').value), fps = Number($('gifFps').value);
+    var round = $('roundIn').checked;
+    // Use the exact seamless period while it stays a sane length; otherwise one
+    // cycle, where only the dash phase differs across the seam.
+    var useExact = period.exact <= 6.001;
+    var secs = useExact ? period.exact : period.base;
+    var n = Math.round(secs * fps);
+    var delayCs = Math.round(100 / fps);
+
+    note.className = 'note';
+    note.textContent = 'Sampling colours…';
+    bar.style.width = '4%';
+    await frame();
+
+    // pre-pass: four frames across the loop are enough for this palette
+    var picks = [], marks = [0, 0.25, 0.5, 0.75];
+    for(var m = 0; m < marks.length; m++){
+      var c0 = await raster(bakeAt(svgText, LOOP_T0 + marks[m] * secs, size), size, round);
+      picks.push(c0.getContext('2d').getImageData(0, 0, size, size).data);
+      await frame();
+    }
+    var pal = buildPalette(picks);
+    picks = null;
+
+    var cache = new Map(), framesIdx = [];
+    for(var i = 0; i < n; i++){
+      note.textContent = 'Frame ' + (i + 1) + ' of ' + n + '…';
+      bar.style.width = (6 + i / n * 86) + '%';
+      await frame();
+      var canvas = await raster(bakeAt(svgText, LOOP_T0 + i / fps, size), size, round);
+      framesIdx.push(quantize(canvas.getContext('2d').getImageData(0, 0, size, size).data, pal, cache));
+    }
+
+    note.textContent = 'Encoding…';
+    bar.style.width = '95%';
+    await frame();
+    var bytes = gifEncode(framesIdx, size, delayCs, pal);
+    bar.style.width = '100%';
+    note.textContent = (downloads ? 'Waiting for you to confirm the save… ' : 'Saving… ') + '(' + Math.round(bytes.length / 1024) + ' KB)';
+    await offerSave('hoodrxch_' + state.tokenId + '_loop.gif', new Blob([bytes], {type:'image/gif'}), note);
+    if(!useExact && note.className === 'note ok'){
+      note.textContent += ' — one cycle; the dash phase only repeats every ' + period.exact.toFixed(2) + 's.';
+    }
+  }catch(e){
+    note.textContent = 'GIF failed: ' + e.message; note.className = 'note warn';
+  }
+  bar.style.width = '0';
+  busy(false);
+});
+
+load(94, 0);
+})();
+</script>
+
+</body>
+</html>
