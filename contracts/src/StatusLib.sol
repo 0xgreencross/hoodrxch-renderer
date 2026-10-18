@@ -171,6 +171,20 @@ library StatusLib {
                 body.app(Geom.slice(ci, y, h, dx, T.BLACK));
             }
         }
+        // kill crest: the grave keeps what the wraith earned. After the scars
+        // (history is not shredded), before the verdict (on a terminal grave
+        // the red X stays the loudest thing in the frame). Acid to
+        // EXECUTIONER, white for the last two tiers.
+        {
+            int256 tier = int256(GenesisLib.tierForKills(s.kills));
+            if (tier > 0) {
+                body.app(GenesisLib.octFill(50, 30, 9, T.BLACK));
+                body.app(GenesisLib.octRing(50, 30, 9, 3, T.ACID));
+                for (int256 i = 0; i < tier; i++) {
+                    body.app(Geom.rect(50 - tier + 2 * i, 29, 1, 2, i >= 5 ? T.WHITE : T.ACID));
+                }
+            }
+        }
         // the verdict is drawn after the scars — planks and vitals can never be shredded
         if (terminal) {
             Geom.Pt[] memory p1 = new Geom.Pt[](4);
@@ -251,6 +265,59 @@ library StatusLib {
         for (uint256 i = 0; i < 8; i++) {
             o.app(Geom.rect(33 + int256(i) * 4, 2, 2, 3, T.RED));
         }
+        return o.fin();
+    }
+
+    /// PURGED — the warrant was bought out and the wraith lived. Deliberately
+    /// MARKED's own geometry, undone: the same scope ring in ACID instead of
+    /// RED, severed at the cardinal points, chevrons outside the ring where
+    /// MARKED's sit inside it, corner brackets opening instead of closing.
+    /// Red never appears here; this state is the opposite of the warrant.
+    function purgedOverlay(T.Gen memory g) internal pure returns (string memory) {
+        Buf.B memory o = Buf.init(4096);
+        o.app(
+            abi.encodePacked(
+                '<path d="M30 120V30H120M880 30H970V120M970 880V970H880M120 970H30V880" fill="none" stroke="',
+                T.ACID,
+                '" stroke-width="10"/>'
+            )
+        );
+        int256 cx = g.t.cx;
+        int256 cy = g.t.cy - 2;
+        int256 R = g.t.rh + 12;
+        o.app(GenesisLib.octRing(cx, cy, R, 10, T.ACID));
+        o.app(Geom.rect(cx - 4, cy - R - 1, 8, 3, T.BLACK));
+        o.app(Geom.rect(cx - 4, cy + R - 2, 8, 3, T.BLACK));
+        o.app(Geom.rect(cx - R - 1, cy - 4, 3, 8, T.BLACK));
+        o.app(Geom.rect(cx + R - 2, cy - 4, 3, 8, T.BLACK));
+        o.app(Geom.rect(cx - 5, cy - R - 2, 1, 4, T.ACID));
+        o.app(Geom.rect(cx + 4, cy - R - 2, 1, 4, T.ACID));
+        o.app(Geom.rect(cx - 5, cy + R - 2, 1, 4, T.ACID));
+        o.app(Geom.rect(cx + 4, cy + R - 2, 1, 4, T.ACID));
+        o.app(Geom.rect(cx - R - 2, cy - 5, 4, 1, T.ACID));
+        o.app(Geom.rect(cx - R - 2, cy + 4, 4, 1, T.ACID));
+        o.app(Geom.rect(cx + R - 2, cy - 5, 4, 1, T.ACID));
+        o.app(Geom.rect(cx + R - 2, cy + 4, 4, 1, T.ACID));
+        {
+            // clamped to the canvas: the ring is wider than the frame on some
+            // heads, and an arrow half outside it reads as nothing. The top
+            // cardinal is left bare — the struck-through warrant strip is the
+            // marker that belongs there.
+            int256 bB = cy + R + 12 < 99 ? cy + R + 12 : int256(99);
+            int256 lB = cx - R - 12 > 1 ? cx - R - 12 : int256(1);
+            int256 rB = cx + R + 12 < 99 ? cx + R + 12 : int256(99);
+            Geom.Pt[] memory p = new Geom.Pt[](3);
+            p[0] = Geom.Pt(cx - 4, bB); p[1] = Geom.Pt(cx + 4, bB); p[2] = Geom.Pt(cx, bB - 6);
+            o.app(Geom.poly(p, T.ACID));
+            p[0] = Geom.Pt(lB, cy - 4); p[1] = Geom.Pt(lB, cy + 4); p[2] = Geom.Pt(lB + 6, cy);
+            o.app(Geom.poly(p, T.ACID));
+            p[0] = Geom.Pt(rB, cy - 4); p[1] = Geom.Pt(rB, cy + 4); p[2] = Geom.Pt(rB - 6, cy);
+            o.app(Geom.poly(p, T.ACID));
+        }
+        for (uint256 i = 0; i < 8; i++) {
+            o.app(Geom.rect(33 + int256(i) * 4, 2, 2, 3, T.ACID));
+        }
+        o.app(abi.encodePacked('<path d="M320 35h330" stroke="', T.WHITE, '" stroke-width="4"/>'));
         return o.fin();
     }
 

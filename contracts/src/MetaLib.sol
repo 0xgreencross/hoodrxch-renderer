@@ -118,17 +118,32 @@ library MetaLib {
 
     /// metadata JSON; `svg` must be the already-rendered image for the state
     function metadata(RenderStateV1 memory s, string memory svg, bytes32 sh) public pure returns (string memory) {
+        return metadata(s, svg, "", sh);
+    }
+
+    /// As above; when `animSvg` is non-empty it is published as `animation_url`
+    /// beside the still, so a marketplace that plays motion plays it and one
+    /// that does not still shows a finished wraith.
+    function metadata(RenderStateV1 memory s, string memory svg, string memory animSvg, bytes32 sh)
+        public
+        pure
+        returns (string memory)
+    {
         uint256 tier = GenesisLib.tierForKills(s.kills);
-        Buf.B memory b = Buf.init(bytes(svg).length * 2 + 8192);
+        Buf.B memory b = Buf.init((bytes(svg).length + bytes(animSvg).length) * 2 + 8192);
         b.app(
             abi.encodePacked(
                 '{"name":"HOODRXCH #',
                 Num.utoa(s.tokenId),
                 '","description":"A persistent onchain HOODRXCH mask. Fully generative, fully onchain.","image":"data:image/svg+xml;base64,',
                 Num.base64(bytes(svg)),
-                '","attributes":['
+                '"'
             )
         );
+        if (bytes(animSvg).length > 0) {
+            b.app(abi.encodePacked(',"animation_url":"data:image/svg+xml;base64,', Num.base64(bytes(animSvg)), '"'));
+        }
+        b.app(bytes(',"attributes":['));
         aNum(b, "Token ID", s.tokenId, false);
         aStr(b, "Ward", string(abi.encodePacked("WARD 0", Num.utoa(s.wardId))), true);
         aStr(b, "Block", string(abi.encodePacked("BLOCK 0", Num.utoa(s.blockId))), true);
@@ -160,6 +175,7 @@ library MetaLib {
         aStr(b, "WITSEC Applies", yesNo(s.witsecApplies), true);
         aStr(b, "Lay Low", yesNo(s.laidLow), true);
         aStr(b, "Buyer Protected", yesNo(s.buyerProtected), true);
+        aStr(b, "Purged", yesNo(s.purged), true);
         aStr(b, "Hunter Selected", yesNo(s.hunterSelected), true);
         aNum(b, "Marked By Token ID", s.markedByTokenId, true);
         aNum(b, "Purge Deadline", s.purgeDeadline, true);
@@ -168,8 +184,8 @@ library MetaLib {
         aNum(b, "Historical State Count", s.historicalStateCount, true);
         aStr(b, "Display Mode", s.displayMode != 0 ? "STATS" : "PLAIN", true);
         aStr(b, "Canonical Game State", lifeName(s.lifeState), true);
-        aNum(b, "Renderer Version", 1, true);
-        aNum(b, "Render-State Schema Version", 1, true);
+        aNum(b, "Renderer Version", 2, true);
+        aNum(b, "Render-State Schema Version", 2, true);
         aStr(b, "State Hash", Num.hex0x(sh), true);
         {
             Mask.Traits memory t = Mask.drawTraits(Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.artIndex)));

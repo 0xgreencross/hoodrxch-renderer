@@ -47,4 +47,9 @@ struct RenderStateV1 {
     uint256 historicalStateCount;
     uint256 displayMode; // 0 PLAIN 1 STATS
     bool flicker;
+    // --- schema 2 -----------------------------------------------------------
+    /// The warrant on this wraith was bought out and it lived. Set by the game;
+    /// mutually exclusive with `marked`, and never true in the ground. This is
+    /// the ONLY field the Season One art needed that V2 did not already carry.
+    bool purged;
 }

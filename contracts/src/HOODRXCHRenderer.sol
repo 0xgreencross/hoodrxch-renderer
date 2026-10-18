@@ -20,13 +20,13 @@ import {Glyphs} from "./Glyphs.sol";
 contract HOODRXCHRenderer {
     using Buf for Buf.B;
 
-    uint256 public constant RENDERER_VERSION = 1;
-    uint256 public constant SCHEMA_VERSION = 1;
+    uint256 public constant RENDERER_VERSION = 2;
+    uint256 public constant SCHEMA_VERSION = 2;
 
-    // --- validation (E01–E12) ----------------------------------------------
+    // --- validation (E01–E14) ----------------------------------------------
 
     function validate(RenderStateV1 memory s) public pure returns (string[] memory) {
-        bool[12] memory e;
+        bool[14] memory e;
         uint256 prot = (s.witsecApplies ? 1 : 0) + (s.laidLow ? 1 : 0) + (s.buyerProtected ? 1 : 0);
         bool Tt = s.lifeState == 3;
         bool C = s.lifeState == 2;
@@ -44,18 +44,26 @@ contract HOODRXCHRenderer {
         bool exC = s.exposureState == 5;
         bool exT = s.exposureState == 6;
         if ((exT && !Tt) || (Tt && !exT) || (exC && !C) || (C && !exC)) e[9] = true;
-        if (s.wardId < 1 || s.wardId > 3 || s.blockId < 1 || s.blockId > 6 || s.tokenId < 1 || s.tokenId > 666 || s.schemaVersion != 1) e[10] = true;
+        if (
+            s.wardId < 1 || s.wardId > 3 || s.blockId < 1 || s.blockId > 6 || s.tokenId < 1 || s.tokenId > 666
+                || (s.schemaVersion != 1 && s.schemaVersion != 2)
+        ) e[10] = true;
         if (s.latestSeasonBadgeFlags != 0 && (s.latestSeasonRank == 0 || s.latestAwardSeasonId == 0)) e[11] = true;
         if (s.latestSeasonRank >= 1 && s.latestSeasonRank <= 5 && s.latestSeasonBadgeFlags != 3) e[11] = true;
         if (s.latestSeasonRank >= 6 && s.latestSeasonRank <= 10 && s.latestSeasonBadgeFlags != 1) e[11] = true;
+        // PURGED is the warrant bought out: it cannot coexist with the warrant
+        // itself, and a wraith in the ground was never released.
+        if (s.purged && M) e[12] = true;
+        if (s.purged && (C || Tt)) e[13] = true;
         uint256 n;
-        for (uint256 i = 0; i < 12; i++) {
+        for (uint256 i = 0; i < 14; i++) {
             if (e[i]) n++;
         }
-        string[12] memory names = ["E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09", "E10", "E11", "E12"];
+        string[14] memory names =
+            ["E01", "E02", "E03", "E04", "E05", "E06", "E07", "E08", "E09", "E10", "E11", "E12", "E13", "E14"];
         string[] memory out = new string[](n);
         uint256 j;
-        for (uint256 i = 0; i < 12; i++) {
+        for (uint256 i = 0; i < 14; i++) {
             if (e[i]) out[j++] = names[i];
         }
         return out;
@@ -98,16 +106,24 @@ contract HOODRXCHRenderer {
             s.territoryAchievementCount,
             s.displayMode
         );
+        // `purged` is material — it changes the art — but it is only hashed for
+        // states that declare schema 2, so every v1 state keeps exactly the
+        // hash it had before this field existed.
+        if (s.schemaVersion >= 2) {
+            return keccak256(bytes.concat(a, b, c, abi.encode(s.purged ? uint256(1) : uint256(0))));
+        }
         return keccak256(bytes.concat(a, b, c));
     }
 
     // --- status -------------------------------------------------------------
 
-    /// 0 ALIVE 1 MARKED 2 COFFINED 3 TERMINAL 4 WITSEC 5 BUYER 6 LAYLOW 7 HUNTER
+    /// 0 ALIVE 1 MARKED 2 COFFINED 3 TERMINAL 4 WITSEC 5 BUYER 6 LAYLOW
+    /// 7 HUNTER 8 PURGED
     function resolveStatusCode(RenderStateV1 memory s) public pure returns (uint256) {
         if (s.lifeState == 3) return 3;
         if (s.lifeState == 2) return 2;
         if (s.lifeState == 1 || s.marked) return 1;
+        if (s.purged) return 8;
         if (s.witsecApplies) return 4;
         if (s.buyerProtected) return 5;
         if (s.laidLow) return 6;
@@ -123,6 +139,7 @@ contract HOODRXCHRenderer {
         if (code == 5) return spaced ? "BUYER PROTECTED" : "BUYER_PROTECTED";
         if (code == 6) return spaced ? "LAY LOW" : "LAY_LOW";
         if (code == 7) return spaced ? "HUNTER SELECTED" : "HUNTER_SELECTED";
+        if (code == 8) return "PURGED";
         return "ALIVE";
     }
 
@@ -169,6 +186,7 @@ contract HOODRXCHRenderer {
     uint8 public constant PROFILE_ANIMATED = 1;
     uint8 public constant PROFILE_STATS = 2;
     uint8 public constant PROFILE_BANNER = 3;
+    uint8 public constant PROFILE_MARKETPLACE = 4;
 
     /// Default profile stays ANIMATED, so every existing caller and every
     /// fixture keeps its exact bytes.
@@ -231,6 +249,7 @@ contract HOODRXCHRenderer {
         // continuing the figure's sequence (base = tMouth = 1.42s)
         uint256 seq = g.introSeq;
         if (status == 1) body.app(Intro.reveal(anim, StatusLib.markedOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 8) body.app(Intro.reveal(anim, StatusLib.purgedOverlay(g), 142 + 25 * int256(++seq)));
         else if (status == 4) body.app(Intro.reveal(anim, StatusLib.witsecOverlay(g, anim), 142 + 25 * int256(++seq)));
         else if (status == 6) body.app(Intro.reveal(anim, StatusLib.layLowOverlay(g), 142 + 25 * int256(++seq)));
         else if (status == 5) body.app(Intro.reveal(anim, StatusLib.buyerOverlay(g, anim), 142 + 25 * int256(++seq)));
@@ -291,10 +310,73 @@ contract HOODRXCHRenderer {
         if (profile == PROFILE_STATS) s.displayMode = 1;
         // sequenced explicitly: Solidity does not fix argument evaluation order,
         // and all three readings must see the same state.
+        if (profile == PROFILE_MARKETPLACE) {
+            string memory still = renderSVG(s, PROFILE_CANONICAL_STATIC);
+            string memory moving = renderSVG(s, PROFILE_ANIMATED);
+            bytes32 hm = stateHash(s);
+            string memory outM = MetaLib.metadata(s, still, moving, hm);
+            s.displayMode = prevMode;
+            return outM;
+        }
         string memory svg = renderSVG(s, profile);
         bytes32 h = stateHash(s);
         string memory out = MetaLib.metadata(s, svg, h);
         s.displayMode = prevMode;
         return out;
+    }
+
+    // --- pre-reveal ----------------------------------------------------------
+
+    /// What all 666 show between mint and reveal. Takes no state at all, by
+    /// construction: there is no argument through which a trait could leak.
+    function renderPrereveal(uint8 profile) public pure returns (string memory) {
+        bool anim = profile == PROFILE_ANIMATED;
+        Buf.B memory o = Buf.init(8192);
+        o.app(abi.encodePacked('<rect width="1000" height="1000" fill="', T.BLACK, '"/>'));
+        Buf.B memory rows = Buf.init(6144);
+        // 48 rows at a 2-unit pitch: one more than a live render, so the drift
+        // always has a row to bring up from under the bottom edge.
+        for (uint256 li = 0; li < 48; li++) {
+            rows.app(
+                abi.encodePacked(
+                    '<path d="M0 ', Num.utoa((4 + li * 2) * 10), 'h1000" fill="none" stroke="', T.ACID,
+                    '" stroke-width="4"/>'
+                )
+            );
+        }
+        // the field drifts by exactly one row pitch, so the loop is seamless.
+        // Base attributes stay the finished art: a non-SMIL renderer sees the
+        // still field, which is the whole static-fallback rule.
+        if (anim) {
+            o.app(
+                abi.encodePacked(
+                    "<g>",
+                    rows.fin(),
+                    '<animateTransform attributeName="transform" type="translate" values="0 0;0 -20" dur="2.4s" repeatCount="indefinite"/></g>'
+                )
+            );
+        } else {
+            o.app(rows.fin());
+        }
+        o.app(abi.encodePacked('<rect x="0" y="430" width="1000" height="140" fill="', T.BLACK, '"/>'));
+        o.app(GenesisLib.octRing(50, 50, 14, 6, T.ACID));
+        o.app(GenesisLib.octRing(50, 50, 22, 2, T.WHITE));
+        return string(
+            abi.encodePacked('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">', o.fin(), "</svg>")
+        );
+    }
+
+    function prerevealMetadata() public pure returns (string memory) {
+        return string(
+            abi.encodePacked(
+                '{"name":"HOODRXCH","description":"Unrevealed. 666 signal wraiths, fully onchain.","image":"data:image/svg+xml;base64,',
+                Num.base64(bytes(renderPrereveal(PROFILE_CANONICAL_STATIC))),
+                '","animation_url":"data:image/svg+xml;base64,',
+                Num.base64(bytes(renderPrereveal(PROFILE_ANIMATED))),
+                '","attributes":[{"trait_type":"Status","value":"UNREVEALED"},{"trait_type":"Renderer Version","value":',
+                Num.utoa(RENDERER_VERSION),
+                "}]}"
+            )
+        );
     }
 }
