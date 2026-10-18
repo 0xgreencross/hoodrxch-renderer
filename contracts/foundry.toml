@@ -5,6 +5,7 @@ out = "out"
 libs = ["lib"]
 optimizer = true
 via_ir = true
+evm_version = "cancun"   # matches the game repo's frozen toolchain
 optimizer_runs = 1
 fs_permissions = [{ access = "read-write", path = "./" }]
 
