@@ -64,6 +64,9 @@ class Rng{
 }
 function genesisSeed(genesisHash,tokenId){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId)); }
 // Provisional damage seed (open item O-3): keccak(genesisHash, tokenId, deaths)
-function damageSeed(genesisHash,tokenId,deaths){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId),u8(deaths),strBytes('DMG')); }
+// ONE DEATH, ONE SCAR, FOREVER. The seed is keyed on the death's own ordinal,
+// never on the running total, so death #2 can never move the scar #1 left.
+// artIndex (not tokenId) keys it: the art's identity is the art index.
+function damageSeed(genesisHash,artIndex,deathIndex){ return concatBytes(hexToBytes(genesisHash),u16be(artIndex),u8(deathIndex),strBytes('DMG')); }
 // Demo genesisHash for the workbench when the provider isn't wired: keccak("HOODRXCH_GENESIS_V1", tokenId)
 function demoGenesisHash(tokenId){ return bytesToHex(keccak256(concatBytes(strBytes('HOODRXCH_GENESIS_V1'),word(tokenId)))); }
