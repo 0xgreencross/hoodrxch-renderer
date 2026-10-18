@@ -7,6 +7,41 @@ unless marked JS-only.
 > change and a rules-final pinned commit. Build against this freely; make the FINAL renderer
 > deployment only from the rules-final pin.
 
+## 2026-10-18 — Season One art approvals shipped
+
+Five decisions reviewed against the live states and approved; all five are in the renderer
+and under the gate. Full write-up in `docs/SEASON_1_ART_DECISIONS.md`, proof sheet in
+`proofs/season1_states.png`.
+
+- **PURGED** (approved candidate A, *warrant cut*) — MARKED's scope ring in ACID, severed at
+  four cardinal points and capped, chevrons outside the ring where MARKED's sit inside it,
+  corner brackets opening instead of closing, warrant strip struck through in white. No red:
+  red belongs to the warrant and the verdict. `StatusLib.purgedOverlay`, status code 8,
+  precedence MARKED > PURGED > WITSEC > BUYER > LAY_LOW > HUNTER. The three chevrons clamp to
+  the canvas because the ring is wider than the frame on the tall head forms; FX_037–FX_040
+  cover four of them.
+- **Coffin kill crest** (approved candidate B, *head crest*) — an octagon at the coffin head,
+  one pip per tier, acid to EXECUTIONER then white. Drawn after the scars (history is not
+  shredded) and before the verdict (the red X stays loudest). Needs **nothing** from the
+  schema: `kills` and `lifeState` already exist. FX_041–FX_044.
+- **Pre-reveal** (approved candidate A, *empty field*) — `renderPrereveal(profile)` and
+  `prerevealMetadata()`. Takes no state at all, by construction: no argument exists through
+  which a trait could leak. 48 rows so the animated profile drifts one pitch and loops exact.
+- **Fallback: unchanged, deliberately.** A broken token keeps rendering the loud red
+  diagnostic. New codes **E13** (purged *and* marked) and **E14** (purged in the ground).
+- **Profile 4 MARKETPLACE** — `image` is the static render, `animation_url` the animated one.
+  Profiles 0–3 untouched and every pre-existing fixture still byte-identical. Measured at
+  476M–481M gas on a live wraith (both renders in one call) — see `INTEGRATION_GUIDE.md` §5.2
+  before pointing `tokenURI` at it.
+
+**Schema:** `RENDERER_VERSION = 2`, `SCHEMA_VERSION = 2`, one new input field — `bool purged`.
+`validate` accepts `schemaVersion` 1 **or** 2, and `purged` is folded into `stateHash` only
+for states that declare 2, so every v1 state renders *and hashes* exactly as before. Nothing
+breaks the day this lands.
+
+**Gate:** 44 fixtures (was 36) with seven assertions each, plus a standalone pre-reveal test.
+139 tests green, 0 failures, JS↔Solidity byte-identical throughout.
+
 ## 2026-09-19 — integration pass: profiles, identity, feasibility
 
 - **CANONICAL STATIC profile.** `renderSVG(s, profile)` / `renderMetadata(s, profile)` with

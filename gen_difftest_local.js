@@ -45,6 +45,17 @@ const FIXTURES = [
  ['FX_034', 61, {deaths: 1, sealsRemaining: 2}],
  ['FX_035', 61, {deaths: 2, sealsRemaining: 1}],
  ['FX_036', 61, {lifeState: 3, exposureState: 6, deaths: 3, sealsRemaining: 0}],
+ // PURGED (schema 2): the warrant bought out. Four heads, because the scope
+ // ring is wider than the canvas on the tall forms and the chevrons clamp.
+ ['FX_037', 94, {purged: true, kills: 3}],
+ ['FX_038', 7, {purged: true}],
+ ['FX_039', 311, {purged: true, kills: 7, forcedPurges: 2}],
+ ['FX_040', 512, {purged: true, deaths: 1, sealsRemaining: 2}],
+ // COFFIN KILL CREST at every tier boundary that changes the pip row.
+ ['FX_041', 61, {lifeState: 2, exposureState: 5, deaths: 1, sealsRemaining: 2, kills: 1}],
+ ['FX_042', 61, {lifeState: 2, exposureState: 5, deaths: 1, sealsRemaining: 2, kills: 5}],
+ ['FX_043', 61, {lifeState: 2, exposureState: 5, deaths: 1, sealsRemaining: 2, kills: 7}],
+ ['FX_044', 61, {lifeState: 3, exposureState: 6, deaths: 3, sealsRemaining: 0, kills: 7}],
 ];
 const BANNER_SET = new Set(['FX_001', 'FX_007', 'FX_009', 'FX_016', 'FX_028']);
 
@@ -65,12 +76,15 @@ for (const [name, id, patch] of FIXTURES) {
   const svg0 = ctx.renderSVG(st, 0);
   const svg2 = ctx.renderSVG(st, 2);
   const meta0 = ctx.renderMetadata(st, 0);
+  // PROFILE 4 MARKETPLACE — still as the image, animation alongside it
+  const meta4 = ctx.renderMetadata(st, 4);
   if (/<animate/.test(svg0) || /<animate/.test(svg2)) throw new Error(name + ': static profile still emits SMIL');
   fs.writeFileSync('contracts/js_expected/' + name + '.svg', svg);
   fs.writeFileSync('contracts/js_expected/' + name + '.json', meta);
   fs.writeFileSync('contracts/js_expected/' + name + '.static.svg', svg0);
   fs.writeFileSync('contracts/js_expected/' + name + '.stats.svg', svg2);
   fs.writeFileSync('contracts/js_expected/' + name + '.static.json', meta0);
+  fs.writeFileSync('contracts/js_expected/' + name + '.market.json', meta4);
   let sets = '';
   for (const [k, v] of Object.entries(patch)) {
     sets += `        s.${k} = ${v};\n`;
@@ -86,6 +100,7 @@ for (const [name, id, patch] of FIXTURES) {
   fns += `        assertEq(keccak256(bytes(r.renderSVG(s, 2))), bytes32(${h(svg2)}), "svg-stats");\n`;
   fns += `        assertEq(keccak256(bytes(r.renderMetadata(s, 0))), bytes32(${h(meta0)}), "metadata-static");\n`;
   fns += `        assertEq(keccak256(bytes(r.renderSVG(s, 1))), bytes32(${h(svg)}), "svg-profile1-default");\n`;
+  fns += `        assertEq(keccak256(bytes(r.renderMetadata(s, 4))), bytes32(${h(meta4)}), "metadata-marketplace");\n`;
   if (BANNER_SET.has(name)) {
     const ban = ctx.renderBanner(st);
     fs.writeFileSync('contracts/js_expected/' + name + '.banner.svg', ban);
@@ -112,7 +127,7 @@ contract Differential is Test {
     }
 
     function defaultState(uint256 tokenId) internal pure returns (RenderStateV1 memory s) {
-        s.schemaVersion = 1;
+        s.schemaVersion = 2;
         s.tokenId = tokenId;
         s.artIndex = tokenId;
         s.wardId = ((tokenId - 1) % 3) + 1;
@@ -127,7 +142,14 @@ contract Differential is Test {
         s.historicalStateCount = 1;
     }
 
-${fns}}
+${fns}    // The pre-reveal takes no state at all — there is no argument through
+    // which a trait could leak — so it is checked on its own.
+    function test_PREREVEAL() public view {
+        assertEq(keccak256(bytes(r.renderPrereveal(0))), bytes32(${h(ctx.renderPrereveal(0))}), "prereveal-static");
+        assertEq(keccak256(bytes(r.renderPrereveal(1))), bytes32(${h(ctx.renderPrereveal(1))}), "prereveal-animated");
+        assertEq(keccak256(bytes(r.prerevealMetadata())), bytes32(${h(ctx.prerevealMetadata())}), "prereveal-metadata");
+    }
+}
 `;
 fs.writeFileSync('contracts/test/Differential.t.sol', sol);
 console.log('wrote Differential.t.sol with', FIXTURES.length, 'fixtures');

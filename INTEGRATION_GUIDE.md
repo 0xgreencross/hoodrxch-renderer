@@ -206,6 +206,25 @@ Where it started, before this pass: **526M–1,072M gas** for the same static re
 
 All of it proved byte-identical by the differential. Not one pixel moved.
 
+#### Profile 4 MARKETPLACE — measured
+
+The approved marketplace policy (still as `image`, animation as `animation_url`) is
+implemented and under the gate, but one call pays for **both** renders:
+
+| fixture | market payload | market gas |
+|---|---|---|
+| FX_001 ALIVE | 339,251 B | 476M |
+| FX_037 PURGED | 338,739 B | 481M |
+| FX_016 TERMINAL | 23,062 B | 63.8M |
+| FX_044 TERMINAL + crest | 24,999 B | 64.8M |
+
+Read that against §5.3 before pointing `tokenURI` at profile 4: on a live wraith it is ~7×
+the static profile. The decision is design-correct and costs nothing in design terms — the
+static art was always the finished art — but serving it from `tokenURI` depends on closing
+the gap below, and render-and-store (option 1) closes it for profile 4 as cleanly as for
+profile 0. Until then, point `tokenURI` at profile 0 and let an indexer that can raise its
+own `eth_call` cap serve profile 4.
+
 ### 5.3 The remaining gap
 
 **Static tokenURI is 68M–112M against a 45M ceiling.** Honest reading: another ~2× is
@@ -255,10 +274,14 @@ selectors, version getters, complete hash encoding, identity rules and canonical
 semantics."* Profile selectors and identity rules are delivered above. The struct is yours.
 What the art needs from it:
 
-- **`protection` as `NONE / WITSEC / PURGED`.** PURGED needs a distinct rescued treatment —
-  acid/white, distinct from WITSEC and from the red slash. Send the field and I'll design and
-  ship the treatment; I'm not going to invent a lifecycle state's look without it being real
-  in the schema first.
+- **~~`protection` as `NONE / WITSEC / PURGED`~~ → now just `bool purged`.** Superseded:
+  the PURGED treatment is designed, approved and shipped (`docs/SEASON_1_ART_DECISIONS.md`
+  §1). It needs exactly one bit. The renderer declares `SCHEMA_VERSION = 2`, accepts
+  `schemaVersion` 1 **or** 2, and only folds `purged` into `stateHash` for states that
+  declare 2 — so a v1 state renders and hashes exactly as it did before, and PURGED starts
+  working the day the game sets the bit. Nothing on the art side is blocked on this any
+  more; the state just renders as ALIVE until the bit arrives. A fuller `protection` enum is
+  fine too if you prefer it — map `PURGED` onto this bit and the art is unchanged.
 - **Drop `hunterSelected`, `laidLow`, `buyerProtected`, `witsecCredits`, `activeBlockId`.**
   Season 1 removes them. Deleting their overlays also buys back contract size, which §5.1 says
   we need.
