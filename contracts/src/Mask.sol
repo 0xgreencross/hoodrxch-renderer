@@ -186,12 +186,14 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 nx = ((x - cx) * 100) / rw;
-        int256 ny = ((y - cy) * 100) / rh;
-        int256 d2 = nx * nx + ny * ny;
-        if (d2 >= 10000) return 0;
-        int256 q = 10000 - d2;
-        return (A * q * q) / 1000000;
+        unchecked {
+            int256 nx = ((x - cx) * 100) / rw;
+            int256 ny = ((y - cy) * 100) / rh;
+            int256 d2 = nx * nx + ny * ny;
+            if (d2 >= 10000) return 0;
+            int256 q = 10000 - d2;
+            return (A * q * q) / 1000000;
+        }
     }
 
     /// flat-top head mass: full amplitude plateau, steep linear falloff
@@ -200,12 +202,14 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 nx = ((x - cx) * 100) / rw;
-        int256 ny = ((y - cy) * 100) / rh;
-        int256 d2 = nx * nx + ny * ny;
-        if (d2 >= 10000) return 0;
-        int256 q = d2 < 4200 ? int256(10000) : ((10000 - d2) * 10000) / 5800;
-        return (A * q) / 100;
+        unchecked {
+            int256 nx = ((x - cx) * 100) / rw;
+            int256 ny = ((y - cy) * 100) / rh;
+            int256 d2 = nx * nx + ny * ny;
+            if (d2 >= 10000) return 0;
+            int256 q = d2 < 4200 ? int256(10000) : ((10000 - d2) * 10000) / 5800;
+            return (A * q) / 100;
+        }
     }
 
     /// heightfield in centi-units; x,y in units
@@ -214,27 +218,29 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 b = bumpFlat100(x, y, t.cx, t.cy, t.rw, t.rh, t.amp);
-        b += bump100(x, y, t.cx + t.peak, t.cy - t.rh + 6, 14, 16, t.pamp);
-        b += bumpFlat100(x, y, t.cx + t.peak / 2, t.cy + 18, t.rw + 5, 14, t.amp >> 1);
-        b -= bump100(x, y, t.cx + t.peak / 3, t.cy + 7, 4, 6, t.nas);
-        // form modifiers: twin peak / horns / crater
-        if (t.x2mode == 1) {
-            b += bump100(x, y, t.cx - t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
-            b += bump100(x, y, t.cx + t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
-        } else if (t.x2mode == 2) {
-            b += bump100(x, y, t.cx - t.rw + 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
-            b += bump100(x, y, t.cx + t.rw - 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
-        } else if (t.x2mode == 3) {
-            b -= bump100(x, y, t.cx + t.peak / 2, t.cy - t.rh + 8, 9, 10, t.x2amp);
+        unchecked {
+            int256 b = bumpFlat100(x, y, t.cx, t.cy, t.rw, t.rh, t.amp);
+            b += bump100(x, y, t.cx + t.peak, t.cy - t.rh + 6, 14, 16, t.pamp);
+            b += bumpFlat100(x, y, t.cx + t.peak / 2, t.cy + 18, t.rw + 5, 14, t.amp >> 1);
+            b -= bump100(x, y, t.cx + t.peak / 3, t.cy + 7, 4, 6, t.nas);
+            // form modifiers: twin peak / horns / crater
+            if (t.x2mode == 1) {
+                b += bump100(x, y, t.cx - t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
+                b += bump100(x, y, t.cx + t.x2dx, t.cy - t.rh + 7, 10, 14, t.x2amp);
+            } else if (t.x2mode == 2) {
+                b += bump100(x, y, t.cx - t.rw + 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
+                b += bump100(x, y, t.cx + t.rw - 4, t.cy - t.rh + 10, 5, 12, t.x2amp);
+            } else if (t.x2mode == 3) {
+                b -= bump100(x, y, t.cx + t.peak / 2, t.cy - t.rh + 8, 9, 10, t.x2amp);
+            }
+            if (y > t.jawY) {
+                int256 f = Num.max(0, 1400 - (y - t.jawY) * 100);
+                b = (b * f) / 1400;
+            }
+            if (b < -400) b = -400;
+            int256 col = Num.max(0, Num.min(50, x >> 1));
+            return b + noiseCols[uint256(col)];
         }
-        if (y > t.jawY) {
-            int256 f = Num.max(0, 1400 - (y - t.jawY) * 100);
-            b = (b * f) / 1400;
-        }
-        if (b < -400) b = -400;
-        int256 col = Num.max(0, Num.min(50, x >> 1));
-        return b + noiseCols[uint256(col)];
     }
 
     // --- DECI-UNIT variants (conveyor animation pass) --------------------
@@ -245,12 +251,14 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 nx = ((x - cx) * 100) / rw;
-        int256 ny = ((yd - cyd) * 10) / rh;
-        int256 d2 = nx * nx + ny * ny;
-        if (d2 >= 10000) return 0;
-        int256 q = 10000 - d2;
-        return (A * q * q) / 1000000;
+        unchecked {
+            int256 nx = ((x - cx) * 100) / rw;
+            int256 ny = ((yd - cyd) * 10) / rh;
+            int256 d2 = nx * nx + ny * ny;
+            if (d2 >= 10000) return 0;
+            int256 q = 10000 - d2;
+            return (A * q * q) / 1000000;
+        }
     }
 
     function bumpFlat100D(int256 x, int256 yd, int256 cx, int256 cyd, int256 rw, int256 rh, int256 A)
@@ -258,12 +266,14 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 nx = ((x - cx) * 100) / rw;
-        int256 ny = ((yd - cyd) * 10) / rh;
-        int256 d2 = nx * nx + ny * ny;
-        if (d2 >= 10000) return 0;
-        int256 q = d2 < 4200 ? int256(10000) : ((10000 - d2) * 10000) / 5800;
-        return (A * q) / 100;
+        unchecked {
+            int256 nx = ((x - cx) * 100) / rw;
+            int256 ny = ((yd - cyd) * 10) / rh;
+            int256 d2 = nx * nx + ny * ny;
+            if (d2 >= 10000) return 0;
+            int256 q = d2 < 4200 ? int256(10000) : ((10000 - d2) * 10000) / 5800;
+            return (A * q) / 100;
+        }
     }
 
     function heightAtD(Traits memory t, int256[51] memory noiseCols, int256 x, int256 yd)
@@ -271,26 +281,28 @@ library Mask {
         pure
         returns (int256)
     {
-        int256 b = bumpFlat100D(x, yd, t.cx, t.cy * 10, t.rw, t.rh, t.amp);
-        b += bump100D(x, yd, t.cx + t.peak, (t.cy - t.rh + 6) * 10, 14, 16, t.pamp);
-        b += bumpFlat100D(x, yd, t.cx + t.peak / 2, (t.cy + 18) * 10, t.rw + 5, 14, t.amp >> 1);
-        b -= bump100D(x, yd, t.cx + t.peak / 3, (t.cy + 7) * 10, 4, 6, t.nas);
-        if (t.x2mode == 1) {
-            b += bump100D(x, yd, t.cx - t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
-            b += bump100D(x, yd, t.cx + t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
-        } else if (t.x2mode == 2) {
-            b += bump100D(x, yd, t.cx - t.rw + 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
-            b += bump100D(x, yd, t.cx + t.rw - 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
-        } else if (t.x2mode == 3) {
-            b -= bump100D(x, yd, t.cx + t.peak / 2, (t.cy - t.rh + 8) * 10, 9, 10, t.x2amp);
+        unchecked {
+            int256 b = bumpFlat100D(x, yd, t.cx, t.cy * 10, t.rw, t.rh, t.amp);
+            b += bump100D(x, yd, t.cx + t.peak, (t.cy - t.rh + 6) * 10, 14, 16, t.pamp);
+            b += bumpFlat100D(x, yd, t.cx + t.peak / 2, (t.cy + 18) * 10, t.rw + 5, 14, t.amp >> 1);
+            b -= bump100D(x, yd, t.cx + t.peak / 3, (t.cy + 7) * 10, 4, 6, t.nas);
+            if (t.x2mode == 1) {
+                b += bump100D(x, yd, t.cx - t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
+                b += bump100D(x, yd, t.cx + t.x2dx, (t.cy - t.rh + 7) * 10, 10, 14, t.x2amp);
+            } else if (t.x2mode == 2) {
+                b += bump100D(x, yd, t.cx - t.rw + 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
+                b += bump100D(x, yd, t.cx + t.rw - 4, (t.cy - t.rh + 10) * 10, 5, 12, t.x2amp);
+            } else if (t.x2mode == 3) {
+                b -= bump100D(x, yd, t.cx + t.peak / 2, (t.cy - t.rh + 8) * 10, 9, 10, t.x2amp);
+            }
+            if (yd > t.jawY * 10) {
+                int256 f = Num.max(0, 1400 - (yd - t.jawY * 10) * 10);
+                b = (b * f) / 1400;
+            }
+            if (b < -400) b = -400;
+            int256 col = Num.max(0, Num.min(50, x >> 1));
+            return b + noiseCols[uint256(col)];
         }
-        if (yd > t.jawY * 10) {
-            int256 f = Num.max(0, 1400 - (yd - t.jawY * 10) * 10);
-            b = (b * f) / 1400;
-        }
-        if (b < -400) b = -400;
-        int256 col = Num.max(0, Num.min(50, x >> 1));
-        return b + noiseCols[uint256(col)];
     }
 
     function inSocketD(Traits memory t, int256 x, int256 yvd, uint256 which) internal pure returns (bool) {
@@ -359,27 +371,29 @@ library Mask {
         pure
         returns (string memory)
     {
-        if (blockId == 1) return Geom.rect(cx - 1, cy - 1, 2, 2, fill);
-        if (blockId == 2) return Geom.rect(cx - 3, cy - 1, 6, 2, fill);
-        if (blockId == 3) {
-            return string(abi.encodePacked(Geom.rect(cx - 3, cy - 1, 2, 2, fill), Geom.rect(cx + 1, cy - 1, 2, 2, fill)));
+        unchecked {
+            if (blockId == 1) return Geom.rect(cx - 1, cy - 1, 2, 2, fill);
+            if (blockId == 2) return Geom.rect(cx - 3, cy - 1, 6, 2, fill);
+            if (blockId == 3) {
+                return string(abi.encodePacked(Geom.rect(cx - 3, cy - 1, 2, 2, fill), Geom.rect(cx + 1, cy - 1, 2, 2, fill)));
+            }
+            if (blockId == 4) {
+                Geom.Pt[] memory p = new Geom.Pt[](3);
+                p[0] = Geom.Pt(-2, 2);
+                p[1] = Geom.Pt(0, -3);
+                p[2] = Geom.Pt(2, 2);
+                return Geom.poly(Geom.offsetPts(p, cx, cy), fill);
+            }
+            if (blockId == 5) {
+                Geom.Pt[] memory p = new Geom.Pt[](4);
+                p[0] = Geom.Pt(-2, -2);
+                p[1] = Geom.Pt(2, -2);
+                p[2] = Geom.Pt(2, 2);
+                p[3] = Geom.Pt(-2, 2);
+                return Geom.poly(Geom.offsetPts(p, cx, cy), fill);
+            }
+            if (blockId == 6) return Geom.xmark(cx, cy, 2, 1, fill, rng);
+            return "";
         }
-        if (blockId == 4) {
-            Geom.Pt[] memory p = new Geom.Pt[](3);
-            p[0] = Geom.Pt(-2, 2);
-            p[1] = Geom.Pt(0, -3);
-            p[2] = Geom.Pt(2, 2);
-            return Geom.poly(Geom.offsetPts(p, cx, cy), fill);
-        }
-        if (blockId == 5) {
-            Geom.Pt[] memory p = new Geom.Pt[](4);
-            p[0] = Geom.Pt(-2, -2);
-            p[1] = Geom.Pt(2, -2);
-            p[2] = Geom.Pt(2, 2);
-            p[3] = Geom.Pt(-2, 2);
-            return Geom.poly(Geom.offsetPts(p, cx, cy), fill);
-        }
-        if (blockId == 6) return Geom.xmark(cx, cy, 2, 1, fill, rng);
-        return "";
     }
 }

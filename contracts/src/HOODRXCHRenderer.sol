@@ -159,15 +159,38 @@ contract HOODRXCHRenderer {
 
     // --- renderSVG ----------------------------------------------------------
 
+    /// PROFILES: 0 CANONICAL_STATIC · 1 ANIMATED · 2 STATS · 3 BANNER.
+    /// The static profiles emit the finished character with NO SMIL at all —
+    /// both the marketplace-safe still frame and the only way tokenURI fits a
+    /// sane gas ceiling (keyframe `values=` are ~86% of an animated payload).
+    /// Free by the renderer's standing invariant: every base attribute is
+    /// already the finished art and animations only ride on top.
+    uint8 public constant PROFILE_CANONICAL_STATIC = 0;
+    uint8 public constant PROFILE_ANIMATED = 1;
+    uint8 public constant PROFILE_STATS = 2;
+    uint8 public constant PROFILE_BANNER = 3;
+
+    /// Default profile stays ANIMATED, so every existing caller and every
+    /// fixture keeps its exact bytes.
     function renderSVG(RenderStateV1 memory s) public pure returns (string memory) {
-        (string memory core,) = renderCore(s);
+        return renderSVG(s, PROFILE_ANIMATED);
+    }
+
+    function renderSVG(RenderStateV1 memory s, uint8 profile) public pure returns (string memory) {
+        if (profile == PROFILE_BANNER) return renderBanner(s);
+        // memory structs pass by reference, so the STATS override is borrowed
+        // and handed straight back — a caller's state is never left mutated.
+        uint256 prevMode = s.displayMode;
+        if (profile == PROFILE_STATS) s.displayMode = 1;
+        (string memory core,) = renderCore(s, profile == PROFILE_ANIMATED);
+        s.displayMode = prevMode;
         return string(
             abi.encodePacked('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">', core, "</svg>")
         );
     }
 
     /// core = inner content of the token SVG (everything between the svg tags)
-    function renderCore(RenderStateV1 memory s) internal pure returns (string memory, uint256 nErrs) {
+    function renderCore(RenderStateV1 memory s, bool anim) internal pure returns (string memory, uint256 nErrs) {
         string[] memory errs = validate(s);
         if (errs.length > 0) {
             string memory d = diagnosticSVG(s, errs);
@@ -175,9 +198,9 @@ contract HOODRXCHRenderer {
         }
         uint256 status = resolveStatusCode(s);
         if (status == 2 || status == 3) {
-            return (stripSvg(StatusLib.coffinSVG(s)), 0);
+            return (stripSvg(StatusLib.coffinSVG(s, anim)), 0);
         }
-        T.Gen memory g = GenesisLib.build(s);
+        T.Gen memory g = GenesisLib.build(s, anim);
         Glyphs.Used memory used = Glyphs.newUsed();
         Buf.B memory body = Buf.init(112000);
         body.app(abi.encodePacked('<rect width="1000" height="1000" fill="', T.BLACK, '"/>'));
@@ -207,24 +230,24 @@ contract HOODRXCHRenderer {
         // construction intro: the body layers join the 0.25s succession,
         // continuing the figure's sequence (base = tMouth = 1.42s)
         uint256 seq = g.introSeq;
-        if (status == 1) body.app(Intro.reveal(StatusLib.markedOverlay(g), 142 + 25 * int256(++seq)));
-        else if (status == 4) body.app(Intro.reveal(StatusLib.witsecOverlay(g), 142 + 25 * int256(++seq)));
-        else if (status == 6) body.app(Intro.reveal(StatusLib.layLowOverlay(g), 142 + 25 * int256(++seq)));
-        else if (status == 5) body.app(Intro.reveal(StatusLib.buyerOverlay(g), 142 + 25 * int256(++seq)));
-        else if (status == 7) body.app(Intro.reveal(StatusLib.hunterOverlay(g), 142 + 25 * int256(++seq)));
-        body.app(Intro.reveal(StatusLib.sealHud(s), 142 + 25 * int256(++seq)));
+        if (status == 1) body.app(Intro.reveal(anim, StatusLib.markedOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 4) body.app(Intro.reveal(anim, StatusLib.witsecOverlay(g, anim), 142 + 25 * int256(++seq)));
+        else if (status == 6) body.app(Intro.reveal(anim, StatusLib.layLowOverlay(g), 142 + 25 * int256(++seq)));
+        else if (status == 5) body.app(Intro.reveal(anim, StatusLib.buyerOverlay(g, anim), 142 + 25 * int256(++seq)));
+        else if (status == 7) body.app(Intro.reveal(anim, StatusLib.hunterOverlay(g), 142 + 25 * int256(++seq)));
+        body.app(Intro.reveal(anim, StatusLib.sealHud(s), 142 + 25 * int256(++seq)));
         {
             string memory c1 = StatusLib.seasonChips(s, used);
-            if (bytes(c1).length > 0) body.app(Intro.reveal(c1, 142 + 25 * int256(++seq)));
+            if (bytes(c1).length > 0) body.app(Intro.reveal(anim, c1, 142 + 25 * int256(++seq)));
         }
         {
             string memory c2 = StatusLib.territoryHud(s);
-            if (bytes(c2).length > 0) body.app(Intro.reveal(c2, 142 + 25 * int256(++seq)));
+            if (bytes(c2).length > 0) body.app(Intro.reveal(anim, c2, 142 + 25 * int256(++seq)));
         }
-        if (s.displayMode == 1) body.app(Intro.reveal(StatusLib.statsBand(s, used), 142 + 25 * int256(++seq)));
+        if (s.displayMode == 1) body.app(Intro.reveal(anim, StatusLib.statsBand(s, used), 142 + 25 * int256(++seq)));
         {
-            string memory c3 = StatusLib.flickerSVG(s);
-            if (bytes(c3).length > 0) body.app(Intro.reveal(c3, 142 + 25 * int256(++seq)));
+            string memory c3 = StatusLib.flickerSVG(s, anim);
+            if (bytes(c3).length > 0) body.app(Intro.reveal(anim, c3, 142 + 25 * int256(++seq)));
         }
         return (
             string(
@@ -251,13 +274,27 @@ contract HOODRXCHRenderer {
     // --- banner / metadata ---------------------------------------------------
 
     function renderBanner(RenderStateV1 memory s) public pure returns (string memory) {
-        (string memory core, uint256 nErrs) = renderCore(s);
+        (string memory core, uint256 nErrs) = renderCore(s, true);
         uint256 status = resolveStatusCode(s);
         bool statusRed = status == 1 || status == 3;
         return BannerLib.banner(s, core, nErrs, statusName(status, true), statusRed, status == 0);
     }
 
     function renderMetadata(RenderStateV1 memory s) public pure returns (string memory) {
-        return MetaLib.metadata(s, renderSVG(s), stateHash(s));
+        return renderMetadata(s, PROFILE_ANIMATED);
+    }
+
+    /// The image the metadata embeds follows `profile`; the stateHash never
+    /// does — it covers the state, not the presentation.
+    function renderMetadata(RenderStateV1 memory s, uint8 profile) public pure returns (string memory) {
+        uint256 prevMode = s.displayMode;
+        if (profile == PROFILE_STATS) s.displayMode = 1;
+        // sequenced explicitly: Solidity does not fix argument evaluation order,
+        // and all three readings must see the same state.
+        string memory svg = renderSVG(s, profile);
+        bytes32 h = stateHash(s);
+        string memory out = MetaLib.metadata(s, svg, h);
+        s.displayMode = prevMode;
+        return out;
     }
 }

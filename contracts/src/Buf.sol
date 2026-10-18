@@ -20,12 +20,9 @@ library Buf {
         // +31: the word-wise copy may scribble up to 31 bytes past the end
         require(l + s.length + 31 <= d.length, "buf overflow");
         assembly ("memory-safe") {
-            let src := add(s, 32)
-            let dst := add(add(d, 32), l)
-            let n := mload(s)
-            for { let i := 0 } lt(i, n) { i := add(i, 32) } {
-                mstore(add(dst, i), mload(add(src, i)))
-            }
+            // Cancun MCOPY: one opcode for the whole fragment instead of a
+            // word-at-a-time loop. Buf.app is the renderer's hottest call.
+            mcopy(add(add(d, 32), l), add(s, 32), mload(s))
         }
         b.len = l + s.length;
     }

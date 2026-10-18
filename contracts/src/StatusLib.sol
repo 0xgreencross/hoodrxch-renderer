@@ -44,9 +44,9 @@ library StatusLib {
     }
 
     /// full coffin SVG (COFFINED / TERMINAL_COFFIN)
-    function coffinSVG(RenderStateV1 memory s) public pure returns (string memory) {
+    function coffinSVG(RenderStateV1 memory s, bool anim) public pure returns (string memory) {
         bool terminal = s.lifeState == 3;
-        Rng.R memory rng = Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.tokenId));
+        Rng.R memory rng = Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.artIndex));
         Mask.Traits memory t = Mask.drawTraits(rng);
         Buf.B memory f = Buf.init(24000);
         int256 swv = t.lineW <= 2 ? (t.lineW == 0 ? int256(3) : t.lineW == 1 ? int256(4) : int256(6)) : int256(4);
@@ -160,9 +160,9 @@ library StatusLib {
         body.app(abi.encodePacked('<rect width="1000" height="1000" fill="', T.BLACK, '"/><use href="#f"/>'));
         {
             uint256 nd = s.deaths > 0 ? s.deaths : 1;
-            Rng.R memory drng = Rng.init(GenesisLib.damageSeed(s.genesisHash, s.tokenId, s.deaths > 0 ? s.deaths : 1));
             uint256 ci = 0;
             for (uint256 k = 0; k < nd; k++) {
+                Rng.R memory drng = Rng.init(GenesisLib.damageSeed(s.genesisHash, s.artIndex, k + 1));
                 int256 y = 20 + drng.rInt(56);
                 int256 h = 2 + drng.rInt(4);
                 int256 base = 4 + drng.rInt(7);
@@ -190,7 +190,8 @@ library StatusLib {
             // the residual heartbeat: each pass, the flatline itself rises into
             // the complex — a traveling black cover erases the static line under
             // the beat so the zigzag replaces it — then melts back flat.
-            body.app(
+            // CANONICAL STATIC: the flatline holds — the beat IS the animation.
+            if (anim) body.app(
                 abi.encodePacked(
                     '<g transform="translate(520 0)"><rect x="-348" y="533" width="348" height="14" fill="',
                     T.BLACK,
@@ -200,7 +201,7 @@ library StatusLib {
                 )
             );
         }
-        body.app(flickerSVG(s));
+        body.app(flickerSVG(s, anim));
         return string(
             abi.encodePacked(
                 '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000"><defs><g id="f">',
@@ -253,7 +254,7 @@ library StatusLib {
         return o.fin();
     }
 
-    function witsecOverlay(T.Gen memory g) internal pure returns (string memory) {
+    function witsecOverlay(T.Gen memory g, bool anim) internal pure returns (string memory) {
         int256 y;
         int256 x0;
         int256 x1;
@@ -272,25 +273,30 @@ library StatusLib {
         o.app(abi.encodePacked('<g shape-rendering="crispEdges">', Geom.rect(x0, y, x1 - x0, 22, T.BLACK)));
         int256[3] memory band = [y, x0, x1];
         for (uint256 f = 0; f < 6; f++) {
-            witsecFrame(o, g, band, f);
+            if (!anim && f > 0) continue; // static: one interference frame
+            witsecFrame(o, g, band, f, anim);
         }
         o.app(bytes("</g>"));
         return o.fin();
     }
 
     /// one SMIL frame of the witsec static band, appended into o
-    function witsecFrame(Buf.B memory o, T.Gen memory g, int256[3] memory b, uint256 f) private pure {
+    function witsecFrame(Buf.B memory o, T.Gen memory g, int256[3] memory b, uint256 f, bool anim) private pure {
         bytes memory v;
         for (uint256 k = 0; k < 6; k++) {
             v = abi.encodePacked(v, k > 0 ? ";" : "", k == f ? "inline" : "none");
         }
-        o.app(
-            abi.encodePacked(
-                '<g display="', f > 0 ? "none" : "inline",
-                '"><animate attributeName="display" values="', v,
-                '" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>'
-            )
-        );
+        if (!anim) {
+            o.app(bytes("<g>"));
+        } else {
+            o.app(
+                abi.encodePacked(
+                    '<g display="', f > 0 ? "none" : "inline",
+                    '"><animate attributeName="display" values="', v,
+                    '" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>'
+                )
+            );
+        }
         for (int256 ys = b[0]; ys < b[0] + 22; ys += 2) {
             for (int256 x = b[1]; x < b[2]; x += 2) {
                 int256 n = g.rng.rInt(100);
@@ -324,7 +330,7 @@ library StatusLib {
     }
 
     /// one SMIL frame of the collapsing echo: display-flip group + ring (dash "" = solid)
-    function echoFrame(int256 cx, int256 cy, int256 r, int256 w, string memory dash, uint256 f)
+    function echoFrame(int256 cx, int256 cy, int256 r, int256 w, string memory dash, uint256 f, bool anim)
         private
         pure
         returns (string memory)
@@ -336,6 +342,7 @@ library StatusLib {
         string memory ring;
         if (bytes(dash).length == 0) ring = GenesisLib.octRing(cx, cy, r, w, T.ACID);
         else ring = octRingDash(cx, cy, r, w, dash);
+        if (!anim) return string(abi.encodePacked("<g>", ring, "</g>"));
         return string(
             abi.encodePacked(
                 '<g display="', f > 0 ? "none" : "inline",
@@ -371,7 +378,7 @@ library StatusLib {
         );
     }
 
-    function buyerOverlay(T.Gen memory g) internal pure returns (string memory) {
+    function buyerOverlay(T.Gen memory g, bool anim) internal pure returns (string memory) {
         Mask.Traits memory t = g.t;
         int256 cx = t.cx;
         int256 cy = t.cy - 2;
@@ -379,10 +386,13 @@ library StatusLib {
         Buf.B memory o = Buf.init(8000);
         o.app(GenesisLib.octRing(cx, cy, R, 12, T.ACID));
         // echo wave collapses inward: born at the shield, dissolving toward the face
-        o.app(echoFrame(cx, cy, R - 3, 4, "", 0));
-        o.app(echoFrame(cx, cy, R - 11, 3, "24 10", 1));
-        o.app(echoFrame(cx, cy, R - 19, 3, "14 16", 2));
-        o.app(echoFrame(cx, cy, R - 27, 2, "8 22", 3));
+        o.app(echoFrame(cx, cy, R - 3, 4, "", 0, anim));
+        if (anim) {
+            // static: the outermost collapse ring only
+            o.app(echoFrame(cx, cy, R - 11, 3, "24 10", 1, anim));
+            o.app(echoFrame(cx, cy, R - 19, 3, "14 16", 2, anim));
+            o.app(echoFrame(cx, cy, R - 27, 2, "8 22", 3, anim));
+        }
         o.app(padlockSeal(cx, cy + R - 4));
         return o.fin();
     }
@@ -565,7 +575,8 @@ library StatusLib {
         return o.fin();
     }
 
-    function flickerSVG(RenderStateV1 memory s) internal pure returns (string memory) {
+    function flickerSVG(RenderStateV1 memory s, bool anim) internal pure returns (string memory) {
+        if (!anim) return "";
         if (!s.flicker) return "";
         return string(
             abi.encodePacked(

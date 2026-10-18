@@ -28,8 +28,8 @@ library BannerLib {
     ) public pure returns (string memory) {
         Glyphs.Used memory used = Glyphs.newUsed();
         Rng.R memory rng =
-            Rng.init(abi.encodePacked(GenesisLib.genesisSeed(s.genesisHash, s.tokenId), "BNR"));
-        Mask.Traits memory t = Mask.drawTraits(Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.tokenId)));
+            Rng.init(abi.encodePacked(GenesisLib.genesisSeed(s.genesisHash, s.artIndex), "BNR"));
+        Mask.Traits memory t = Mask.drawTraits(Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.artIndex)));
         int256 swv = t.lineW <= 2 ? (t.lineW == 0 ? int256(3) : t.lineW == 1 ? int256(4) : int256(6)) : int256(4);
         Buf.B memory body = Buf.init(48000);
         body.app(abi.encodePacked('<rect width="3000" height="1000" fill="', T.BLACK, '"/>'));

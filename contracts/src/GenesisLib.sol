@@ -37,14 +37,26 @@ library GenesisLib {
         int256 mouthY;
         uint256 tier;
         int256 flatLi;
+        bool anim; // false = CANONICAL STATIC profile: emit zero SMIL
+        // heightAtD memo over the 34x512 cover/clip sampling grid
+        // ((x/3) * 512 + yd/2), stored as v + HM_BIAS so 0 means "not yet".
+        int256[] hm;
     }
 
-    function genesisSeed(bytes32 genesisHash, uint256 tokenId) internal pure returns (bytes memory) {
-        return abi.encodePacked(genesisHash, uint16(tokenId));
+    /// IDENTITY: the ART INDEX seeds the artwork. The token ID is display only,
+    /// so a transfer, a re-mint or a token-ID remap can never change a wraith.
+    function genesisSeed(bytes32 genesisHash, uint256 artIndex) internal pure returns (bytes memory) {
+        return abi.encodePacked(genesisHash, uint16(artIndex));
     }
 
-    function damageSeed(bytes32 genesisHash, uint256 tokenId, uint256 deaths) internal pure returns (bytes memory) {
-        return abi.encodePacked(genesisHash, uint16(tokenId), uint8(deaths), "DMG");
+    /// ONE DEATH, ONE SCAR, FOREVER. Keyed on the death's own ordinal, never on
+    /// the running total, so a second death can never move the first scar.
+    function damageSeed(bytes32 genesisHash, uint256 artIndex, uint256 deathIndex)
+        internal
+        pure
+        returns (bytes memory)
+    {
+        return abi.encodePacked(genesisHash, uint16(artIndex), uint8(deathIndex), "DMG");
     }
 
     /// HOODRXCH_SEASON_1_RULES_V1 tier table — seven ACHIEVABLE stages on
@@ -311,9 +323,11 @@ library GenesisLib {
         uint256 nBrk;
     }
 
-    function build(RenderStateV1 memory s) public pure returns (T.Gen memory g) {
+    function build(RenderStateV1 memory s, bool anim) public pure returns (T.Gen memory g) {
         Ctx memory c;
-        c.rng = Rng.init(genesisSeed(s.genesisHash, s.tokenId));
+        c.anim = anim;
+        c.hm = new int256[](17408);
+        c.rng = Rng.init(genesisSeed(s.genesisHash, s.artIndex));
         c.t = Mask.drawTraits(c.rng);
         c.flatLi = -1;
         // column noise walk (PHANTOM doubles the amplitude)
@@ -595,7 +609,7 @@ library GenesisLib {
     }
 
     function buildFigure(Ctx memory c, RenderStateV1 memory s, Pre memory pre) internal pure returns (string memory, uint256 introSeq) {
-        Buf.B memory f = Buf.init(1300000); // intro keyframes dominate (DENSE peaks far above the old 400KB)
+        Buf.B memory f = Buf.init(c.anim ? 1300000 : 120000); // intro keyframes dominate (DENSE peaks far above the old 400KB)
         // white specks (captured; revealed on the intro schedule)
         string memory specksSvg;
         {
@@ -644,7 +658,7 @@ library GenesisLib {
             if (pre.lightning) sc.tLight = tM + 25 * int256(++sc.seq);
             if (c.t.pink == 7) sc.tHeart = tM + 25 * int256(++sc.seq);
         }
-        f.app(Intro.reveal(specksSvg, sc.tSpecks));
+        f.app(Intro.reveal(c.anim, specksSvg, sc.tSpecks));
         // === THE CONVEYOR: every LINES style flows. BARCODE breathes its
         // widths through a standing slot pattern; NO SIGNAL runs a slow sky
         // band plus a fast signal band clipped to the hood silhouette.
@@ -665,12 +679,12 @@ library GenesisLib {
             Buf.B memory hc = Buf.init(60000);
             convHoles(c, hc, pre);
             convCovers(c, hc, pre);
-            f.app(Intro.reveal(hc.fin(), 100));
+            f.app(Intro.reveal(c.anim, hc.fin(), 100));
         }
         // FLATLINE SCAR
         if (c.flatLi >= 0) {
             f.app(
-                Intro.reveal(
+                Intro.reveal(c.anim, 
                     string(
                         abi.encodePacked(
                             '<path d="M0 ', Num.itoa(c.lines[uint256(c.flatLi)].y * 10),
@@ -691,7 +705,7 @@ library GenesisLib {
             }
             string memory dd = d.fin();
             f.app(
-                Intro.reveal(
+                Intro.reveal(c.anim, 
                     string(
                         abi.encodePacked(
                             '<path d="', dd, '" fill="none" stroke="', T.PINK, '" stroke-width="6"/>',
@@ -707,7 +721,7 @@ library GenesisLib {
             int256 hy = (20 + c.rng.rInt(60)) * 10;
             int256 bx = (10 + c.rng.rInt(60)) * 10;
             f.app(
-                Intro.reveal(
+                Intro.reveal(c.anim, 
                     string(
                         abi.encodePacked(
                             '<path d="M0 ', Num.itoa(hy), "h", Num.itoa(bx), "l15 -70 15 140 15 -70h",
@@ -815,7 +829,8 @@ library GenesisLib {
         bool pinkFigAll = c.tier >= 4;
         bool pinkFigUpper = c.tier == 3;
         bool pinkCrest6 = c.tier == 2;
-        for (uint256 j = 0; j < cv.NKC; j++) {
+        uint256 nj = c.anim ? cv.NKC : 1; // static reads colK[ri * NKC] only
+        for (uint256 j = 0; j < nj; j++) {
             uint256 rank = 0;
             for (uint256 ri = 0; ri < cv.nRows; ri++) {
                 int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
@@ -1085,11 +1100,21 @@ library GenesisLib {
         int256 y0d = cv.y0Start + int256(ri) * cv.stepD;
         int256 w = rowWOf(c, y0d);
         uint8 c0 = colK[ri * cv.NKC];
+        bool hasDash = dashHas(c, y0d);
+        if (!c.anim) {
+            // CANONICAL STATIC: frame 0 is the finished field — emit it and stop.
+            f.app(
+                abi.encodePacked(
+                    '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, cv, c0, w)), '"',
+                    convDash(c, cv, y0d), ' d="', ds[ri * (cv.NKC + 1)], '"/>'
+                )
+            );
+            return;
+        }
         bool varies = false;
         for (uint256 j = 1; j < cv.NKC; j++) {
             if (colK[ri * cv.NKC + j] != c0) varies = true;
         }
-        bool hasDash = dashHas(c, y0d);
         f.app(
             abi.encodePacked(
                 '<path stroke="', strokeOfCol(c0), '" stroke-width="', Num.itoa(widthOfCol(c, cv, c0, w)), '"',
@@ -1172,40 +1197,80 @@ library GenesisLib {
         }
     }
 
-    function convGapC(Ctx memory c, Pre memory pre, int256 x, int256 yd) internal pure returns (bool) {
-        int256 yvd = yd - 10 * Num.jsRound(Mask.heightAtD(c.t, c.noise, x, yd), 100);
-        if (Mask.inSocketD(c.t, x, yvd, 0) || Mask.inSocketD(c.t, x, yvd, 1)) return true;
-        for (uint256 m = 0; m < pre.nMoth; m++) {
-            int256 ddx = x - pre.moth[m][0];
-            int256 ddyd = yd - pre.moth[m][1] * 10;
-            if (ddx * ddx * 100 + ddyd * ddyd < pre.moth[m][2] * pre.moth[m][2] * 100) return true;
+    int256 internal constant HM_BIAS = 1000000;
+
+    /// heightAtD over the cover/clip sampling grid, computed at most once per
+    /// (x, yd). The covers pass and the NO SIGNAL clip walk the same 34x512
+    /// grid, and each walks it twice — this is the renderer's hottest value.
+    function hAt(Ctx memory c, int256 x, int256 yd) internal pure returns (int256) {
+        unchecked {
+            uint256 k = uint256((x / 3) * 512 + yd / 2);
+            int256 v = c.hm[k];
+            if (v != 0) return v - HM_BIAS;
+            v = Mask.heightAtD(c.t, c.noise, x, yd);
+            c.hm[k] = v + HM_BIAS;
+            return v;
         }
-        if (pre.splitY >= 0 && yd >= pre.splitY * 10 && yd < pre.splitY * 10 + 50) return true;
-        if (pre.hasCensor) {
-            for (uint256 m = 0; m < 3; m++) {
-                if (
-                    x >= pre.censor[m][0] && x < pre.censor[m][0] + pre.censor[m][2]
-                        && yd >= pre.censor[m][1] * 10 && yd < (pre.censor[m][1] + pre.censor[m][3]) * 10
-                ) return true;
+    }
+
+    /// True iff x is near enough to either eye socket for inSocketD to be able
+    /// to fire: |nx| >= 100 forces false, and |nx| >= 100 whenever |dx| > r.
+    /// Lets the common column skip the height sample entirely.
+    function socketBandX(Ctx memory c, int256 x) internal pure returns (bool) {
+        unchecked {
+            int256 dL = x - (c.t.cx + c.t.sLdx);
+            if (dL < 0) dL = -dL;
+            if (dL <= c.t.sLr) return true;
+            int256 dR = x - (c.t.cx + c.t.sRdx);
+            if (dR < 0) dR = -dR;
+            return dR <= c.t.sRr;
+        }
+    }
+
+    /// sb: socketBandX(c, x), hoisted by the caller — it depends only on x,
+    /// and this runs 17,408 times per render.
+    function convGapC(Ctx memory c, Pre memory pre, int256 x, int256 yd, bool sb) internal pure returns (bool) {
+        unchecked {
+            if (sb) {
+                int256 yvd = yd - 10 * Num.jsRound(hAt(c, x, yd), 100);
+                if (Mask.inSocketD(c.t, x, yvd, 0) || Mask.inSocketD(c.t, x, yvd, 1)) return true;
             }
+            for (uint256 m = 0; m < pre.nMoth; m++) {
+                int256 ddx = x - pre.moth[m][0];
+                int256 r = pre.moth[m][2];
+                if (ddx > r || ddx < -r) continue; // out of the disc's x span
+                int256 ddyd = yd - pre.moth[m][1] * 10;
+                if (ddx * ddx * 100 + ddyd * ddyd < r * r * 100) return true;
+            }
+            if (pre.splitY >= 0 && yd >= pre.splitY * 10 && yd < pre.splitY * 10 + 50) return true;
+            if (pre.hasCensor) {
+                for (uint256 m = 0; m < 3; m++) {
+                    if (
+                        x >= pre.censor[m][0] && x < pre.censor[m][0] + pre.censor[m][2]
+                            && yd >= pre.censor[m][1] * 10 && yd < (pre.censor[m][1] + pre.censor[m][3]) * 10
+                    ) return true;
+                }
+            }
+            return false;
         }
-        return false;
     }
 
     /// envelope gap covers: exact original gap condition replayed in sampling
     /// space, painted black at its screen extent (chunky 3u columns)
     function convCovers(Ctx memory c, Buf.B memory f, Pre memory pre) internal pure {
+        unchecked {
         for (int256 xi = 0; xi <= 33; xi++) {
             int256 x = xi * 3;
+            bool sb = socketBandX(c, x);
             int256 runA = -1;
             for (int256 yd = 0; yd <= 1022; yd += 2) {
-                bool g = yd <= 1020 && convGapC(c, pre, x, yd);
+                bool g = yd <= 1020 && convGapC(c, pre, x, yd, sb);
                 if (g && runA < 0) runA = yd;
                 else if (!g && runA >= 0) {
                     int256 sMin = 100000;
                     int256 sMax = -100000;
                     for (int256 q = runA; q < yd; q += 2) {
-                        int256 sy = q - Num.jsRound(Mask.heightAtD(c.t, c.noise, x, q), 10);
+                        int256 sy = q - Num.jsRound(hAt(c, x, q), 10);
                         if (sy < sMin) sMin = sy;
                         if (sy > sMax) sMax = sy;
                     }
@@ -1219,6 +1284,7 @@ library GenesisLib {
                 }
             }
         }
+        }
     }
 
     function bandData(Ctx memory c, Pre memory pre, Conv memory cv)
@@ -1228,8 +1294,12 @@ library GenesisLib {
     {
         mh = new int256[](cv.nRows * (cv.NKC + 1));
         ds = new string[](cv.nRows * (cv.NKC + 1));
+        // CANONICAL STATIC emits frame 0 only, so the other NKC keyframes are
+        // never read — and computing them is the single largest cost in a
+        // render. Array SHAPE is unchanged; only the fill stops early.
+        uint256 jMax = c.anim ? cv.NKC : 0;
         for (uint256 ri = 0; ri < cv.nRows; ri++) {
-            for (uint256 j = 0; j <= cv.NKC; j++) {
+            for (uint256 j = 0; j <= jMax; j++) {
                 (string memory d, int256 m,) =
                     convRowKey(c, pre, cv.stepD, cv.y0Start + int256(ri) * cv.stepD, int256(j) * 2, 0, 0, false);
                 ds[ri * (cv.NKC + 1) + j] = d;
@@ -1246,7 +1316,7 @@ library GenesisLib {
         {
             Buf.B memory ec = Buf.init(40000);
             convEchoes(c, ec, cv, ds, mh);
-            f.app(Intro.reveal(ec.fin(), tEcho));
+            f.app(Intro.reveal(c.anim, ec.fin(), tEcho));
         }
         f.app(bytes('<g fill="none">'));
         for (uint256 ri = 0; ri < cv.nRows; ri++) {
@@ -1324,7 +1394,7 @@ library GenesisLib {
                 ec.app(e2.fin());
                 ec.app(bytes("</g>"));
             }
-            f.app(Intro.reveal(ec.fin(), tEcho));
+            f.app(Intro.reveal(c.anim, ec.fin(), tEcho));
         }
         // sky band (all acid)
         {
@@ -1341,13 +1411,13 @@ library GenesisLib {
             int256 x = xi * 3;
             int256 runA = -1;
             for (int256 yd = 0; yd <= 1022; yd += 2) {
-                bool gI = yd <= 1020 && Mask.heightAtD(c.t, c.noise, x, yd) > 300;
+                bool gI = yd <= 1020 && hAt(c, x, yd) > 300;
                 if (gI && runA < 0) runA = yd;
                 else if (!gI && runA >= 0) {
                     int256 sMin = 100000;
                     int256 sMax = -100000;
                     for (int256 q = runA; q < yd; q += 2) {
-                        int256 sy = q - Num.jsRound(Mask.heightAtD(c.t, c.noise, x, q), 10);
+                        int256 sy = q - Num.jsRound(hAt(c, x, q), 10);
                         if (sy < sMin) sMin = sy;
                         if (sy > sMax) sMax = sy;
                     }
@@ -1585,8 +1655,8 @@ library GenesisLib {
             }
         }
         drawEyes(c, parts, mainFill, 0, 0);
-        f.app(Intro.flickL(string(abi.encodePacked(parts[0].fin(), parts[2].fin()))));
-        f.app(Intro.flickR(parts[1].fin()));
+        f.app(Intro.flickL(c.anim, string(abi.encodePacked(parts[0].fin(), parts[2].fin()))));
+        f.app(Intro.flickR(c.anim, parts[1].fin()));
         // battle records join the succession after the mouth
         Buf.B memory rc = Buf.init(8000);
         if (s.kills > 0) {
@@ -1608,8 +1678,8 @@ library GenesisLib {
             for (uint256 i = 0; i < n; i++) rc.app(Geom.xmark(8 + int256(i) * 6, 88, 2, 1, T.PINK, c.rng));
         }
         if (s.deaths > 0) {
-            Rng.R memory drng = Rng.init(damageSeed(s.genesisHash, s.tokenId, s.deaths));
             for (uint256 k2 = 0; k2 < s.deaths; k2++) {
+                Rng.R memory drng = Rng.init(damageSeed(s.genesisHash, s.artIndex, k2 + 1));
                 int256 sy2 = c.t.cy - 14 + drng.rInt(26);
                 rc.app(
                     abi.encodePacked(
@@ -1620,19 +1690,19 @@ library GenesisLib {
                 );
             }
         }
-        f.app(Intro.reveal(rc.fin(), sc.tRecs));
+        f.app(Intro.reveal(c.anim, rc.fin(), sc.tRecs));
         // the mouth materializes by its own motif once the eyes burn steady
         {
             Buf.B memory mo = Buf.init(8000);
             mouthMarks(c, mo);
             f.app(glitchReveal(c, mo.fin()));
         }
-        f.app(Intro.reveal(Mask.sigilSVG(s.wardId, 20, 20, T.ACID), sc.tSigil));
-        f.app(Intro.reveal(Mask.blockMarkSVG(s.blockId, 80, 80, c.rng, T.ACID), sc.tBlock));
+        f.app(Intro.reveal(c.anim, Mask.sigilSVG(s.wardId, 20, 20, T.ACID), sc.tSigil));
+        f.app(Intro.reveal(c.anim, Mask.blockMarkSVG(s.blockId, 80, 80, c.rng, T.ACID), sc.tBlock));
         if (c.tier > 0) {
             Buf.B memory hb = Buf.init(20000);
             haloInto(hb, c);
-            f.app(Intro.reveal(hb.fin(), sc.tHalo));
+            f.app(Intro.reveal(c.anim, hb.fin(), sc.tHalo));
         }
     }
 
@@ -1689,6 +1759,7 @@ library GenesisLib {
     /// twangs, the scream erupts, the drip falls. Ghost doubles (glitch family
     /// only) are intro-only. Base attrs always stay the finished art.
     function glitchReveal(Ctx memory c, string memory content) internal pure returns (string memory) {
+        if (!c.anim) return content;
         if (bytes(content).length == 0) return content;
         int256 mid = c.t.mouth;
         // mouth bounding geometry in px
@@ -1915,8 +1986,8 @@ library GenesisLib {
         T.Slc[] memory sl = new T.Slc[](total);
         for (uint256 i = 0; i < nm; i++) sl[i] = tmp[i];
         if (s.deaths > 0) {
-            Rng.R memory drng = Rng.init(damageSeed(s.genesisHash, s.tokenId, s.deaths));
             for (uint256 k2 = 0; k2 < s.deaths; k2++) {
+                Rng.R memory drng = Rng.init(damageSeed(s.genesisHash, s.artIndex, k2 + 1));
                 T.Slc memory e = sl[nm + k2];
                 e.y = c.t.cy - 16 + drng.rInt(30);
                 e.h = 3 + drng.rInt(4);

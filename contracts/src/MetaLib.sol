@@ -172,7 +172,7 @@ library MetaLib {
         aNum(b, "Render-State Schema Version", 1, true);
         aStr(b, "State Hash", Num.hex0x(sh), true);
         {
-            Mask.Traits memory t = Mask.drawTraits(Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.tokenId)));
+            Mask.Traits memory t = Mask.drawTraits(Rng.init(GenesisLib.genesisSeed(s.genesisHash, s.artIndex)));
             aStr(b, "Genesis Form", formName(t.form), true);
             aStr(b, "Genesis Lines", lineName(t.lineW), true);
             aStr(b, "Genesis Tear", tearName(t.tear), true);

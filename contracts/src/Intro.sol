@@ -43,7 +43,8 @@ library Intro {
 
     /// reveal(content, tSec): one-shot discrete display switch at tSec
     /// (dur = 2*tSec trick). Empty content or t<=0.01s passes through.
-    function reveal(string memory content, int256 tCs) internal pure returns (string memory) {
+    function reveal(bool anim, string memory content, int256 tCs) internal pure returns (string memory) {
+        if (!anim) return content;
         if (bytes(content).length == 0 || tCs <= 1) return content;
         return string(
             abi.encodePacked(
@@ -55,7 +56,8 @@ library Intro {
 
     // cyberpunk ignition rhythms at tEyes = 1.0s — the full animate tags are
     // state-independent, extracted verbatim from the JS reference output
-    function flickL(string memory content) internal pure returns (string memory) {
+    function flickL(bool anim, string memory content) internal pure returns (string memory) {
+        if (!anim) return content;
         if (bytes(content).length == 0) return content;
         return string(
             abi.encodePacked(
@@ -65,7 +67,8 @@ library Intro {
         );
     }
 
-    function flickR(string memory content) internal pure returns (string memory) {
+    function flickR(bool anim, string memory content) internal pure returns (string memory) {
+        if (!anim) return content;
         if (bytes(content).length == 0) return content;
         return string(
             abi.encodePacked(
