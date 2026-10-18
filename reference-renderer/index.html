@@ -151,7 +151,10 @@ class Rng{
 }
 function genesisSeed(genesisHash,tokenId){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId)); }
 // Provisional damage seed (open item O-3): keccak(genesisHash, tokenId, deaths)
-function damageSeed(genesisHash,tokenId,deaths){ return concatBytes(hexToBytes(genesisHash),u16be(tokenId),u8(deaths),strBytes('DMG')); }
+// ONE DEATH, ONE SCAR, FOREVER. The seed is keyed on the death's own ordinal,
+// never on the running total, so death #2 can never move the scar #1 left.
+// artIndex (not tokenId) keys it: the art's identity is the art index.
+function damageSeed(genesisHash,artIndex,deathIndex){ return concatBytes(hexToBytes(genesisHash),u16be(artIndex),u8(deathIndex),strBytes('DMG')); }
 // Demo genesisHash for the workbench when the provider isn't wired: keccak("HOODRXCH_GENESIS_V1", tokenId)
 function demoGenesisHash(tokenId){ return bytesToHex(keccak256(concatBytes(strBytes('HOODRXCH_GENESIS_V1'),word(tokenId)))); }
 // ---------------------------------------------------------------------------
@@ -495,10 +498,13 @@ const PHASES=['REGISTRATION','SELECTION','RESCUE','EXECUTION','FINALISATION','AR
 // kills (6 wars, 1 accepted incoming per token per war; 100 kills would have
 // taken years). 5-6 = DEATH DEALER, 7+ = REAPER. Kills keep counting above 7.
 function tierForKills(k){ if(k>=7)return 6; if(k>=5)return 5; if(k>=4)return 4; if(k>=3)return 3; if(k>=2)return 2; if(k>=1)return 1; return 0; }
-function defaultState(tokenId){
+function defaultState(tokenId,artIndex){
   tokenId=tokenId||1;
+  if(artIndex===undefined) artIndex=tokenId;
   const wardId=((tokenId-1)%3)+1, blockId=(Math.floor((tokenId-1)/3)%6)+1; // demo assignment only; WardRegistry is canonical
-  return {schemaVersion:1,tokenId,artIndex:tokenId,wardId,blockId,genesisHash:demoGenesisHash(tokenId),
+  // genesisHash is keyed on the ART INDEX in production too
+  // (keccak("HOODRXCH_GENESIS_V1", artIndex)) — the token ID never reaches the art.
+  return {schemaVersion:1,tokenId,artIndex,wardId,blockId,genesisHash:demoGenesisHash(artIndex),
     warId:1,campaignId:1,seasonId:1,activeBlockId:1,warPhase:0,
     lifeState:0,exposureState:1,sealsRemaining:3,hunterSelected:false,transferLocked:false,transferLockUntil:0,
     marked:false,markedByTokenId:0,markedByWardId:0,purgeDeadline:0,
@@ -615,12 +621,21 @@ function eyeGlyph(st,side,cx,cy,r,fill,rng){
   return e;
 }
 // ---------------------------------------------------------------------------
+// --- RENDER PROFILES -------------------------------------------------------
+// ANIM gates every SMIL element in the renderer. The CANONICAL STATIC profile
+// emits the finished character with NO <animate>/<animateTransform> at all —
+// which is both the marketplace-safe still frame and the only way tokenURI
+// fits a sane gas ceiling (keyframe values are ~86% of an animated payload).
+// This is free because of the renderer's standing invariant: every base
+// attribute is already the finished art, and animations only ride on top.
+var ANIM=true;
 // --- CONSTRUCTION INTRO (draft): reveal helpers ----------------------------
 // Every base attribute stays the finished art; reveals hide-then-show via
 // one-shot discrete display animates, so non-SMIL renderers see the final PFP.
 function T2(x){ return (Math.round(x*100)/100)+'s'; }
 function kt4(x){ return (Math.round(x*10000)/10000)+''; }
 function reveal(content,tSec){
+  if(!ANIM) return content;
   if(!content||!tSec||tSec<=0.01) return content;
   return '<g><animate attributeName="display" values="none;inline" calcMode="discrete" dur="'+T2(2*tSec)+'" repeatCount="1"/>'+content+'</g>';
 }
@@ -629,6 +644,7 @@ function reveal(content,tSec){
 const FLICK_L=[0,0.03,0.05,0.08,0.10,0.13,0.15,0.19,0.21,0.24,0.26,0.30,0.36];
 const FLICK_R=[0.02,0.04,0.07,0.09,0.12,0.16,0.18,0.22,0.25,0.28,0.31,0.33,0.37];
 function revealFlicker(content,tSec,offs){
+  if(!ANIM) return content;
   if(!content) return content;
   const d2=tSec+offs[offs.length-1]+0.05;
   const kt=[0]; for(const o of offs) kt.push((tSec+o)/d2);
@@ -642,6 +658,7 @@ function revealFlicker(content,tSec,offs){
 // animates run only at tSec. Ghost doubles (glitch family only) are intro-only.
 // geo: mouth bounding geometry in px {x,y,w,cx,py}.
 function glitchReveal(content,tSec,mid,geo){
+  if(!ANIM) return content;
   if(!content||!tSec||tSec<=0.01) return content;
   const b=T2(tSec);
   const an=(attr,vals,dur2,mode,kts)=>'<animate attributeName="'+attr+'" values="'+vals+'"'+(kts?' keyTimes="'+kts+'"':'')+' calcMode="'+mode+'" begin="'+b+'" dur="'+T2(dur2)+'" repeatCount="1"/>';
@@ -694,7 +711,7 @@ function glitchReveal(content,tSec,mid,geo){
 // ---------------------------------------------------------------------------
 function buildGenesis(sState){
   const s=sState;
-  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const rng=new Rng(genesisSeed(s.genesisHash,s.artIndex));
   const t=drawTraits(rng);
   // column noise: a smooth random walk shared by every line (organic wobble)
   const noiseAmp = t.form===15 ? 24 : 12; // PHANTOM: the figure barely holds together
@@ -916,6 +933,11 @@ function buildGenesis(sState){
           } }
         if(dashF){ const vs=[]; for(let c=0;c<7;c++) vs.push(dashF(c));
           dashAnim='<animate attributeName="stroke-dashoffset" values="'+vs.join(';')+'" dur="'+T2(o.cycD*7*75/1000)+'" calcMode="discrete" repeatCount="indefinite"'+bg+'/>'; }
+        if(!ANIM){
+          // CANONICAL STATIC: frame 0 is the finished field — emit it and stop.
+          out+='<path stroke="'+strokeOf(cols[0])+'" stroke-width="'+widthOf(cols[0])+'"'+dash+' d="'+vals[ri][0]+'"/>';
+          continue;
+        }
         out+='<path stroke="'+strokeOf(cols[0])+'" stroke-width="'+widthOf(cols[0])+'"'+dash+' d="'+vals[ri][0]+'">';
         if(o.intro){
           // construction: populate as a flat flowing line, then extrude the
@@ -1145,8 +1167,9 @@ function buildGenesis(sState){
   if(sState.savesReceived>0){ const n=Math.min(5,sState.savesReceived);
     for(let i=0;i<n;i++) f+=xmark(8+i*6,88,2,1,PINK,rng); }
   // death damage: permanent scar bands + exposed bone lines (survives exhumation)
-  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
+  if(sState.deaths>0){
     for(let k2=0;k2<sState.deaths;k2++){
+      const drng=new Rng(damageSeed(s.genesisHash,s.artIndex,k2+1));
       const sy2=t.cy-14+drng.int(26);
       f+='<path d="M'+((t.cx-t.rw+2)*U)+' '+(sy2*U)+'l'+((t.rw-4+drng.int(8))*U)+' '+((drng.int(5)-2)*U)+'" stroke="'+WHITE+'" stroke-width="4" fill="none"/>';
     } }
@@ -1234,14 +1257,15 @@ function buildGenesis(sState){
   else if(t.mosh===6){ // MELTDOWN: one smear band + corruption
     slices.push({y:30+rng.int(40),h:6+rng.int(5),smear:1});
     for(let i=0;i<3;i++) slices.push({y:6+rng.int(84),h:2+rng.int(4),dx:(4+rng.int(7))*(rng.int(2)?1:-1)}); }
-  if(sState.deaths>0){ const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,sState.deaths));
-    for(let k2=0;k2<sState.deaths;k2++) slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)});
+  if(sState.deaths>0){
+    for(let k2=0;k2<sState.deaths;k2++){ const drng=new Rng(damageSeed(s.genesisHash,s.artIndex,k2+1));
+      slices.push({y:t.cy-16+drng.int(30),h:3+drng.int(4),dx:(5+drng.int(8))*(drng.int(2)?1:-1)}); }
   }
   // screen-space eye anchors (units) for status overlays
   const eyeScreen=eyePos.map(([ex,ey2,r])=>{ const disp=Math.round(heightAt(t,noiseCols,ex,ey2,true)/100); return [ex,ey2-((disp/3)|0)+2,r]; });
   return {defs,figure:f,traits:t,slices,rng,eyeScreen,introEnd,introBase:tMouth,introSeq:__seq};
 }
-function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
+function traitNames(s){ const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.artIndex))); return {form:FORM_NAMES[t.form],lines:LINE_NAMES[t.lineW],tear:TEAR_NAMES[t.tear],spikes:SPIKE_NAMES[t.spike],eyes:EYE_NAMES[t.eyes],treatment:TREAT_NAMES[t.treat],mouth:MOUTH_NAMES[t.mouth],pink:PINKAMT_NAMES[t.pink],mosh:MOSH_NAMES[t.mosh],sigil:WARD_NAMES[s.wardId]}; }
 // ---------------------------------------------------------------------------
 // COFFIN COMPOSITIONS (lifeState COFFINED / TERMINAL_COFFIN).
 // The signal flatlines. The field goes still and undisturbed; the wraith is
@@ -1265,7 +1289,7 @@ function inCoffin(x,y,pad){
 }
 function buildCoffinSVG(s){
   const terminal=s.lifeState===3;
-  const rng=new Rng(genesisSeed(s.genesisHash,s.tokenId));
+  const rng=new Rng(genesisSeed(s.genesisHash,s.artIndex));
   const t=drawTraits(rng);
   const C=terminal?RED:WHITE;
   let f='';
@@ -1308,8 +1332,8 @@ function buildCoffinSVG(s){
   f+=blockMarkSVG(s.blockId,80,80,rng,ACID);
   // death scars displace the stillness too
   const slices=[];
-  { const drng=new Rng(damageSeed(s.genesisHash,s.tokenId,s.deaths||1));
-    for(let k=0;k<Math.max(1,s.deaths);k++) slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); }
+  { for(let k=0;k<Math.max(1,s.deaths);k++){ const drng=new Rng(damageSeed(s.genesisHash,s.artIndex,k+1));
+      slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); } }
   let defs='<g id="f">'+f+'</g>', body='<rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f"/>';
   let ci=0; for(const sl of slices){ ++ci; body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
   // the verdict is drawn after the scars — planks and vitals can never be shredded
@@ -1322,6 +1346,9 @@ function buildCoffinSVG(s){
     // the residual heartbeat: each pass, the flatline itself rises into the
     // complex — a traveling black cover erases the static line under the beat
     // so the zigzag replaces it — then melts back flat. One resurrection per pass.
+    if(!ANIM){
+      // static: the flatline holds — the beat is the animation itself
+    } else
     body+='<g transform="translate(520 0)"><rect x="-348" y="533" width="348" height="14" fill="'+BLACK+'"/><path d="M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40" fill="none" stroke="'+WHITE+'" stroke-width="5"><animate attributeName="d" values="M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 -72 20 72h50l24 -300 24 600 24 -300h50l28 -104 28 104h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40;M-348 540h40l20 0 20 0h50l24 0 24 0 24 0h50l28 0 28 0h40" keyTimes="0;0.3;0.5;0.7;1" dur="2.8s" repeatCount="indefinite"/></path><animateTransform attributeName="transform" type="translate" values="0 0;1348 0" dur="2.8s" repeatCount="indefinite"/></g>';
   }
   body+=flickerSVG(s);
@@ -1356,7 +1383,8 @@ function witsecOverlay(g,rng){
   let o='<g shape-rendering="crispEdges">'+rect(X0,y,X1-X0,22,BLACK);
   for(let f=0;f<6;f++){
     let v=''; for(let k=0;k<6;k++) v+=(k?';':'')+(k===f?'inline':'none');
-    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>';
+    if(!ANIM&&f>0) continue; // static: one interference frame
+    o+= !ANIM ? '<g>' : ('<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.72s" repeatCount="indefinite"/>');
     for(let ys=y; ys<y+22; ys+=2) for(let x=X0; x<X1; x+=2){
       const n=rng.int(100);
       if(n>=44&&n<92) o+='<rect x="'+(x*U)+'" y="'+(ys*U)+'" width="21" height="21" fill="'+(n<86?WHITE:ACID)+'"/>';
@@ -1383,7 +1411,8 @@ function buyerOverlay(g,rng){
     let v=''; for(let k=0;k<4;k++) v+=(k?';':'')+(k===f?'inline':'none');
     let ring=octRing(cx,cy,ER[f],EW[f],ACID);
     if(ED[f]) ring=ring.replace('"/>','" stroke-dasharray="'+ED[f]+'"/>');
-    o+='<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+ring+'</g>';
+    if(!ANIM&&f>0) continue; // static: the outermost collapse ring only
+    o+= !ANIM ? ('<g>'+ring+'</g>') : ('<g display="'+(f?'none':'inline')+'"><animate attributeName="display" values="'+v+'" calcMode="discrete" dur="0.6s" repeatCount="indefinite"/>'+ring+'</g>');
   }
   const bx=cx, by=cy+R-4;
   o+='<path d="M'+((bx-5)*U)+' '+((by-6)*U)+'V'+((by-12)*U)+'L'+((bx-3)*U)+' '+((by-14)*U)+'H'+((bx+3)*U)+'L'+((bx+5)*U)+' '+((by-12)*U)+'V'+((by-6)*U)+'" stroke="'+ACID+'" stroke-width="16" fill="none"/>';
@@ -1445,6 +1474,7 @@ function statsBand(s,used){
 }
 // flicker: SMIL scanline sweep + a pink echo tracer (deterministic, loops)
 function flickerSVG(s){
+  if(!ANIM) return '';
   if(!s.flicker) return '';
   return '<rect x="0" y="-8" width="1000" height="6" fill="'+WHITE+'"><animate attributeName="y" values="-8;1000;-8" dur="7s" repeatCount="indefinite"/></rect>'
        + '<rect x="0" y="-4" width="1000" height="3" fill="'+PINK+'"><animate attributeName="y" values="1000;-4;1000" dur="11s" repeatCount="indefinite"/></rect>';
@@ -1452,7 +1482,19 @@ function flickerSVG(s){
 // ---------------------------------------------------------------------------
 // renderSVG — composition per STATE_TO_LAYER_MAP z-order
 // ---------------------------------------------------------------------------
-function renderSVG(s){
+// PROFILES: 0 CANONICAL_STATIC · 1 ANIMATED · 2 STATS · 3 BANNER.
+// profile is optional and defaults to ANIMATED, so every existing caller and
+// fixture keeps its exact bytes. Static profiles set ANIM=false for the whole
+// render and always restore it, so one throw can never poison a later call.
+function renderSVG(s,profile){
+  if(profile===undefined) profile=1;
+  if(profile===3) return renderBanner(s);
+  const prevAnim=ANIM;
+  ANIM=(profile===1);
+  if(profile===2){ s=Object.assign({},s,{displayMode:1}); }
+  try{ return _renderSVG(s); } finally{ ANIM=prevAnim; }
+}
+function _renderSVG(s){
   const errs=validate(s); if(errs.length) return diagnosticSVG(s,errs);
   const status=resolveStatus(s);
   if(status==='TERMINAL'||status==='COFFINED') return buildCoffinSVG(s);
@@ -1495,8 +1537,8 @@ function renderBanner(s){
   const errs=validate(s);
   const inner=renderSVG(s);
   const used=new Set();
-  const rng=new Rng(concatBytes(genesisSeed(s.genesisHash,s.tokenId),strBytes('BNR')));
-  const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.tokenId)));
+  const rng=new Rng(concatBytes(genesisSeed(s.genesisHash,s.artIndex),strBytes('BNR')));
+  const t=drawTraits(new Rng(genesisSeed(s.genesisHash,s.artIndex)));
   const sw=t.lineW<=2?[3,4,6][t.lineW]:4;
   let body='<rect width="3000" height="1000" fill="'+BLACK+'"/>';
   // the signal continues past the portrait
@@ -1534,8 +1576,18 @@ function renderBanner(s){
     +'<path d="M1000 0v1000" stroke="'+ACID+'" stroke-width="3"/></svg>';
 }
 function kdText(s){ if(s.deaths===0) return s.kills===0?'UNTESTED':'UNDEFEATED'; return (Math.floor(s.kills*10/s.deaths)/10).toFixed(1); }
-function renderMetadata(s){
-  const svg=renderSVG(s); const tier=tierForKills(s.kills);
+function renderMetadata(s,profile){
+  if(profile!==undefined&&profile!==1){
+    const prevAnim=ANIM; ANIM=(profile===1);
+    const st=(profile===2)?Object.assign({},s,{displayMode:1}):s;
+    try{ return _renderMetadata(st); } finally{ ANIM=prevAnim; }
+  }
+  return _renderMetadata(s);
+}
+function _renderMetadata(s){
+  // _renderSVG, not renderSVG: the public wrapper would reset ANIM to true and
+  // the STATIC profile's metadata would silently embed the animated image.
+  const svg=_renderSVG(s); const tier=tierForKills(s.kills);
   const a=(t,v)=>({trait_type:t,value:v});
   const attrs=[a('Token ID',s.tokenId),a('Ward','WARD 0'+s.wardId),a('Block','BLOCK 0'+s.blockId),a('Art Index',s.artIndex),
     a('Life State',LIFE[s.lifeState]),a('Exposure State',EXPO[s.exposureState]),a('Seals Remaining',s.sealsRemaining),
