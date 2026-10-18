@@ -83,7 +83,7 @@ a.btn{display:inline-block;background:var(--acid);color:#000;padding:5px 10px;te
 // HOODRXCH reference renderer — single file, vanilla JS, no deps.
 // Mirrors contracts/ one-to-one. Same state → byte-identical SVG.
 // ============================================================================
-const RENDERER_VERSION = 1, SCHEMA_VERSION = 1;
+const RENDERER_VERSION = 2, SCHEMA_VERSION = 2;
 const BLACK = '#000000', ACID = '#CCFF00', RED = '#FF2A2A';
 // ---------------------------------------------------------------------------
 // keccak256 (Ethereum variant, pad 0x01..0x80). BigInt lanes. Input: Uint8Array.
@@ -504,11 +504,11 @@ function defaultState(tokenId,artIndex){
   const wardId=((tokenId-1)%3)+1, blockId=(Math.floor((tokenId-1)/3)%6)+1; // demo assignment only; WardRegistry is canonical
   // genesisHash is keyed on the ART INDEX in production too
   // (keccak("HOODRXCH_GENESIS_V1", artIndex)) — the token ID never reaches the art.
-  return {schemaVersion:1,tokenId,artIndex,wardId,blockId,genesisHash:demoGenesisHash(artIndex),
+  return {schemaVersion:SCHEMA_VERSION,tokenId,artIndex,wardId,blockId,genesisHash:demoGenesisHash(artIndex),
     warId:1,campaignId:1,seasonId:1,activeBlockId:1,warPhase:0,
     lifeState:0,exposureState:1,sealsRemaining:3,hunterSelected:false,transferLocked:false,transferLockUntil:0,
     marked:false,markedByTokenId:0,markedByWardId:0,purgeDeadline:0,
-    witsecCredits:0,witsecApplies:false,laidLow:false,buyerProtected:false,
+    witsecCredits:0,witsecApplies:false,laidLow:false,buyerProtected:false,purged:false,
     kills:0,deaths:0,forcedPurges:0,savesGiven:0,savesReceived:0,currentKillStreak:0,longestKillStreak:0,terminalKills:0,
     lifetimeKillTier:0,latestAwardSeasonId:0,latestSeasonRank:0,latestSeasonBadgeFlags:0,seasonAwardCount:0,territoryAchievementCount:0,
     deathRecordCount:0,historicalStateCount:1,
@@ -529,7 +529,11 @@ function validate(s){
   if(s.marked!==(s.lifeState===1)) e.push('E09');
   const exC=s.exposureState===5, exT=s.exposureState===6;
   if((exT&&!T)||(T&&!exT)||(exC&&!C)||(C&&!exC)) e.push('E10');
-  if(s.wardId<1||s.wardId>3||s.blockId<1||s.blockId>6||s.tokenId<1||s.tokenId>666||s.schemaVersion!==1) e.push('E11');
+  if(s.wardId<1||s.wardId>3||s.blockId<1||s.blockId>6||s.tokenId<1||s.tokenId>666||(s.schemaVersion!==1&&s.schemaVersion!==2)) e.push('E11');
+  // PURGED is the warrant bought out: it cannot coexist with the warrant
+  // itself, and a wraith in the ground was never released.
+  if(s.purged&&M) e.push('E13');
+  if(s.purged&&(C||T)) e.push('E14');
   if(s.latestSeasonBadgeFlags!==0&&(s.latestSeasonRank===0||s.latestAwardSeasonId===0)) e.push('E12');
   if(s.latestSeasonRank>=1&&s.latestSeasonRank<=5&&s.latestSeasonBadgeFlags!==3) e.push('E12');
   if(s.latestSeasonRank>=6&&s.latestSeasonRank<=10&&s.latestSeasonBadgeFlags!==1) e.push('E12');
@@ -543,12 +547,14 @@ function stateHash(s){
     s.witsecApplies?1:0,s.laidLow?1:0,s.buyerProtected?1:0,s.kills,s.deaths,s.forcedPurges,s.savesReceived,s.currentKillStreak,
     s.latestAwardSeasonId,s.latestSeasonRank,s.latestSeasonBadgeFlags,s.territoryAchievementCount,s.displayMode];
   b=concatBytes(b,...rest.map(word));
+  if(s.schemaVersion>=2) b=concatBytes(b,word(s.purged?1:0));
   return bytesToHex(keccak256(b));
 }
 function resolveStatus(s){
   if(s.lifeState===3) return 'TERMINAL';
   if(s.lifeState===2) return 'COFFINED';
   if(s.lifeState===1||s.marked) return 'MARKED';
+  if(s.purged) return 'PURGED';
   if(s.witsecApplies) return 'WITSEC';
   if(s.buyerProtected) return 'BUYER_PROTECTED';
   if(s.laidLow) return 'LAY_LOW';
@@ -1336,6 +1342,17 @@ function buildCoffinSVG(s){
       slices.push({y:20+drng.int(56),h:2+drng.int(4),dx:(4+drng.int(7))*(drng.int(2)?1:-1)}); } }
   let defs='<g id="f">'+f+'</g>', body='<rect width="1000" height="1000" fill="'+BLACK+'"/><use href="#f"/>';
   let ci=0; for(const sl of slices){ ++ci; body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
+  // kill crest: the grave keeps what the wraith earned. Drawn after the scars
+  // (history is not shredded) and before the verdict (on a terminal grave the
+  // red X has to stay the loudest thing in the frame). Acid to EXECUTIONER,
+  // white for the last two tiers. Approved as candidate B (Head crest).
+  { const tier=tierForKills(s.kills);
+    if(tier>0){ const cx=50, cy=30, R=9;
+      body+=octFill(cx,cy,R,BLACK);
+      body+=octRing(cx,cy,R,3,ACID);
+      // pitch 2, width 1 — seven pips still clear the ring's inner wall
+      for(let i=0;i<tier;i++) body+=rect(cx-tier+2*i,cy-1,1,2,i>=5?WHITE:ACID);
+    } }
   // the verdict is drawn after the scars — planks and vitals can never be shredded
   if(terminal){
     body+=poly([[40,33],[44,32],[60,79],[56,80]],RED);
@@ -1374,6 +1391,44 @@ function markedOverlay(g,rng){
     o+=poly([[cx+R-3,cy-5],[cx+R-3,cy+5],[cx+R-11,cy]],RED); }
   // warrant strip: purge countdown ticks along the crown edge
   for(let i=0;i<8;i++) o+=rect(33+i*4,2,2,3,RED);
+  return o;
+}
+// PURGED — the warrant was bought out and the wraith lived. Deliberately
+// MARKED's own geometry, undone: the same scope ring in ACID instead of RED,
+// severed at the four cardinal points, chevrons turned outward and corner
+// brackets opening instead of closing. Red is never used here — red belongs to
+// the warrant and to the terminal verdict, and this state is the opposite of
+// both. Approved as candidate A (Warrant cut), Season One art review.
+function purgedOverlay(g,rng){
+  const t=g.traits; let o='';
+  const L=9, cx=t.cx, cy=t.cy-2, R=t.rh+12;
+  // corner brackets, opening outward
+  o+='<path d="M30 '+((3+L)*U)+'V30H'+((3+L)*U)+'M'+(1000-30-L*U)+' 30H970V'+((3+L)*U)
+    +'M970 '+(1000-30-L*U)+'V970H'+(1000-30-L*U)+'M'+((3+L)*U)+' 970H30V'+(1000-30-L*U)
+    +'" fill="none" stroke="'+ACID+'" stroke-width="10"/>';
+  // the scope ring, cut open at four points and capped at every cut end
+  o+=octRing(cx,cy,R,10,ACID);
+  o+=rect(cx-4,cy-R-1,8,3,BLACK);
+  o+=rect(cx-4,cy+R-2,8,3,BLACK);
+  o+=rect(cx-R-1,cy-4,3,8,BLACK);
+  o+=rect(cx+R-2,cy-4,3,8,BLACK);
+  o+=rect(cx-5,cy-R-2,1,4,ACID); o+=rect(cx+4,cy-R-2,1,4,ACID);
+  o+=rect(cx-5,cy+R-2,1,4,ACID); o+=rect(cx+4,cy+R-2,1,4,ACID);
+  o+=rect(cx-R-2,cy-5,4,1,ACID); o+=rect(cx-R-2,cy+4,4,1,ACID);
+  o+=rect(cx+R-2,cy-5,4,1,ACID); o+=rect(cx+R-2,cy+4,4,1,ACID);
+  // chevrons outside the ring, where MARKED's sit inside it. The ring is wider
+  // than the canvas on some heads (so is MARKED's), so each one is clamped to
+  // stay on the canvas — an arrow half outside the frame reads as nothing. The
+  // top cardinal is deliberately left bare: that is where the warrant strip
+  // lives, and the strike through it is the marker that belongs there.
+  const bB=Math.min(99,cy+R+12);
+  const lB=Math.max(1,cx-R-12), rB=Math.min(99,cx+R+12);
+  o+=poly([[cx-4,bB],[cx+4,bB],[cx,bB-6]],ACID);
+  o+=poly([[lB,cy-4],[lB,cy+4],[lB+6,cy]],ACID);
+  o+=poly([[rB,cy-4],[rB,cy+4],[rB-6,cy]],ACID);
+  // the warrant strip itself, struck through
+  for(let i=0;i<8;i++) o+=rect(33+i*4,2,2,3,ACID);
+  o+='<path d="M'+(32*U)+' '+(3.5*U)+'h'+(33*U)+'" stroke="'+WHITE+'" stroke-width="4"/>';
   return o;
 }
 function witsecOverlay(g,rng){
@@ -1482,7 +1537,7 @@ function flickerSVG(s){
 // ---------------------------------------------------------------------------
 // renderSVG — composition per STATE_TO_LAYER_MAP z-order
 // ---------------------------------------------------------------------------
-// PROFILES: 0 CANONICAL_STATIC · 1 ANIMATED · 2 STATS · 3 BANNER.
+// PROFILES: 0 CANONICAL_STATIC · 1 ANIMATED · 2 STATS · 3 BANNER · 4 MARKETPLACE.
 // profile is optional and defaults to ANIMATED, so every existing caller and
 // fixture keeps its exact bytes. Static profiles set ANIM=false for the whole
 // render and always restore it, so one throw can never poison a later call.
@@ -1512,8 +1567,9 @@ function _renderSVG(s){
     else body+=slice('f',ci,sl.y,sl.h,sl.dx,BLACK); }
   // construction intro: the body layers join the 0.25s succession
   let iSeq=g.introSeq||0; const iT=()=>g.introBase+0.25*(++iSeq);
-  // z7: status overlays, precedence MARKED > WITSEC/LAY_LOW/BUYER > HUNTER
+  // z7: status overlays, precedence MARKED > PURGED > WITSEC/LAY_LOW/BUYER > HUNTER
   if(status==='MARKED') body+=reveal(markedOverlay(g,g.rng),iT());
+  else if(status==='PURGED') body+=reveal(purgedOverlay(g,g.rng),iT());
   else if(status==='WITSEC') body+=reveal(witsecOverlay(g,g.rng),iT());
   else if(status==='LAY_LOW') body+=reveal(layLowOverlay(g,g.rng),iT());
   else if(status==='BUYER_PROTECTED') body+=reveal(buyerOverlay(g,g.rng),iT());
@@ -1575,8 +1631,46 @@ function renderBanner(s){
     +'<svg x="0" y="0" width="1000" height="1000" viewBox="0 0 1000 1000">'+inner.replace(/^<svg[^>]*>/,'').replace(/<\/svg>$/,'')+'</svg>'
     +'<path d="M1000 0v1000" stroke="'+ACID+'" stroke-width="3"/></svg>';
 }
+// ---------------------------------------------------------------------------
+// renderPrereveal — what all 666 show between mint and reveal. Takes no state
+// at all, by construction: there is no argument through which a trait could
+// leak. The signal field runs with nothing standing in it, and the collection
+// sigil sits at the crown. Approved as candidate A (Empty field).
+// ---------------------------------------------------------------------------
+function prerevealBody(){
+  let o='<rect width="1000" height="1000" fill="'+BLACK+'"/>';
+  // 48 rows at a 2-unit pitch: one more than a live render, so the drift below
+  // always has a row to bring up from under the bottom edge.
+  let g='';
+  for(let li=0;li<48;li++){ const y=4+li*2;
+    g+='<path d="M0 '+(y*U)+'h1000" fill="none" stroke="'+ACID+'" stroke-width="4"/>'; }
+  // the field drifts by exactly one row pitch, so the loop is seamless. Base
+  // attributes stay the finished art: a non-SMIL renderer sees the still field.
+  o+=ANIM?'<g>'+g+'<animateTransform attributeName="transform" type="translate" values="0 0;0 -'+(2*U)+'" dur="2.4s" repeatCount="indefinite"/></g>':g;
+  // the void where the wraith will stand
+  o+='<rect x="0" y="430" width="1000" height="140" fill="'+BLACK+'"/>';
+  o+=octRing(50,50,14,6,ACID);
+  o+=octRing(50,50,22,2,WHITE);
+  return o;
+}
+function renderPrereveal(profile){
+  const prevAnim=ANIM; ANIM=(profile===1);
+  try{ return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000">'+prerevealBody()+'</svg>'; }
+  finally{ ANIM=prevAnim; }
+}
+function prerevealMetadata(){
+  const still=renderPrereveal(0), moving=renderPrereveal(1);
+  const b64=(x)=>'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(x)));
+  return JSON.stringify({name:'HOODRXCH',description:'Unrevealed. 666 signal wraiths, fully onchain.',
+    image:b64(still),animation_url:b64(moving),
+    attributes:[{trait_type:'Status',value:'UNREVEALED'},{trait_type:'Renderer Version',value:RENDERER_VERSION}]});
+}
 function kdText(s){ if(s.deaths===0) return s.kills===0?'UNTESTED':'UNDEFEATED'; return (Math.floor(s.kills*10/s.deaths)/10).toFixed(1); }
 function renderMetadata(s,profile){
+  // profile 4 MARKETPLACE: the still is the token image and the animation rides
+  // alongside it, so a marketplace that plays motion plays it and one that does
+  // not still shows a finished wraith. Approved, Season One art review.
+  if(profile===4) return _renderMetadata(s,true);
   if(profile!==undefined&&profile!==1){
     const prevAnim=ANIM; ANIM=(profile===1);
     const st=(profile===2)?Object.assign({},s,{displayMode:1}):s;
@@ -1584,10 +1678,15 @@ function renderMetadata(s,profile){
   }
   return _renderMetadata(s);
 }
-function _renderMetadata(s){
+function _renderMetadata(s,withAnimation){
   // _renderSVG, not renderSVG: the public wrapper would reset ANIM to true and
   // the STATIC profile's metadata would silently embed the animated image.
-  const svg=_renderSVG(s); const tier=tierForKills(s.kills);
+  let svg, anim='';
+  if(withAnimation){
+    const prevAnim=ANIM;
+    try{ ANIM=false; svg=_renderSVG(s); ANIM=true; anim=_renderSVG(s); } finally{ ANIM=prevAnim; }
+  } else svg=_renderSVG(s);
+  const tier=tierForKills(s.kills);
   const a=(t,v)=>({trait_type:t,value:v});
   const attrs=[a('Token ID',s.tokenId),a('Ward','WARD 0'+s.wardId),a('Block','BLOCK 0'+s.blockId),a('Art Index',s.artIndex),
     a('Life State',LIFE[s.lifeState]),a('Exposure State',EXPO[s.exposureState]),a('Seals Remaining',s.sealsRemaining),
@@ -1596,12 +1695,15 @@ function _renderMetadata(s){
     a('Lifetime Kill Tier',TIER_NAMES[tier]),a('Latest Season',s.latestAwardSeasonId),a('Latest Season Rank',s.latestSeasonRank),
     a('Season Top 10',(s.latestSeasonBadgeFlags&1)?'YES':'NO'),a('Season Top 5',(s.latestSeasonBadgeFlags&2)?'YES':'NO'),a('Season Award Count',s.seasonAwardCount),
     a('Territory Achievements',s.territoryAchievementCount),a('Current War',s.warId),a('Current Campaign',s.campaignId),a('Current Season',s.seasonId),a('War Phase',PHASES[s.warPhase]||String(s.warPhase)),
-    a('WITSEC Credits',s.witsecCredits),a('WITSEC Applies',s.witsecApplies?'YES':'NO'),a('Lay Low',s.laidLow?'YES':'NO'),a('Buyer Protected',s.buyerProtected?'YES':'NO'),a('Hunter Selected',s.hunterSelected?'YES':'NO'),
+    a('WITSEC Credits',s.witsecCredits),a('WITSEC Applies',s.witsecApplies?'YES':'NO'),a('Lay Low',s.laidLow?'YES':'NO'),a('Buyer Protected',s.buyerProtected?'YES':'NO'),a('Purged',s.purged?'YES':'NO'),a('Hunter Selected',s.hunterSelected?'YES':'NO'),
     a('Marked By Token ID',s.markedByTokenId),a('Purge Deadline',s.purgeDeadline),a('Transfer Locked',s.transferLocked?'YES':'NO'),a('Transfer Lock Expiry',s.transferLockUntil),
     a('Historical State Count',s.historicalStateCount),a('Display Mode',s.displayMode?'STATS':'PLAIN'),a('Canonical Game State',LIFE[s.lifeState]),
     a('Renderer Version',RENDERER_VERSION),a('Render-State Schema Version',SCHEMA_VERSION),a('State Hash',stateHash(s))];
   const tn=traitNames(s); for(const k in tn) attrs.push(a('Genesis '+k[0].toUpperCase()+k.slice(1),tn[k]));
-  return JSON.stringify({name:'HOODRXCH #'+s.tokenId,description:'A persistent onchain HOODRXCH mask. Fully generative, fully onchain.',image:'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg))),attributes:attrs});
+  const o={name:'HOODRXCH #'+s.tokenId,description:'A persistent onchain HOODRXCH mask. Fully generative, fully onchain.',image:'data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(svg)))};
+  if(anim) o.animation_url='data:image/svg+xml;base64,'+btoa(unescape(encodeURIComponent(anim)));
+  o.attributes=attrs;
+  return JSON.stringify(o);
 }
 // ---------------------------------------------------------------------------
 // Workbench UI
